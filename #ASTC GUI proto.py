@@ -1,1 +1,457 @@
+#ASTC GUI proto
+import shutil
+from kivy.app import App
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.textinput import TextInput
+from kivy.uix.button import Button
+from kivy.uix.label import Label
+
+# import openpyxl 
+import string
+import time
+import pandas as pd
+from pandas import ExcelWriter
+import numpy as np
+from openpyxl import load_workbook
+from openpyxl import Workbook
+from openpyxl import cell
+from openpyxl.utils import get_column_letter
+import xlsxwriter
+import matplotlib.pyplot as plot
+from os import listdir, walk
+from os.path import isfile, join
+import tkinter as tk
+from tkinter import *
+from win32com import client
+import win32com.client
+
+# Pulling SLM data function definition
+def write_testdata(self,find_datafile, reportfile, newsheetname):
+    rawDtestpath = self.slm_data_d_path
+    rawEtestpath = self.slm_data_e_path
+    rawReportpath = self.report_output_folder_path
+    D_datafiles = [f for f in listdir(rawDtestpath) if isfile(join(rawDtestpath,f))]
+    E_datafiles = [f for f in listdir(rawEtestpath) if isfile(join(rawEtestpath,f))]
+    excel = win32com.client.Dispatch("Excel.Application")
+    if find_datafile[0] =='D':
+        datafile_num = find_datafile[1:]
+        datafile_num = '-831_Data.'+datafile_num+'.xlsx'
+        slm_found = [x for x in D_datafiles if datafile_num in x]
+        slm_found[0] = rawDtestpath+slm_found[0]# If this line errors, the test file is mislabled or doesn't exist 
+        # print(srs_slm_found)
+    elif find_datafile[0] == 'E':
+        datafile_num = find_datafile[1:]
+        datafile_num = '-831_Data.'+datafile_num+'.xlsx'
+        slm_found = [x for x in E_datafiles if datafile_num in x]
+        slm_found[0] = rawEtestpath+slm_found[0]# If this line errors, the test file is mislabled or doesn't exist 
+
+    print(slm_found[0])
+
+    srs_data = pd.read_excel(slm_found[0],sheet_name='OBA') # data must be in OBA tab
+    with ExcelWriter(
+    rawReportpath+reportfile,
+    mode="a",
+    engine="openpyxl",
+    if_sheet_exists="replace",
+    ) as writer:
+        srs_data.to_excel(writer, sheet_name=newsheetname) #writes to report file
+    time.sleep(1)
+    excel.Quit()
+
+def write_RTtestdata(self, find_datafile, reportfile,newsheetname):
+    rawDtestpath = self.slm_data_d_path
+    rawEtestpath = self.slm_data_e_path
+    rawReportpath = self.report_output_folder_path
+    D_datafiles = [f for f in listdir(rawDtestpath) if isfile(join(rawDtestpath,f))]
+    E_datafiles = [f for f in listdir(rawEtestpath) if isfile(join(rawEtestpath,f))]
+    excel = win32com.client.Dispatch("Excel.Application")
+    if find_datafile[0] =='D':
+        datafile_num = find_datafile[1:]
+        datafile_num = '-RT_Data.'+datafile_num+'.xlsx'
+        slm_found = [x for x in D_datafiles if datafile_num in x]
+        slm_found[0] = rawDtestpath+slm_found[0]# If this line errors, the test file is mislabled or doesn't exist 
+        # print(srs_slm_found)
+    elif find_datafile[0] == 'E':
+        datafile_num = find_datafile[1:]
+        datafile_num = '-RT_Data.'+datafile_num+'.xlsx'
+        slm_found = [x for x in E_datafiles if datafile_num in x]
+        slm_found[0] = rawEtestpath+slm_found[0] # If this line errors, the test file is mislabled or doesn't exist 
+
+    print(slm_found[0])
+
+    srs_data = pd.read_excel(slm_found[0],sheet_name='Summary')
+    # data must be in Summary tab for RT meas.
+    # could reduce this function by also passing the sheet to be read into the args.
+    with ExcelWriter(
+    rawReportpath+reportfile,
+    mode="a",
+    engine="openpyxl",
+    if_sheet_exists="replace",
+    ) as writer:
+        srs_data.to_excel(writer, sheet_name=newsheetname) 
+    time.sleep(1)
+    excel.Quit()
+
+    
+def sanitize_filepath(filepath):
+    ##"""Sanitize a file path by replacing forward slashes with backslashes."""
+    filepath = filepath.replace('T:', '//DLA-04/Shared/')
+    filepath = filepath.replace('\\','/')
+    # need to add a line to append a / at the end of the filename
+    return filepath
+################ ## # # ###############
+    # End of function section #
+#######################################
+
+#### THIS LIBRARY IMPORT NEEDS TO REMAIN HERE- Otherwise kivy errors result. 
+from kivy.app import App
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.textinput import TextInput
+from kivy.uix.button import Button
+from kivy.uix.label import Label
+from kivy.uix.checkbox import CheckBox
+from kivy.uix.recycleview import RecycleView
+from kivy.uix.label import Label
+from kivy.uix.popup import Popup
+from kivy.uix.gridlayout import GridLayout
+
+# GPT code - kivy GUI 
+class FileLoaderApp(App):
+    def build(self):
+        # Initialize path variables as instance variables
+        self.test_plan_path = ''
+        self.report_template_path = ''
+        self.slm_data_d_path = ''
+        self.slm_data_e_path = ''
+        self.report_output_folder_path = ''
+
+        # Layout
+        layout = BoxLayout(orientation='vertical', spacing=10, padding=10)
+        # put use description on the top of the window. 
+        # ie - need to have excel closed before running
+        # format of folders to output to - change this eventually for the program to
+        # modifiy the folder structure itself. rev 2 - plot of STC vals, removing excel, ect
+        # Label for the first text entry box
+        layout.add_widget(Label(text='Test Plan path and filename:'))
+
+        # Text Entry Boxes
+        self.first_text_input = TextInput(multiline=False, hint_text='File Path 1')
+        self.first_text_input.bind(on_text_validate=self.on_text_validate)
+        layout.add_widget(self.first_text_input)
+        
+        # Label for the second text entry box
+        layout.add_widget(Label(text='Excel Report Template Path, will be PDF report export folder:'))
+
+        # Text Entry Box for the second path
+        self.second_text_input = TextInput(multiline=False, hint_text='File Path 2')
+        self.second_text_input.bind(on_text_validate=self.on_text_validate)
+        layout.add_widget(self.second_text_input)
+
+        # Label for the third text entry box
+        layout.add_widget(Label(text='SLM Data D'))
+
+        # Text Entry Box for the third path
+        self.third_text_input = TextInput(multiline=False, hint_text='File Path 3')
+        self.third_text_input.bind(on_text_validate=self.on_text_validate)
+        layout.add_widget(self.third_text_input)
+
+        # Label for the fourth text entry box
+        layout.add_widget(Label(text='SLM Data E'))
+
+        # Text Entry Box for the fourth path
+        self.fourth_text_input = TextInput(multiline=False, hint_text='File Path 4')
+        self.fourth_text_input.bind(on_text_validate=self.on_text_validate)
+        layout.add_widget(self.fourth_text_input)
+
+        # Label for the fifth text entry box
+        layout.add_widget(Label(text='Excel Report per test Output Folder path: '))
+
+        # Text Entry Box for the fifth path
+        self.fifth_text_input = TextInput(multiline=False, hint_text='File Path 5')
+        self.fifth_text_input.bind(on_text_validate=self.on_text_validate)
+        layout.add_widget(self.fifth_text_input)
+
+        # CheckBox for AIIC Testing
+        self.aiic_testing_checkbox = CheckBox(active=False, size_hint=(None, None))
+        self.aiic_testing_checkbox.bind(active=self.on_aiic_testing_checkbox_active)
+        layout.add_widget(Label(text='AIIC Testing'))
+        layout.add_widget(self.aiic_testing_checkbox)
+
+        # Load Data Button
+        load_button = Button(text='Load Data', on_press=self.load_data)
+        layout.add_widget(load_button)
+
+        # Output Reports Button
+        output_button = Button(text='Output Reports', on_press=self.output_reports)
+        layout.add_widget(output_button)
+
+        # Status Text Box
+        self.status_label = Label(text='Status: Ready')
+        layout.add_widget(self.status_label)
+
+        return layout
+
+    def on_text_validate(self, instance):
+        # Check if the widget is a TextInput before updating instance variables
+        if isinstance(instance, TextInput):
+            # Update instance variables with the entered text
+            if instance is self.first_text_input:
+                self.test_plan_path = sanitize_filepath(instance.text)
+                instance.text = self.test_plan_path
+            elif instance is self.second_text_input:
+                self.report_template_path = sanitize_filepath(instance.text)
+                instance.text = self.report_template_path
+            elif instance is self.third_text_input:
+                self.slm_data_d_path = sanitize_filepath(instance.text)
+                instance.text = self.slm_data_d_path
+            elif instance is self.fourth_text_input:
+                self.slm_data_e_path = sanitize_filepath(instance.text)
+                instance.text = self.slm_data_e_path
+            elif instance is self.fifth_text_input:
+                self.report_output_folder_path = sanitize_filepath(instance.text)
+                instance.text = self.report_output_folder_path
+
+    def on_aiic_testing_checkbox_active(self, instance, value):
+        # Handle checkbox state change
+        if value:
+            print("AIIC Testing Enabled")
+            # You can assign values to curr_test here or add logic based on checkbox state
+        else:
+            print("AIIC Testing Disabled")
+
+    def load_data(self, instance):
+        # # Access the text from all text boxes
+
+        first_text_input_value = sanitize_filepath(self.first_text_input.text)
+        second_text_input_value = sanitize_filepath(self.second_text_input.text)
+        third_text_input_value = sanitize_filepath(self.third_text_input.text)
+        fourth_text_input_value = sanitize_filepath(self.fourth_text_input.text)
+        fifth_text_input_value = sanitize_filepath(self.fifth_text_input.text)
+
+        # first_text_input_value = self.test_plan_path
+        # second_text_input_value = self.report_template_path
+        # third_text_input_value = self.slm_data_d_path
+        # fourth_text_input_value = self.slm_data_e_path
+        # fifth_text_input_value = self.report_output_folder_path
+
+        self.test_plan_path = first_text_input_value
+        self.report_template_path = second_text_input_value
+        self.slm_data_d_path = third_text_input_value
+        self.slm_data_e_path = fourth_text_input_value
+        self.report_output_folder_path = fifth_text_input_value
+
+            # Update instance variables with the text from the text input boxes
+
+        print('Value from the first text box:', first_text_input_value)
+        print('Value from the second text box:', second_text_input_value)
+        print('Value from the third text box:', third_text_input_value)
+        print('Value from the fourth text box:', fourth_text_input_value)
+        print('Value from the fifth text box:', fifth_text_input_value)
+
+        # Display a message in the status label
+        self.status_label.text = 'Status: Loading Data...'
+        # Add logic to load data from file paths
+        print('Arguments received by load_data:', instance, self.test_plan_path, self.report_template_path, self.slm_data_d_path, self.slm_data_e_path, self.report_output_folder_path)
+
+        # For demonstration purposes, let's just print the file paths
+        print('File Paths:', [first_text_input_value, second_text_input_value, third_text_input_value,
+                              fourth_text_input_value, fifth_text_input_value])
+                # Access the text from all text boxes
+        testplan_path = self.test_plan_path
+        rawReportpath = self.report_template_path
+        rawDtestpath = self.slm_data_d_path
+        rawEtestpath = self.slm_data_e_path
+        outputfolder = self.report_output_folder_path
+
+        self.D_datafiles = [f for f in listdir(rawDtestpath) if isfile(join(rawDtestpath,f))]
+        self.E_datafiles = [f for f in listdir(rawEtestpath) if isfile(join(rawEtestpath,f))]
+        self.test_list = pd.read_excel(testplan_path)
+        testnums = self.test_list['Test Label'] ## Determines the labels and number of excel files copied
+        project_name =  self.test_list['Project Name'] # need to access a cell within template the project name to copy to final reports
+        project_name = project_name.iloc[1]
+        reports =  [f for f in listdir(rawReportpath) if isfile(join(rawReportpath,f))]
+        # Display a message in the status label
+        self.status_label.text = 'Status: Generating Reports...'
+        self.status_label.text = 'Status: Copying Excel template per testplan...'
+        # for i in range(len(testnums)):
+            # shutil.copy(rawReportpath+reports[0], outputfolder+'23-154 ASTC-NIC Test Report_'+testnums[i]+'_.xlsx')
+        # Add logic to generate reports
+        for index, testnum in enumerate(testnums):
+            shutil.copy(rawReportpath + reports[0], outputfolder + f'23-154 ASTC-NIC Test Report_{testnum}_.xlsx')    
+        
+        self.status_label.text = 'Status: Data Loaded'
+
+    def output_reports(self, instance):
+        testplan_path = self.test_plan_path
+        rawReportpath = self.report_output_folder_path
+
+        test_list = pd.read_excel(testplan_path)
+        print('Test list:',test_list)
+        testnums = test_list['Test Label'] ## Determines the labels and number of excel files copied
+        project_name =  test_list['Project Name'] # need to access a cell within template the project name to copy to final reports
+        project_name =  test_list['Project Name'] # need to access a cell within template the project name to copy to final reports
+        project_name = project_name.iloc[1]
+        
+        reports =  [f for f in listdir(rawReportpath) if isfile(join(rawReportpath,f))]
+
+        # Main loop through all test data
+        for i in range(len(testnums)):
+            # list entry with all test data
+            curr_test = test_list.iloc[i]
+            print('Current Test:', curr_test)
+            aiic_testing_enabled = self.aiic_testing_checkbox.active
+            find_report = curr_test['Test Label'] # using the test entry to find the report file name
+            report_string = '_'+find_report+'_' 
+            print('Report string: ', report_string)
+            print('Report list: ', reports)
+            curr_report_file = [x for x in reports if report_string in x]
+            print('Current report file: ',curr_report_file)
+            print(curr_report_file[0]) #print the name of the report file being used
+            if aiic_testing_enabled:
+                print("AIIC testing enabled, copying data...")
+        ### IIC variables  #### When extending to IIC data
+                find_posOne = curr_test['Position1']
+                find_posTwo = curr_test['Position2']
+                find_posThree = curr_test['Position3']
+                find_posFour = curr_test['Position4']
+                find_poscarpet = curr_test['Carpet']
+                find_Tapsrs = curr_test['SourceTap']
+
+                write_testdata(self,find_source,curr_report_file[0],'ASTC Source')
+                write_testdata(self,find_rec,curr_report_file[0],'ASTC Receive')
+                write_testdata(self,find_BNL,curr_report_file[0],'BNL')
+                write_RTtestdata(self,find_RT,curr_report_file[0],'RT')
+                write_testdata(self,find_posOne,curr_report_file[0],'AIIC POS 1')
+                write_testdata(self,find_posTwo,curr_report_file[0],'AIIC POS 2')
+                write_testdata(self,find_posThree,curr_report_file[0],'AIIC POS 3')
+                write_testdata(self,find_posFour,curr_report_file[0],'AIIC POS 4')
+                write_testdata(self,find_poscarpet,curr_report_file[0],'AIIC CARPET')
+                write_testdata(self,find_Tapsrs,curr_report_file[0],'AIIC Source')
+            else:
+                print("AIIC data not enabled")
+
+            ## ASTC variables - test file numbers 
+            find_source = curr_test['Source']
+            find_rec = curr_test['Recieve ']
+            find_BNL = curr_test['BNL']
+            find_RT = curr_test['RT']
+            
+            write_testdata(self,find_source,curr_report_file[0],'ASTC Source')
+            write_testdata(self,find_rec,curr_report_file[0],'ASTC Receive')
+            write_testdata(self,find_BNL,curr_report_file[0],'BNL')
+            write_RTtestdata(self,find_RT,curr_report_file[0],'RT')
+
+
+            raw_report = rawReportpath+curr_report_file[0]
+        
+            #### write room dimensions ####
+            
+            srs_roomName = curr_test['Source Room']
+            rec_roomName = curr_test['Receiving Room']
+            testdate = curr_test['Test Date'] 
+            reportdate = curr_test['Report Date']
+            source_vol = curr_test['source room vol']
+            rec_vol = curr_test['receive room vol']
+            partition_area = curr_test['partition area']
+            partition_dim = curr_test['partition dim']
+            source_rm_finish = curr_test['source room finish']
+            rec_rm_finish = curr_test['receive room finish']
+            srs_floor_descrip = curr_test['srs_floor']
+            srs_ceiling_descrip = curr_test['srs_ceiling']
+            srs_walls_descrip = curr_test['srs_Walls']
+            rec_floor_descrip = curr_test['rec_floor']
+            rec_ceiling_descrip = curr_test['rec_ceiling']
+            rec_walls_descrip = curr_test['rec_Wall']
+            tested_assem = curr_test['tested assembly']
+            expected_perf = curr_test['expected performance']
+            annex_two = curr_test['Annex 2 used?']
+            test_assem_type = curr_test['Test assembly Type']
+
+            if int(source_vol) >= 5300 or int(rec_vol) >= 5300:
+                NICreporting_Note = 'The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver and/or source room was greater than the maximum allowed per E336-16, Paragraph 9.4.1.2.'
+            elif int(source_vol) <= 833 or int(rec_vol) <= 833:
+                NICreporting_Note = 'The receiver and/or source room has a volume less than the minimum volume requirement of 25 m3 (883 cu. ft.).'
+            else:
+                NICreporting_Note = '---'
+
+
+            # append all this data or write individully to a dataframe, then save as new sheet
+            # refer to this sheet with the SLM Data sheet to propigate to report.
+            room_properties = pd.DataFrame(
+                {
+                    "Source Room Name": srs_roomName,
+                    "Recieve Room Name": rec_roomName,
+                    "Testdate": testdate,
+                    "ReportDate": reportdate,
+                    "Test number": find_report,
+                    "Source Vol" : source_vol,
+                    "Recieve Vol": rec_vol,
+                    "Partition area": partition_area,
+                    "Partition dim.": partition_dim,
+                    "Source room Finish" : source_rm_finish,
+                    "Recieve room Finish": rec_rm_finish,
+                    "Srs Floor Descrip.": srs_floor_descrip,
+                    "Srs Ceiling Descrip.": srs_ceiling_descrip,
+                    "Srs Walls Descrip.": srs_walls_descrip,
+                    "Rec Floor Descrip.": rec_floor_descrip,
+                    "Rec Ceiling Descrip.": rec_ceiling_descrip,
+                    "Rec Walls Descrip.": rec_walls_descrip,          
+                    "Tested Assembly": tested_assem,
+                    "Expected Performance": expected_perf,
+                    "Annex 2 used?": annex_two,
+                    "Test assem. type": test_assem_type,
+                    "NIC reporting Note": NICreporting_Note
+                },
+                index=[0]
+            )
+            excel = client.Dispatch("Excel.Application")
+            #### write this all to a proper reference template. ###
+            with ExcelWriter(
+            raw_report,
+            mode="a",
+            engine="openpyxl",
+            if_sheet_exists="replace",
+            ) as writer:
+                room_properties.to_excel(writer, sheet_name='room_properties') 
+            
+            time.sleep(1)
+            excel.Quit()
+            print("pausing for excel...")
+            time.sleep(3)
+            #### open excel file and write the reports to PDF ###
+            # lol wil output wherever the file explorer in VS is currently. Probably should fix this. 
+        
+            # Open/Read Excel File
+            sheets = excel.Workbooks.Open(raw_report)
+            print("writing to report file:")
+            print(raw_report)
+            ## need logic here to determine if NIC or ASTC, and report one or the other 
+            if curr_test['NIC'] == 1 and curr_test['ASTC'] == 1:
+                NIC_report = sheets.Worksheets[5]
+            # needs to be closed and unique file name to work. 
+            # Converting into PDF File
+                NIC_report.ExportAsFixedFormat(0, project_name+report_string+'NIC_report.pdf')  # saves the NIC report workbook as PDF. 
+                ASTC_report = sheets.Worksheets[6] # saves the ASTC report workbook.
+
+                ASTC_report.ExportAsFixedFormat(0, project_name+report_string+'ASTC_report.pdf')  # saves the ASTC report workbook as PDF. 
+                # sheets.Save()
+            elif curr_test['ASTC'] == 1:
+                ASTC_report = sheets.Worksheets[6] # saves the ASTC report workbook.
+                # sheets.Save()
+                ASTC_report.ExportAsFixedFormat(0, project_name+report_string+'ASTC_report.pdf')  # saves the ASTC report workbook as PDF. 
+            elif curr_test['NIC'] == 1:
+                NIC_report = sheets.Worksheets[5]
+                # sheets.Save()
+            # needs to be closed and unique file name to work. 
+            # Converting into PDF File
+                NIC_report.ExportAsFixedFormat(0, project_name+report_string+'NIC_report.pdf')  # saves the NIC report workbook as PDF. 
+            # sheets.Save()
+            sheets.Close()
+            excel.Quit()
+        
+        print('Generating Reports...')
+        self.status_label.text = 'Status: Reports Generated'
+
+if __name__ == '__main__':
+    FileLoaderApp().run()
 
