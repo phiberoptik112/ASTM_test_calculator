@@ -8,6 +8,7 @@ from openpyxl import Workbook
 from openpyxl import cell
 from openpyxl.utils import get_column_letter
 import xlsxwriter
+import time
 
 def sanitize_filepath(filepath):
     ##"""Sanitize a file path by replacing forward slashes with backslashes."""
@@ -19,39 +20,91 @@ def sanitize_filepath(filepath):
 #### ADDITION TO MAKE IT METER LETTER AGNOSTIC - METER 1 and 2 #### STILL NEED TO DO THIS
 
 # writing meter data to report file function definition
-def write_testdata(self,find_datafile, reportfile, newsheetname):
-    rawDtestpath = self.slm_data_d_path
-    rawEtestpath = self.slm_data_e_path
-    rawAtestpath = self.slm_data_e_path
-    rawReportpath = self.report_output_folder_path
-    D_datafiles = [f for f in listdir(rawDtestpath) if isfile(join(rawDtestpath,f))]
-    E_datafiles = [f for f in listdir(rawEtestpath) if isfile(join(rawEtestpath,f))]
-    E_datafiles = [f for f in listdir(rawEtestpath) if isfile(join(rawEtestpath,f))]
+# def write_testdata(self,find_datafile, reportfile, newsheetname):
+#     rawDtestpath = self.slm_data_d_path
+#     rawEtestpath = self.slm_data_e_path
+#     rawAtestpath = self.slm_data_e_path
+#     rawReportpath = self.report_output_folder_path
+#     D_datafiles = [f for f in listdir(rawDtestpath) if isfile(join(rawDtestpath,f))]
+#     E_datafiles = [f for f in listdir(rawEtestpath) if isfile(join(rawEtestpath,f))]
+#     E_datafiles = [f for f in listdir(rawEtestpath) if isfile(join(rawEtestpath,f))]
 
-    if find_datafile[0] =='A': ## REPLACE WITH METER 1 - NEED TO DEFINE IN TESTPLAN ##
-        datafile_num = find_datafile[1:]
-        datafile_num = '-831_Data.'+datafile_num+'.xlsx'
-        slm_found = [x for x in A_datafiles if datafile_num in x]
-        slm_found[0] = rawAtestpath+slm_found[0]# If this line errors, the test file is mislabled or doesn't exist 
-        # print(srs_slm_found)
-    elif find_datafile[0] == 'E':
-        datafile_num = find_datafile[1:]
-        datafile_num = '-831_Data.'+datafile_num+'.xlsx'
-        slm_found = [x for x in E_datafiles if datafile_num in x]
-        slm_found[0] = rawEtestpath+slm_found[0]# If this line errors, the test file is mislabled or doesn't exist 
+#     if find_datafile[0] =='A': ## REPLACE WITH METER 1 - NEED TO DEFINE IN TESTPLAN ##
+#         datafile_num = find_datafile[1:]
+#         datafile_num = '-831_Data.'+datafile_num+'.xlsx'
+#         slm_found = [x for x in A_datafiles if datafile_num in x]
+#         slm_found[0] = rawAtestpath+slm_found[0]# If this line errors, the test file is mislabled or doesn't exist 
+#         # print(srs_slm_found)
+#     elif find_datafile[0] == 'E':
+#         datafile_num = find_datafile[1:]
+#         datafile_num = '-831_Data.'+datafile_num+'.xlsx'
+#         slm_found = [x for x in E_datafiles if datafile_num in x]
+#         slm_found[0] = rawEtestpath+slm_found[0]# If this line errors, the test file is mislabled or doesn't exist 
+
+#     print(slm_found[0])
+
+#     srs_data = pd.read_excel(slm_found[0],sheet_name='OBA') # data must be in OBA tab
+#     with ExcelWriter(
+#     rawReportpath+reportfile,
+#     mode="a",
+#     engine="openpyxl",
+#     if_sheet_exists="replace",
+#     ) as writer:
+#         srs_data.to_excel(writer, sheet_name=newsheetname) #writes to report file
+#     time.sleep(1)
+
+
+
+    
+def write_testdata(self, find_datafile):
+    raw_testpaths = {
+        'D': self.slm_data_d_path,
+        'E': self.slm_data_e_path,
+        'A': self.slm_data_a_path
+    }
+    datafiles = {}
+    for key, path in raw_testpaths.items():
+        datafiles[key] = [f for f in listdir(path) if isfile(join(path, f))]
+
+    if find_datafile[0] in datafiles:
+        datafile_num = '-831_Data.' + find_datafile[1:] + '.xlsx'
+        slm_found = [x for x in datafiles[find_datafile[0]] if datafile_num in x]
+        slm_found[0] = raw_testpaths[find_datafile[0]] + slm_found[0]  # If this line errors, the test file is mislabeled or doesn't exist 
 
     print(slm_found[0])
 
-    srs_data = pd.read_excel(slm_found[0],sheet_name='OBA') # data must be in OBA tab
-    with ExcelWriter(
-    rawReportpath+reportfile,
-    mode="a",
-    engine="openpyxl",
-    if_sheet_exists="replace",
-    ) as writer:
-        srs_data.to_excel(writer, sheet_name=newsheetname) #writes to report file
-    time.sleep(1)
-    # excel.Quit()
+    srs_data = pd.read_excel(slm_found[0], sheet_name='OBA')  # data must be in OBA tab
+
+    # this function needs to be passed an indicator for which test type this is, so that the correct database variable can be used
+
+
+
+
+#### database has raw OBA datasheet, needs to be cleaned for plotting
+OBAdatasheet = 'OBA'
+RTsummarysheet = 'Summary'
+freqbands = ['63','125','250','500','1000','2000','4000','8000']
+srs_OBAdata = pd.read_excel(srs_slm_file[0],OBAdatasheet)
+recive_OBAdata = pd.read_excel(receive_slm_file[0],OBAdatasheet)
+bkgrd_OBAdata = pd.read_excel(bkgrnd_slm_file[0],OBAdatasheet)
+rt = pd.read_excel(rt_slm_file[0],RTsummarysheet)
+
+transposed_srsOBAdata = srs_OBAdata.transpose()
+srs_OBAdata = srs_OBAdata.dropna()
+
+# Get the first row of variables as the new column names
+new_column_names = transposed_srsOBAdata.iloc[0]
+
+# Rename the columns of transposed_srsOBAdata
+transposed_srsOBAdata = transposed_srsOBAdata.rename(columns=new_column_names)
+
+# Remove the first row (variable labels)
+transposed_srsOBAdata = transposed_srsOBAdata[1:]
+onethird_srs = srs_OBAdata[6:10]
+onethird_rec = recive_OBAdata[6:10]
+onethird_bkgrd = bkgrd_OBAdata[6:10]
+
+
 
 def write_RTtestdata(find_datafile, reportfile,newsheetname):
     rawDtestpath = self.slm_data_d_path
@@ -75,6 +128,8 @@ def write_RTtestdata(find_datafile, reportfile,newsheetname):
 
     srs_data = pd.read_excel(slm_found[0],sheet_name='Summary')# data must be in Summary tab for RT meas.
     # could reduce this function by also passing the sheet to be read into the args. 
+    # transfer to either master Pandas database or SQL database
+
     with ExcelWriter(
     rawReportpath+reportfile,
     mode="a",
@@ -85,6 +140,188 @@ def write_RTtestdata(find_datafile, reportfile,newsheetname):
     time.sleep(1)
     # excel.Quit()
 
+def calc_ATL_val(srs_overalloct,rec_overalloct,bkgrnd_overalloct,rt_thirty,parition_area,recieve_roomvol,ASTC_vollimit):
+    ASTC_vollimit = 883
+    if recieve_roomvol > ASTC_vollimit:
+        print('Using NIC calc, room volume too large')
+    constant = np.int32(20.047*np.sqrt(273.15+20))
+    intermed = 30/rt_thirty
+    thisval = np.int32(recieve_roomvol*intermed)
+    sabines =thisval/constant
+    sabines = np.round(sabines*(0.921))
+    recieve_corr = list()
+    recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
+    for i, val in enumerate(recieve_vsBkgrnd):
+        if val < 5:
+            recieve_corr.append(rec_overalloct.iloc[i]-2)
+        elif val < 10:
+            recieve_corr.append(np.log10(10**(rec_overalloct.iloc[i]/10)-10**(bkgrnd_overalloct.iloc[i]/10)))
+        else:
+            recieve_corr.append(rec_overalloct.iloc[i])
+    recieve_corr = np.round(recieve_corr,1)
+    ATL_val = srs_overalloct - recieve_corr+10*(np.log10(parition_area/sabines))
+    return ATL_val
+
+## UNTESTED, needs validating 
+def calc_AIIC_val(ATL_val):
+    pos_diffs = list()
+    diff_negative = 0
+    diff_positive = 0
+    AIIC_start = 0
+    New_curve = list()
+    new_sum = 0
+    IIC_curve = [2,2,2,2,2,2,2,1,-110,-1,-2,-3,-6,-9,-12,-15,-18]
+    while (diff_negative < 8 and new_sum < 32):
+        # print('starting loop')
+        print('AIIC fit test value: ', AIIC_start)
+        for vals in STCCurve:
+            New_curve.append(vals+AIIC_start)
+        IIC_curve = New_curve - ATL_val
+        # print('ASTC curve: ',ASTC_curve)
+
+        diff_negative =  np.max(IIC_curve - ATL_val)
+        print('Max, single diff: ', diff_negative)
+        for val in IIC_curve:
+            if val > 0:
+                pos_diffs.append(np.round(val))
+            else:
+                pos_diffs.append(0)
+        # print(pos_diffs)
+        new_sum = np.sum(pos_diffs)
+        print('Sum Positive diffs: ', new_sum)
+        # AIIC_curve_fitplotter(IIC_curve,New_curve)
+        if new_sum > 32 or diff_negative > 8:
+            print('Curve too high! AIIC fit: ', AIIC_start-1)
+            print('Result for test: ', find_test) 
+            print('-=-=-=-=-=-=-=-=-')
+            break 
+        pos_diffs = []
+        New_curve = []
+        AIIC_start = AIIC_start + 1
+        if AIIC_start >80: break
+
+def calc_ASTC_val(ATL_val):
+    pos_diffs = list()
+    diff_negative=0
+    diff_positive=0 
+    ASTC_start = 20
+    New_curve =list()
+    new_sum = 0
+    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
+    while (diff_negative < 8 and new_sum < 32):
+        # print('starting loop')
+        print('ASTC fit test value: ', ASTC_start)
+        for vals in STCCurve:
+            New_curve.append(vals+ASTC_start)
+        ASTC_curve = New_curve - ATL_val
+        # print('ASTC curve: ',ASTC_curve)
+
+        diff_negative =  np.max(ASTC_curve - ATL_val)
+        print('Max, single diff: ', diff_negative)
+        for val in ASTC_curve:
+            if val > 0:
+                pos_diffs.append(np.round(val))
+            else:
+                pos_diffs.append(0)
+        # print(pos_diffs)
+        new_sum = np.sum(pos_diffs)
+        print('Sum Positive diffs: ', new_sum)
+        
+        if new_sum > 32 or diff_negative > 8:
+            print('Curve too high! ASTC fit: ', ASTC_start-1) 
+            return ASTC_start-1
+            break
+        pos_diffs = []
+        New_curve = []
+        ASTC_start = ASTC_start + 1
+        
+        
+        if ASTC_start >80: break
+
+# need to write a big overall wrapper function here that will go through the testplan, depending on what test type, pull the data from each excel file, write the data to the database variables for that test and then use those database variables to plot the data in the report.
+# for each testplan entry, first write the room properties database: 
+# Organize the variables into a dictionary
+
+# Kaulu by gentry testing ## EXAMPLE DATA CREATE LOOP FOR EACH TESTPLAN ENTRY
+testplan_path ='//DLA-04/Shared/KAILUA PROJECTS/2024/24-004 Kaulu by Gentry ASTC - AIIC testing/Documents/TestPlan_Kaulu_ASTM_testingv1.xlsx'
+
+
+test_list = pd.read_excel(testplan_path)
+testnums = test_list['Test Label']
+
+
+srs_roomName = curr_test['Source Room']
+rec_roomName = curr_test['Receiving Room']
+testdate = curr_test['Test Date'] 
+reportdate = curr_test['Report Date']
+source_vol = curr_test['source room vol']
+rec_vol = curr_test['receive room vol']
+partition_area = curr_test['partition area']
+partition_dim = curr_test['partition dim']
+source_rm_finish = curr_test['source room finish']
+rec_rm_finish = curr_test['receive room finish']
+srs_floor_descrip = curr_test['srs_floor']
+srs_ceiling_descrip = curr_test['srs_ceiling']
+srs_walls_descrip = curr_test['srs_Walls']
+rec_floor_descrip = curr_test['rec_floor']
+rec_ceiling_descrip = curr_test['rec_ceiling']
+rec_walls_descrip = curr_test['rec_Wall']
+tested_assem = curr_test['tested assembly']
+expected_perf = curr_test['expected performance']
+annex_two = curr_test['Annex 2 used?']
+test_assem_type = curr_test['Test assembly Type']
+
+room_properties = pd.DataFrame(
+    {
+        "Source Room Name": srs_roomName,
+        "Recieve Room Name": rec_roomName,
+        "Testdate": testdate,
+        "ReportDate": reportdate,
+        "Test number": find_report,
+        "Source Vol" : source_vol,
+        "Recieve Vol": rec_vol,
+        "Partition area": partition_area,
+        "Partition dim.": partition_dim,
+        "Source room Finish" : source_rm_finish,
+        "Recieve room Finish": rec_rm_finish,
+        "Srs Floor Descrip.": srs_floor_descrip,
+        "Srs Ceiling Descrip.": srs_ceiling_descrip,
+        "Srs Walls Descrip.": srs_walls_descrip,
+        "Rec Floor Descrip.": rec_floor_descrip,
+        "Rec Ceiling Descrip.": rec_ceiling_descrip,
+        "Rec Walls Descrip.": rec_walls_descrip,          
+        "Tested Assembly": tested_assem,
+        "Expected Performance": expected_perf,
+        "Annex 2 used?": annex_two,
+        "Test assem. type": test_assem_type,
+        "NIC reporting Note": NICreporting_Note
+    },
+    index=[0]
+)
+
+# ## UNTESTED, needs validating
+single_AIICtest_data = {
+    'srs_data': pd.DataFrame(srs_data),
+    'recive_data': pd.DataFrame(recive_data),
+    'bkgrnd_data': pd.DataFrame(bkgrnd_data),
+    'rt': pd.DataFrame(rt),
+    'AIIC_pos1': pd.DataFrame(AIIC_pos1),
+    'AIIC_pos2': pd.DataFrame(AIIC_pos2),
+    'AIIC_pos3': pd.DataFrame(AIIC_pos3),
+    'AIIC_pos4': pd.DataFrame(AIIC_pos4),
+    'AIIC_source': pd.DataFrame(AIIC_source),
+    'AIIC_carpet': pd.DataFrame(AIIC_carpet),
+    'room_properties': pd.DataFrame(room_properties)
+}
+
+# ## UNTESTED, needs validating
+single_ASTCtest_data = {
+    'srs_data': pd.DataFrame(srs_data),
+    'recive_data': pd.DataFrame(recive_data),
+    'bkgrnd_data': pd.DataFrame(bkgrnd_data),
+    'rt': pd.DataFrame(rt),
+    'room_properties': pd.DataFrame(room_properties)
+}
 # _=-=-=-=--=-=-=-_+_=-=-=-=-=-=-_+_=-=-=-=-=-= Text lookups for report print -=-=-=-=-=-=-=- 
 
 stockNIC_note = ["The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver and/or source room was greater than the maximum allowed per E336-16, Paragraph 9.4.1.2.",
@@ -243,10 +480,13 @@ statement_test_results_text =' STATEMENT OF TEST RESULTS: '
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
-from reportlab.lib.units import inch
-from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame, Paragraph, Table, TableStyle, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame, Paragraph, Table, TableStyle, Spacer,PageBreak, KeepInFrame
+from reportlab.pdfgen import canvas
 
+from reportlab.lib.units import inch
+
+#### temp variables for testing - will be an import function from the testplan
 source_room_name = "2nd Floor Bed 3"
 rec_roomName = "1st Floor Bed 3"
 sitename = "Ka'ulu by Gentry"
@@ -269,125 +509,212 @@ receiver_rm_finish = 'unfinished'
 receiver_rm_ceiling = 'gyp'
 test_assem_type = 'Floor-ceiling' ## will change AIIC vs ASTC
 receiver_room_name = '1st floor great room/kitchen'
+
+######## =--=-=-=--= 
 ### custom margins
 # Specify custom margins (in points, where 1 inch equals 72 points)
-left_margin = 0.75 * 72  # 0.75 inches
-right_margin = 0.75 * 72  # 0.75 inches
-top_margin = 1 * 72  # 1 inch
+left_margin = right_margin = 0.75 * 72  # 0.75 inches
+top_margin = 0.25 * 72 # 0.25 inch
 bottom_margin = 1 * 72  # 1 inch
+header_height = 2 * inch
+footer_height = 0.5 * inch
+main_content_height = letter[1] - top_margin - bottom_margin - header_height - footer_height
+
+# # Create a document with custom page templates
+# doc = BaseDocTemplate("report_with_header.pdf", pagesize=letter)
+
+#### -=-=--=-= 
+
+# Document Setup new 
+doc = BaseDocTemplate("report_with_header_footer.pdf", pagesize=letter,
+                      leftMargin=left_margin, rightMargin=right_margin,
+                      topMargin=top_margin, bottomMargin=bottom_margin)
 
 
-# Function to create PDF report
-def create_pdf_report(file_name, left_data, right_data, client_data):
-    doc = SimpleDocTemplate(file_name, pagesize=letter,
-    leftMargin=left_margin,
-    rightMargin=right_margin,
-    topMargin=top_margin,
-    bottomMargin=bottom_margin)
+
+# Define Frames for the header, main content, and footer
+header_frame = Frame(left_margin, letter[1] - top_margin - header_height, letter[0] - 2 * left_margin, header_height, id='header')
+main_frame = Frame(left_margin, bottom_margin + footer_height, letter[0] - 2 * left_margin, letter[1] - top_margin - header_height - footer_height - bottom_margin, id='main')
+footer_frame = Frame(left_margin, bottom_margin, letter[0] - 2 * left_margin, footer_height, id='footer')
+
+
+
+
+# Create styles
+styles = getSampleStyleSheet()
+custom_title_style = styles['Heading1']
+
+
+#     canvas.saveState()
+#     canvas.setFont('Helvetica', 10)
+#     canvas.drawCentredString(letter[0] / 2, letter[1] - top_margin - header_height / 2, "Field Impact Sound Transmission Test Report")
+#     canvas.drawCentredString(letter[0] / 2, bottom_margin + footer_height / 2, f"Page {doc.page} of 4")
+#     canvas.restoreState()
+# Define header elements
+def header_elements():
     elements = []
-
-    # Create a table for the left data
-    table_left = Table(left_data)
-    table_left.setStyle(TableStyle([('GRID', (0, 0), (-1, -1), 1, colors.white)]))
-
-    # Create a table for the right data
-    table_right = Table(right_data)
-    table_right.setStyle(TableStyle([('GRID', (0, 0), (-1, -1), 1, colors.white)]))
-
-    # Create a table for the client data
-    client_table = Table(client_data)
-    client_table.setStyle(TableStyle([('GRID', (0, 0), (-1, -1), 1, colors.white)]))
-
-    # Combine left and right tables into a single table for side by side display
-    table_combined_lr = Table([[table_left, table_right]])
-    # tables will be centered unless their style has been defined via column widths
-    elements.append(table_combined_lr)
-    elements.append(Spacer(1, 10))  # Adds some space 
-    # elements.append(client_table)
-    elements.append(Paragraph('Test site:'+sitename))
-    elements.append(Paragraph('Client:'+client_Name))
-
-    styles = getSampleStyleSheet()
-    styleNormal = styles['Normal']
-    styleHeading = ParagraphStyle('heading', parent=styles['Normal'], spaceAfter=10)
-    elements.append(Spacer(1, 10))  # Adds some space 
-    ## -=-==-= Heading 'STANDARDS'  # -=-=-=-=-=--=-=-=-=-=--=-=-
-    elements.append(Paragraph('STANDARDS:', styleHeading))
-
-    # Standards table data
-    standards_data = [
-        ['ASTM E1007-14', Paragraph('Standard Test Method for Field Measurement of Tapping Machine Impact Sound Transmission Through Floor-Ceiling Assemblies and Associated Support Structure',styles['Normal'])],
-        ['ASTM E989-06(2012)', Paragraph('Standard Classification for Determination of Impact Insulation Class (IIC)',styles['Normal'])],
-        ['ASTM E2235-04(2012)', Paragraph('Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods',styles['Normal'])]
+    elements.append(Paragraph("<b>Field Impact Sound Transmission Test Report</b>", custom_title_style))
+    elements.append(Paragraph("<b>Apparent Impact Insulation Class (AIIC)</b>", custom_title_style))
+    elements.append(Spacer(1, 10))
+    leftside_data = [
+        ["Report Date:", reportdate],
+        ['Test Date:', testdate],
+        ['DLAA Test No', testnum]
     ]
-    # Define column widths
-    col_widths = [doc.width/2.0, doc.width/2.0]  # for example, divide the available width into half
+    rightside_data = [
+        ["Source Room:", source_room_name],
+        ["Receiver Room:", rec_roomName],
+        ["Test Assembly:", tested_assem]
+    ]
 
-    # Create the table
-    standards_table = Table(standards_data, colWidths=col_widths)
-    standards_table.setStyle(TableStyle([
-        ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
-        ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
-        ('LEFTPADDING', (0, 0), (-1, -1), 6),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('ALIGN',(0,0), (-1,-1),'LEFT')
-    ]))
+    table_left = Table(leftside_data)
+    table_right = Table(rightside_data)
+    table_left.setStyle(TableStyle([('GRID', (0, 0), (-1, -1), 1, colors.black)]))
+    table_right.setStyle(TableStyle([('GRID', (0, 0), (-1, -1), 1, colors.black)]))
 
-    # Add the table to the elements list
-    elements.append(standards_table)
+    table_combined_lr = Table([[table_left, table_right]], colWidths=[doc.width / 2.0] * 2)
+    elements.append(KeepInFrame(maxWidth=doc.width, maxHeight=header_height, content=[table_combined_lr], hAlign='LEFT'))
+    elements.append(Spacer(1, 10))
+    elements.append(Paragraph('Test site: ' + sitename, styles['Normal']))
+    elements.append(Spacer(1, 5))
+    elements.append(Paragraph('Client: ' + client_Name, styles['Normal']))
+    return elements
 
-    # Heading 'TEST ENVIRONMENT'
-    elements.append(Paragraph('TEST ENVIRONMENT:', styleHeading))
-    elements.append(Paragraph('The source room was '+source_room_name+'. The space was'+source_rm_finish+'. The floor was '+source_rm_floor+'. The ceiling was '+source_rm_ceiling+". The walls were"+source_rm_walls+". All doors and windows were closed during the testing period. The source room had a volume of approximately"+source_vol+"cu. ft."))
-    elements.append(Spacer(1, 10))  # Adds some space 
-    ### Recieve room paragraph
-    elements.append(Paragraph('The receiver room was '+receiver_room_name+'. The space was'+receiver_rm_finish+'. The floor was '+receiver_rm_floor+'. The ceiling was '+receiver_rm_ceiling+". The walls were"+receiver_rm_walls+". All doors and windows were closed during the testing period. The source room had a volume of approximately"+rec_vol+"cu. ft."))
-    elements.append(Spacer(1, 10))  # Adds some space 
-    elements.append(Paragraph('The test assembly measured approximately '+partition_dim+", and had an area of approximately "+partition_area+"sq. ft."))
-    elements.append(Spacer(1, 10))  # Adds some space 
-    # Heading 'TEST ENVIRONMENT'
-    elements.append(Paragraph('TEST ASSEMBLY:', styleHeading))
-    elements.append(Spacer(1, 10))  # Adds some space 
-    elements.append(Paragraph("The tested assembly was the"+test_assem_type+"The assembly was not field verified, and was based on information provided by the client and drawings for the project. The client advised that no slab treatment or self-leveling was applied. Results may vary if slab treatment or self-leveling or any adhesive is used in other installations."))
-    # END OF FIRST PAGE TEXT  - FOOTER TO COME ##-=-=-=-=-=-==-     
+# Define a function to draw the header and footer
+def header_footer(canvas, doc):
+    canvas.saveState()
 
+    # Build the header
+    header_frame._leftPadding = header_frame._rightPadding = 0
+    header_story = header_elements()
+    header_frame.addFromList(header_story, canvas)
 
-    # Build the document
-    doc.build(elements)
+    # Footer
+    canvas.setFont('Helvetica', 10)
+    footer_text = f"Page {doc.page}"
+    canvas.drawCentredString(letter[0] / 2, bottom_margin + footer_height / 2, footer_text)
 
-# Data for the tables (example data)
-leftside_Data = [
-    ["Report Date:", "4-24-24"],
-    ['Test Date:', "4-3-24"],
-    ['DLAA Test No', '1.1.1']
+    canvas.restoreState()
+
+# Create a page template with header and footer
+page_template = PageTemplate(id='Standard', frames=[main_frame, header_frame, footer_frame], onPage=header_footer)
+doc.addPageTemplates([page_template])
+# Main document content (Add your main document elements here)
+main_elements = []
+
+## -=-==-= Heading 'STANDARDS'  # -=-=-=-=-=--=-=-=-=-=--=-=-
+styleHeading = ParagraphStyle('heading', parent=styles['Normal'], spaceAfter=10)
+main_elements.append(Spacer(1, 10))  # Adds some space 
+main_elements.append(Paragraph('<u>STANDARDS:</u>', styleHeading))
+
+# Standards table data
+standards_data = [
+    ['ASTM E1007-14', Paragraph('Standard Test Method for Field Measurement of Tapping Machine Impact Sound Transmission Through Floor-Ceiling Assemblies and Associated Support Structure',styles['Normal'])],
+    ['ASTM E989-06(2012)', Paragraph('Standard Classification for Determination of Impact Insulation Class (IIC)',styles['Normal'])],
+    ['ASTM E2235-04(2012)', Paragraph('Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods',styles['Normal'])]
 ]
 
-rightside_Data = [
-    ["Source Room:", "2nd Floor Bed 3, Volume: 3643 cu. ft."],
-    ["Receiver Room:", "1st Floor Bed 3, Volume: 1441 cu. ft."],
-    ["Test Assembly:", "Floor-ceiling, Area "+partition_area+"sq. ft."]
+# Create the table
+standards_table = Table(standards_data, hAlign='LEFT')
+standards_table.setStyle(TableStyle([
+    ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
+    ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
+    ('LEFTPADDING', (0, 0), (-1, -1), 6),
+    ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+    ('TOPPADDING', (0, 0), (-1, -1), 6),
+    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ('ALIGN',(0,0), (-1,-1),'LEFT')
+]))
+
+# Add the table to the elements list
+main_elements.append(standards_table)
+
+# Heading 'TEST ENVIRONMENT'
+main_elements.append(Paragraph("<u>TEST ENVIRONMENT:</u>", styleHeading))
+main_elements.append(Paragraph('The source room was '+source_room_name+'. The space was'+source_rm_finish+'. The floor was '+source_rm_floor+'. The ceiling was '+source_rm_ceiling+". The walls were"+source_rm_walls+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+source_vol+"cu. ft."))
+main_elements.append(Spacer(1, 10))  # Adds some space 
+### Recieve room paragraph
+main_elements.append(Paragraph('The receiver room was '+receiver_room_name+'. The space was'+receiver_rm_finish+'. The floor was '+receiver_rm_floor+'. The ceiling was '+receiver_rm_ceiling+". The walls were"+receiver_rm_walls+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+rec_vol+"cu. ft."))
+main_elements.append(Spacer(1, 10))  # Adds some space 
+main_elements.append(Paragraph('The test assembly measured approximately '+partition_dim+", and had an area of approximately "+partition_area+"sq. ft."))
+main_elements.append(Spacer(1, 10))  # Adds some space 
+# Heading 'TEST ENVIRONMENT'
+main_elements.append(Paragraph("<u>TEST ASSEMBLY:</u>", styleHeading))
+main_elements.append(Spacer(1, 10))  # Adds some space 
+main_elements.append(Paragraph("The tested assembly was the"+test_assem_type+"The assembly was not field verified, and was based on information provided by the client and drawings for the project. The client advised that no slab treatment or self-leveling was applied. Results may vary if slab treatment or self-leveling or any adhesive is used in other installations."))
+# END OF FIRST PAGE TEXT  - FOOTER function being written  ##-=-=-=-=-=-==- 
+    
+main_elements.append(PageBreak())
+## 2nd page text : equipment table and test procedure 
+# test procedure 
+main_elements.append(Paragraph("<u>TEST PROCEDURE:</u>", styleHeading))
+main_elements.append(Paragraph('Determination of space-average sound pressure levels was performed via the manually scanned microphones techique, described in ' + standards_data[0][0] + ', Paragraph 11.4.3.3.'+ "The source room was selected in accordance with ASTM E336-11 Paragraph 9.2.5, which states that 'If a corridor must be used as one of the spaces for measurement of ATL or FTL, it shall be used as the source space.'"))
+main_elements.append(Spacer(1,10))
+main_elements.append(Paragraph("Flanking transmission was not evaluated."))
+main_elements.append(Paragraph("To evaluate room absorption, 1 microphone was used to measure 4 decays at 4 locations around the receiving room for a total of 16 measurements, per"+standards_data[2][0]))
+main_elements.append(Paragraph("<u>TEST INSTRUMENTATION:</u>", styleHeading))
+
+## this should shift between meters - predefined, selected with GUI and lookup tabled
+# # will need to create a dynamic table 
+test_instrumentation_table_ASTC = [
+    ["Equipment Type","Manufacturer","Model Number","Serial Number",Paragraph("Last NIST Traceable Calibration"),Paragraph("Last Local Calibration")],
+    ["Sound Level Meter 1", "Larson Davis","831","4328","10/24/2022","Apr 2024"],
+    ["Microphone Pre-Amp:","Larson Davis","PRM831","046469","10/24/2022","Apr 2024"],
+    ["Microphone:","Larson Davis","377B20","168830","10/20/2022","Apr 2024"],
+    ["Calibrator:","Larson Davis","CAL200","5955","10/26/2022","N/A"],
+    ["Sound Level Meter 2","Larson Davis","831","4328","10/24/2022","Apr 2024",],
+    ["Microphone Pre-Amp:","Larson Davis","PRM831","046469","10/24/2022","Apr 2024"],
+    ["Microphone:","Larson Davis","377B20","168830","10/20/2022","Apr 2024"],
+    ["Calibrator:","Larson Davis","CAL200","5955","10/26/2022","N/A"],
+    ["Amplified Loudspeaker","QSC","K10","GAA530909","N/A","N/A"]
+]
+### AIIC table includes tapper 
+test_instrumentation_table_AIIC = [["Equipment Type","Manufacturer","Model Number","Serial Number",Paragraph("Last NIST Traceable Calibration"),Paragraph("Last Local Calibration")],
+["Tapping Machine:","Norsonics","CAL200","2775671","9/19/2022","N/A"],
+["Sound Level Meter","Larson Davis","831","4328","10/24/2022","4/4/2024"],
+["Microphone Pre-Amp","Larson Davis","PRM831","046469","10/24/2022","4/4/2024"],
+["Microphone","Larson Davis","377B20","168830","10/20/2022","4/4/2024"],
+["Calibrator","Larson Davis","CAL200","5955","10/26/2022","N/A"],
+["Amplified Loudspeaker","QSC","K10","GAA530909","N/A","N/A"],
+["Noise Generator","NTi Audio","MR-PRO","0162","N/A","N/A"]
 ]
 
-clienttable = [
-    ['Test site:', "Ka'ulu by Gentry"],
-    ["Client name:", "Gentry Builders, LLC"]
-]
-# variable names 
-# rightside_Data = [["Source Room:", source_room_name+source_vol],
-# ["Receiver Room:", rec_roomName+rec_vol],
-# ["Test Assembly:", tested_assem]]
-# leftside_Data = [
-#     ["Report Date:", reportdate],
-#     ['Test Date:', testdate],
-#     ['DLAA Test No', testnum]
-# ]
+# Create the table - will change ASTC vs AIIC -=-= insert logic here
 
-# clienttable = [
-#     ['Test site:', sitename],
-#     ["Client name:", client_Name]
-# ]
-# # Generate the PDF report
-create_pdf_report("example_report.pdf", leftside_Data, rightside_Data, clienttable)
+test_instrumentation_table = Table(test_instrumentation_table_ASTC, hAlign='LEFT') ## hardcoded, change to table variable for selected test
+test_instrumentation_table.setStyle(TableStyle([
+    ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
+    ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
+    ('LEFTPADDING', (0, 0), (-1, -1), 6),
+    ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+    ('TOPPADDING', (0, 0), (-1, -1), 6),
+    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ('ALIGN',(0,0), (-1,-1),'LEFT')
+]))
+
+# Add the table to the elements list
+main_elements.append(test_instrumentation_table)
+#### END OF SECOND PAGE TXT -=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-
+main_elements.append(PageBreak())
+main_elements.append(Paragraph("<u>STATEMENT OF TEST RESULTS:</u>", styleHeading))
+#### Main calculation table section --- also split into AIIC, ASTC, NIC report results. 
+
+# test appended statements for exceptions 
+
+# test AIIC/ASTC result large text box 
+# take relevant variables for AIIC and ASTC tests and calculate the results, then insert them into the text box.
+# 
+# need proper formatting for this plot. 
+
+# # Function to build the document
+# def build_document(doc):
+#     # Attach header to the first frame of the page template
+#     doc.addPageTemplates([PageTemplate(id='WithHeaderFooter', frames=[header_frame, main_frame, footer_frame], onPage=create_header, onPageEnd=create_footer)])
+#     doc.build(main_elements)
+
+# Build the document
+# build_document(doc)
+doc.build(main_elements)
+
