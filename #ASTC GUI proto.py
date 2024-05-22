@@ -55,6 +55,8 @@ def write_testdata(self,find_datafile, reportfile, newsheetname):
     ) as writer:
         srs_data.to_excel(writer, sheet_name=newsheetname) #writes to report file
     time.sleep(1)
+
+    return srs_data
  
 
 def write_RTtestdata(self, find_datafile, reportfile,newsheetname):
@@ -89,6 +91,8 @@ def write_RTtestdata(self, find_datafile, reportfile,newsheetname):
     ) as writer:
         srs_data.to_excel(writer, sheet_name=newsheetname) 
     time.sleep(1)
+
+    return srs_data
   
 
     
@@ -321,6 +325,75 @@ class FileLoaderApp(App):
             curr_report_file = [x for x in reports if report_string in x]
             print('Current report file: ',curr_report_file)
             print(curr_report_file[0]) #print the name of the report file being used
+                        #### write room dimensions ####
+            
+            srs_roomName = curr_test['Source Room']
+            rec_roomName = curr_test['Receiving Room']
+            testdate = curr_test['Test Date'] 
+            reportdate = curr_test['Report Date']
+            source_vol = curr_test['source room vol']
+            rec_vol = curr_test['receive room vol']
+            partition_area = curr_test['partition area']
+            partition_dim = curr_test['partition dim']
+            source_rm_finish = curr_test['source room finish']
+            rec_rm_finish = curr_test['receive room finish']
+            srs_floor_descrip = curr_test['srs_floor']
+            srs_ceiling_descrip = curr_test['srs_ceiling']
+            srs_walls_descrip = curr_test['srs_Walls']
+            rec_floor_descrip = curr_test['rec_floor']
+            rec_ceiling_descrip = curr_test['rec_ceiling']
+            rec_walls_descrip = curr_test['rec_Wall']
+            tested_assem = curr_test['tested assembly']
+            expected_perf = curr_test['expected performance']
+            annex_two = curr_test['Annex 2 used?']
+            test_assem_type = curr_test['Test assembly Type']
+            
+            # need to add these into the testplan excel sheet
+            AIIC_test = curr_test['AIIC']
+            NIC_test = curr_test['NIC'] 
+            ASTC_test = curr_test['ASTC']
+            if AIIC_test == 1:
+                test_type = 'AIIC'
+            elif NIC_test == 1:
+                test_type = 'NIC'
+            elif ASTC_test == 1:
+                test_type = 'ASTC'
+
+            if int(source_vol) >= 5300 or int(rec_vol) >= 5300:
+                NICreporting_Note = 'The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver and/or source room was greater than the maximum allowed per E336-16, Paragraph 9.4.1.2.'
+            elif int(source_vol) <= 833 or int(rec_vol) <= 833:
+                NICreporting_Note = 'The receiver and/or source room has a volume less than the minimum volume requirement of 25 m3 (883 cu. ft.).'
+            else:
+                NICreporting_Note = '---'
+
+            room_properties = pd.DataFrame(
+                {
+                    "Source Room Name": srs_roomName,
+                    "Recieve Room Name": rec_roomName,
+                    "Testdate": testdate,
+                    "ReportDate": reportdate,
+                    "Test number": find_report,
+                    "Source Vol" : source_vol,
+                    "Recieve Vol": rec_vol,
+                    "Partition area": partition_area,
+                    "Partition dim.": partition_dim,
+                    "Source room Finish" : source_rm_finish,
+                    "Recieve room Finish": rec_rm_finish,
+                    "Srs Floor Descrip.": srs_floor_descrip,
+                    "Srs Ceiling Descrip.": srs_ceiling_descrip,
+                    "Srs Walls Descrip.": srs_walls_descrip,
+                    "Rec Floor Descrip.": rec_floor_descrip,
+                    "Rec Ceiling Descrip.": rec_ceiling_descrip,
+                    "Rec Walls Descrip.": rec_walls_descrip,          
+                    "Tested Assembly": tested_assem,
+                    "Expected Performance": expected_perf,
+                    "Annex 2 used?": annex_two,
+                    "Test assem. type": test_assem_type,
+                    "NIC reporting Note": NICreporting_Note
+                },
+                index=[0]
+            )
+
             if aiic_testing_enabled:
                 print("AIIC testing enabled, copying data...")
         ### IIC variables  #### When extending to IIC data
@@ -330,17 +403,31 @@ class FileLoaderApp(App):
                 find_posFour = curr_test['Position4']
                 find_poscarpet = curr_test['Carpet']
                 find_Tapsrs = curr_test['SourceTap']
+                ### older datapull from excel and write to report excel doc
+                srs_data = write_testdata(self,find_source,curr_report_file[0],'ASTC Source')
+                recive_data = write_testdata(self,find_rec,curr_report_file[0],'ASTC Receive')
+                bkgrnd_data = write_testdata(self,find_BNL,curr_report_file[0],'BNL')
+                rt = write_RTtestdata(self,find_RT,curr_report_file[0],'RT')
+                AIIC_pos1 = write_testdata(self,find_posOne,curr_report_file[0],'AIIC POS 1')
+                AIIC_pos2 = write_testdata(self,find_posTwo,curr_report_file[0],'AIIC POS 2')
+                AIIC_pos3 = write_testdata(self,find_posThree,curr_report_file[0],'AIIC POS 3')
+                AIIC_pos4 = write_testdata(self,find_posFour,curr_report_file[0],'AIIC POS 4')
+                AIIC_carpet = write_testdata(self,find_poscarpet,curr_report_file[0],'AIIC CARPET')
+                AIIC_source = write_testdata(self,find_Tapsrs,curr_report_file[0],'AIIC Source')
 
-                write_testdata(self,find_source,curr_report_file[0],'ASTC Source')
-                write_testdata(self,find_rec,curr_report_file[0],'ASTC Receive')
-                write_testdata(self,find_BNL,curr_report_file[0],'BNL')
-                write_RTtestdata(self,find_RT,curr_report_file[0],'RT')
-                write_testdata(self,find_posOne,curr_report_file[0],'AIIC POS 1')
-                write_testdata(self,find_posTwo,curr_report_file[0],'AIIC POS 2')
-                write_testdata(self,find_posThree,curr_report_file[0],'AIIC POS 3')
-                write_testdata(self,find_posFour,curr_report_file[0],'AIIC POS 4')
-                write_testdata(self,find_poscarpet,curr_report_file[0],'AIIC CARPET')
-                write_testdata(self,find_Tapsrs,curr_report_file[0],'AIIC Source')
+                single_AIICtest_data = {
+                    'srs_data': pd.DataFrame(srs_data),
+                    'recive_data': pd.DataFrame(recive_data),
+                    'bkgrnd_data': pd.DataFrame(bkgrnd_data),
+                    'rt': pd.DataFrame(rt),
+                    'AIIC_pos1': pd.DataFrame(AIIC_pos1),
+                    'AIIC_pos2': pd.DataFrame(AIIC_pos2),
+                    'AIIC_pos3': pd.DataFrame(AIIC_pos3),
+                    'AIIC_pos4': pd.DataFrame(AIIC_pos4),
+                    'AIIC_source': pd.DataFrame(AIIC_source),
+                    'AIIC_carpet': pd.DataFrame(AIIC_carpet),
+                    'room_properties': pd.DataFrame(room_properties)
+                }
             else:
                 print("AIIC data not enabled")
 
@@ -350,11 +437,20 @@ class FileLoaderApp(App):
             find_BNL = curr_test['BNL']
             find_RT = curr_test['RT']
             
-            write_testdata(self,find_source,curr_report_file[0],'ASTC Source')
-            write_testdata(self,find_rec,curr_report_file[0],'ASTC Receive')
-            write_testdata(self,find_BNL,curr_report_file[0],'BNL')
-            write_RTtestdata(self,find_RT,curr_report_file[0],'RT')
-
+            # old method to pull data from excel and write to report excel doc
+            srs_data = write_testdata(self,find_source,curr_report_file[0],'ASTC Source')
+            recive_data = write_testdata(self,find_rec,curr_report_file[0],'ASTC Receive')
+            bkgrnd_data = write_testdata(self,find_BNL,curr_report_file[0],'BNL')
+            rt = write_RTtestdata(self,find_RT,curr_report_file[0],'RT')
+     
+            # ## UNTESTED, needs validating
+            single_ASTCtest_data = {
+            'srs_data': pd.DataFrame(srs_data),
+            'recive_data': pd.DataFrame(recive_data),
+            'bkgrnd_data': pd.DataFrame(bkgrnd_data),
+            'rt': pd.DataFrame(rt),
+            'room_properties': pd.DataFrame(room_properties)
+            }
 
             raw_report = rawReportpath+curr_report_file[0]
         
@@ -391,34 +487,7 @@ class FileLoaderApp(App):
 
             # append all this data or write individully to a dataframe, then save as new sheet
             # refer to this sheet with the SLM Data sheet to propigate to report.
-            room_properties = pd.DataFrame(
-                {
-                    "Source Room Name": srs_roomName,
-                    "Recieve Room Name": rec_roomName,
-                    "Testdate": testdate,
-                    "ReportDate": reportdate,
-                    "Test number": find_report,
-                    "Source Vol" : source_vol,
-                    "Recieve Vol": rec_vol,
-                    "Partition area": partition_area,
-                    "Partition dim.": partition_dim,
-                    "Source room Finish" : source_rm_finish,
-                    "Recieve room Finish": rec_rm_finish,
-                    "Srs Floor Descrip.": srs_floor_descrip,
-                    "Srs Ceiling Descrip.": srs_ceiling_descrip,
-                    "Srs Walls Descrip.": srs_walls_descrip,
-                    "Rec Floor Descrip.": rec_floor_descrip,
-                    "Rec Ceiling Descrip.": rec_ceiling_descrip,
-                    "Rec Walls Descrip.": rec_walls_descrip,          
-                    "Tested Assembly": tested_assem,
-                    "Expected Performance": expected_perf,
-                    "Annex 2 used?": annex_two,
-                    "Test assem. type": test_assem_type,
-                    "NIC reporting Note": NICreporting_Note
-                },
-                index=[0]
-            )
-            excel = client.Dispatch("Excel.Application")
+ 
             #### write this all to a proper reference template. ###
             #### REWORK THIS TO WRITE OUT TO REPORT_GENERATOR function
             with ExcelWriter(
@@ -436,32 +505,20 @@ class FileLoaderApp(App):
             # lol wil output wherever the file explorer in VS is currently. Probably should fix this. 
         
             # Open/Read Excel File - NEED TO TOTALLY REWORK THIS
-            ## OLD CODE FOLLOWS - new funnction from stc_calc_dev3 needs to be plugged in here
-            sheets = excel.Workbooks.Open(raw_report)
+            ## - new funnction from stc_calc_dev3 needs to be plugged in here - create_report
+           
             print("writing to report file:")
             print(raw_report)
             ## need logic here to determine if NIC or ASTC or AIIC , and report one or the other 
             if curr_test['NIC'] == 1 and curr_test['ASTC'] == 1:
-                NIC_report 
-
-
-            # needs to be closed and unique file name to work. 
-            # Converting into PDF File
-                NIC_report.ExportAsFixedFormat(0, project_name+report_string+'NIC_report.pdf')  # saves the NIC report workbook as PDF. 
-                ASTC_report = sheets.Worksheets[6] # saves the ASTC report workbook.
-
-                ASTC_report.ExportAsFixedFormat(0, project_name+report_string+'ASTC_report.pdf')  # saves the ASTC report workbook as PDF. 
-                # sheets.Save()
+                create_report(curr_test, room_properties, single_ASTCtest_data, 'ASTC')
+                # create_report(curr_test, room_properties, single_NICtest_data, 'NIC') # still need NIC report format
             elif curr_test['ASTC'] == 1:
-                ASTC_report = sheets.Worksheets[6] # saves the ASTC report workbook.
-                # sheets.Save()
-                ASTC_report.ExportAsFixedFormat(0, project_name+report_string+'ASTC_report.pdf')  # saves the ASTC report workbook as PDF. 
+                create_report(curr_test, room_properties, single_ASTCtest_data, 'ASTC')
             elif curr_test['NIC'] == 1:
-                NIC_report = sheets.Worksheets[5]
-                # sheets.Save()
-            # needs to be closed and unique file name to work. 
-            # Converting into PDF File
-                NIC_report.ExportAsFixedFormat(0, project_name+report_string+'NIC_report.pdf')  # saves the NIC report workbook as PDF. 
+                # create_report(curr_test, room_properties, single_AIICtest_data, 'NIC') # still need NIC report format
+            elif curr_test['AIIC'] == 1:
+                create_report(curr_test, room_properties, single_AIICtest_data, 'AIIC')
             
 
         
