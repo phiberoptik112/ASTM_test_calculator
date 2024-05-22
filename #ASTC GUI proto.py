@@ -1,10 +1,10 @@
 #ASTC GUI proto
-import shutil
-from kivy.app import App
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.textinput import TextInput
-from kivy.uix.button import Button
-from kivy.uix.label import Label
+# import shutil
+# from kivy.app import App
+# from kivy.uix.boxlayout import BoxLayout
+# from kivy.uix.textinput import TextInput
+# from kivy.uix.button import Button
+# from kivy.uix.label import Label
 
 # import openpyxl 
 import string
@@ -22,8 +22,7 @@ from os import listdir, walk
 from os.path import isfile, join
 import tkinter as tk
 from tkinter import *
-from win32com import client
-import win32com.client
+
 
 # Pulling SLM data function definition
 def write_testdata(self,find_datafile, reportfile, newsheetname):
@@ -32,7 +31,7 @@ def write_testdata(self,find_datafile, reportfile, newsheetname):
     rawReportpath = self.report_output_folder_path
     D_datafiles = [f for f in listdir(rawDtestpath) if isfile(join(rawDtestpath,f))]
     E_datafiles = [f for f in listdir(rawEtestpath) if isfile(join(rawEtestpath,f))]
-    excel = win32com.client.Dispatch("Excel.Application")
+    # excel = win32com.client.Dispatch("Excel.Application")
     if find_datafile[0] =='D':
         datafile_num = find_datafile[1:]
         datafile_num = '-831_Data.'+datafile_num+'.xlsx'
@@ -56,7 +55,7 @@ def write_testdata(self,find_datafile, reportfile, newsheetname):
     ) as writer:
         srs_data.to_excel(writer, sheet_name=newsheetname) #writes to report file
     time.sleep(1)
-    excel.Quit()
+ 
 
 def write_RTtestdata(self, find_datafile, reportfile,newsheetname):
     rawDtestpath = self.slm_data_d_path
@@ -64,7 +63,7 @@ def write_RTtestdata(self, find_datafile, reportfile,newsheetname):
     rawReportpath = self.report_output_folder_path
     D_datafiles = [f for f in listdir(rawDtestpath) if isfile(join(rawDtestpath,f))]
     E_datafiles = [f for f in listdir(rawEtestpath) if isfile(join(rawEtestpath,f))]
-    excel = win32com.client.Dispatch("Excel.Application")
+
     if find_datafile[0] =='D':
         datafile_num = find_datafile[1:]
         datafile_num = '-RT_Data.'+datafile_num+'.xlsx'
@@ -90,7 +89,7 @@ def write_RTtestdata(self, find_datafile, reportfile,newsheetname):
     ) as writer:
         srs_data.to_excel(writer, sheet_name=newsheetname) 
     time.sleep(1)
-    excel.Quit()
+  
 
     
 def sanitize_filepath(filepath):
@@ -115,6 +114,20 @@ from kivy.uix.label import Label
 from kivy.uix.popup import Popup
 from kivy.uix.gridlayout import GridLayout
 
+class TestListPopup(GridLayout):
+    def __init__(self, test_list, **kwargs):
+        super(TestListPopup, self).__init__(**kwargs)
+        self.cols = len(test_list.columns)  # Set the number of columns based on DataFrame columns
+
+        for column in test_list.columns:
+            self.add_widget(Label(text=column))  # Add column headers
+
+        for index, row in test_list.iterrows():
+            for column in test_list.columns:
+                # Add TextInput for each cell in the DataFrame
+                text_input = TextInput(text=str(row[column]), multiline=False)
+                self.add_widget(text_input)
+
 # GPT code - kivy GUI 
 class FileLoaderApp(App):
     def build(self):
@@ -123,6 +136,7 @@ class FileLoaderApp(App):
         self.report_template_path = ''
         self.slm_data_d_path = ''
         self.slm_data_e_path = ''
+        self.slm_data_a_path = ''
         self.report_output_folder_path = ''
 
         # Layout
@@ -218,6 +232,12 @@ class FileLoaderApp(App):
             # You can assign values to curr_test here or add logic based on checkbox state
         else:
             print("AIIC Testing Disabled")
+            
+    def show_test_list_popup(self, instance):
+        # Create a popup with the TestListPopup content
+        test_list_popup = TestListPopup(test_list=self.test_list)
+        popup = Popup(title='Test List Editor', content=test_list_popup, size_hint=(None, None), size=(400, 400))
+        popup.open()
 
     def load_data(self, instance):
         # # Access the text from all text boxes
@@ -227,12 +247,6 @@ class FileLoaderApp(App):
         third_text_input_value = sanitize_filepath(self.third_text_input.text)
         fourth_text_input_value = sanitize_filepath(self.fourth_text_input.text)
         fifth_text_input_value = sanitize_filepath(self.fifth_text_input.text)
-
-        # first_text_input_value = self.test_plan_path
-        # second_text_input_value = self.report_template_path
-        # third_text_input_value = self.slm_data_d_path
-        # fourth_text_input_value = self.slm_data_e_path
-        # fifth_text_input_value = self.report_output_folder_path
 
         self.test_plan_path = first_text_input_value
         self.report_template_path = second_text_input_value
@@ -289,7 +303,7 @@ class FileLoaderApp(App):
         print('Test list:',test_list)
         testnums = test_list['Test Label'] ## Determines the labels and number of excel files copied
         project_name =  test_list['Project Name'] # need to access a cell within template the project name to copy to final reports
-        project_name =  test_list['Project Name'] # need to access a cell within template the project name to copy to final reports
+        # project_name =  test_list['Project Name'] # need to access a cell within template the project name to copy to final reports
         project_name = project_name.iloc[1]
         
         reports =  [f for f in listdir(rawReportpath) if isfile(join(rawReportpath,f))]
@@ -406,6 +420,7 @@ class FileLoaderApp(App):
             )
             excel = client.Dispatch("Excel.Application")
             #### write this all to a proper reference template. ###
+            #### REWORK THIS TO WRITE OUT TO REPORT_GENERATOR function
             with ExcelWriter(
             raw_report,
             mode="a",
@@ -414,20 +429,22 @@ class FileLoaderApp(App):
             ) as writer:
                 room_properties.to_excel(writer, sheet_name='room_properties') 
             
-            time.sleep(1)
-            excel.Quit()
+
             print("pausing for excel...")
             time.sleep(3)
             #### open excel file and write the reports to PDF ###
             # lol wil output wherever the file explorer in VS is currently. Probably should fix this. 
         
-            # Open/Read Excel File
+            # Open/Read Excel File - NEED TO TOTALLY REWORK THIS
+            ## OLD CODE FOLLOWS - new funnction from stc_calc_dev3 needs to be plugged in here
             sheets = excel.Workbooks.Open(raw_report)
             print("writing to report file:")
             print(raw_report)
-            ## need logic here to determine if NIC or ASTC, and report one or the other 
+            ## need logic here to determine if NIC or ASTC or AIIC , and report one or the other 
             if curr_test['NIC'] == 1 and curr_test['ASTC'] == 1:
-                NIC_report = sheets.Worksheets[5]
+                NIC_report 
+
+
             # needs to be closed and unique file name to work. 
             # Converting into PDF File
                 NIC_report.ExportAsFixedFormat(0, project_name+report_string+'NIC_report.pdf')  # saves the NIC report workbook as PDF. 
@@ -445,9 +462,8 @@ class FileLoaderApp(App):
             # needs to be closed and unique file name to work. 
             # Converting into PDF File
                 NIC_report.ExportAsFixedFormat(0, project_name+report_string+'NIC_report.pdf')  # saves the NIC report workbook as PDF. 
-            # sheets.Save()
-            sheets.Close()
-            excel.Quit()
+            
+
         
         print('Generating Reports...')
         self.status_label.text = 'Status: Reports Generated'
