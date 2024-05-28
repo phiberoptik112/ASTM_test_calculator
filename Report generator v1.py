@@ -1,5 +1,6 @@
 # Report generator v1
-
+from os import listdir, walk
+from os.path import isfile, join
 import pandas as pd
 from pandas import ExcelWriter
 import numpy as np
@@ -56,29 +57,63 @@ def sanitize_filepath(filepath):
 
 
     
-def write_testdata(self, find_datafile):
+def pull_testdata(self, find_datafile, datatype):
+    # pass datatype as '-831_Data.' or '-RT_Data.' to pull the correct data
     raw_testpaths = {
         'D': self.slm_data_d_path,
         'E': self.slm_data_e_path,
-        'A': self.slm_data_a_path
+        # 'A': self.slm_data_a_path
     }
     datafiles = {}
     for key, path in raw_testpaths.items():
         datafiles[key] = [f for f in listdir(path) if isfile(join(path, f))]
 
     if find_datafile[0] in datafiles:
-        datafile_num = '-831_Data.' + find_datafile[1:] + '.xlsx'
+        datafile_num = datatype + find_datafile[1:] + '.xlsx'
         slm_found = [x for x in datafiles[find_datafile[0]] if datafile_num in x]
         slm_found[0] = raw_testpaths[find_datafile[0]] + slm_found[0]  # If this line errors, the test file is mislabeled or doesn't exist 
 
     print(slm_found[0])
-
-    srs_data = pd.read_excel(slm_found[0], sheet_name='OBA')  # data must be in OBA tab
+    if datatype == '-831_Data.':
+        srs_data = pd.read_excel(slm_found[0], sheet_name='OBA')
+    elif datatype == '-RT_Data.':
+        srs_data = pd.read_excel(slm_found[0], sheet_name='Summary')  # data must be in Summary tab for RT meas.
+    # srs_data = pd.read_excel(slm_found[0], sheet_name='OBA')  # data must be in OBA tab
+    # potentially need a write to excel here...similar to previous function
     return srs_data
-    # this function needs to be passed an indicator for which test type this is, so that the correct database variable can be used
 
+def format_SLMdata(self, srs_data):
+    srs_thirdoct = srs_data.iloc[7] # hardcoded to SLM export data format
+    srs_thirdoct = srs_thirdoct[14:30] # select only the frequency bands of interest
+    return srs_thirdoct
 
-
+def calc_NR_val(srs_overalloct, rec_overalloct, bkgrnd_overalloct, rt_thirty, parition_area, recieve_roomvol, NIC_vollimit):
+    NIC_vollimit = 150  # cu. ft.
+    if recieve_roomvol > NIC_vollimit:
+        print('Using NIC calc, room volume too large')
+    constant = np.int32(20.047 * np.sqrt(273.15 + 20))
+    intermed = 30 / rt_thirty
+    thisval = np.int32(recieve_roomvol * intermed)
+    sabines = thisval / constant
+    sabines = np.round(sabines*(0.921))        
+    recieve_corr = list()
+    recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
+    print('rec vs background:',recieve_vsBkgrnd)
+    for i in range(len(recieve_vsBkgrnd)):
+        val = recieve_vsBkgrnd[i]
+        print('val:', recieve_vsBkgrnd[i])
+        print('count: ',i)
+        if val < 5:
+            recieve_corr.append(rec_overalloct.iloc[i]-2)
+        elif val < 10:
+            recieve_corr.append(np.log10(10**(rec_overalloct.iloc[i]/10)-10**(bkgrnd_overalloct.iloc[i]/10)))
+        else:
+            recieve_corr.append(rec_overalloct.iloc[i])
+        # print('-=-=-=-=-')
+        # print('recieve_corr: ',recieve_corr)
+    recieve_corr = np.round(recieve_corr,1)
+    NR_val = srs_overalloct - recieve_corr
+    return NR_val, sabines
 
 # #### database has raw OBA datasheet, needs to be cleaned for plotting
 # OBAdatasheet = 'OBA'
@@ -104,44 +139,47 @@ def write_testdata(self, find_datafile):
 # onethird_rec = recive_OBAdata[6:10]
 # onethird_bkgrd = bkgrd_OBAdata[6:10]
 
+# OLD function, will not be used, just reference.
+# def write_RTtestdata(find_datafile, reportfile,newsheetname):
+#     rawDtestpath = self.slm_data_d_path
+#     rawEtestpath = self.slm_data_e_path
+#     # rawAtestpath = self.slm_data_a_path
+#     rawReportpath = self.report_output_folder_path
+#     # A_datafiles = [f for f in listdir(rawDtestpath) if isfile(join(rawDtestpath,f))]
+#     D_datafiles = [f for f in listdir(rawDtestpath) if isfile(join(rawDtestpath,f))]
+#     E_datafiles = [f for f in listdir(rawEtestpath) if isfile(join(rawEtestpath,f))]
+#     if find_datafile[0] =='A':
+#         datafile_num = find_datafile[1:]
+#         datafile_num = '-RT_Data.'+datafile_num+'.xlsx'
+#         slm_found = [x for x in A_datafiles if datafile_num in x]
+#         slm_found[0] = rawAtestpath+slm_found[0]# If this line errors, the test file is mislabled or doesn't exist 
+#         # print(srs_slm_found)
+#     elif find_datafile[0] == 'E':
+#         datafile_num = find_datafile[1:]
+#         datafile_num = '-RT_Data.'+datafile_num+'.xlsx'
+#         slm_found = [x for x in E_datafiles if datafile_num in x]
+#         slm_found[0] = rawEtestpath+slm_found[0] # If this line errors, the test file is mislabled or doesn't exist 
 
+#     print(slm_found[0])
 
-def write_RTtestdata(find_datafile, reportfile,newsheetname):
-    rawDtestpath = self.slm_data_d_path
-    rawEtestpath = self.slm_data_e_path
-    rawReportpath = self.report_output_folder_path
-    D_datafiles = [f for f in listdir(rawDtestpath) if isfile(join(rawDtestpath,f))]
-    E_datafiles = [f for f in listdir(rawEtestpath) if isfile(join(rawEtestpath,f))]
-    if find_datafile[0] =='A':
-        datafile_num = find_datafile[1:]
-        datafile_num = '-RT_Data.'+datafile_num+'.xlsx'
-        slm_found = [x for x in A_datafiles if datafile_num in x]
-        slm_found[0] = rawAtestpath+slm_found[0]# If this line errors, the test file is mislabled or doesn't exist 
-        # print(srs_slm_found)
-    elif find_datafile[0] == 'E':
-        datafile_num = find_datafile[1:]
-        datafile_num = '-RT_Data.'+datafile_num+'.xlsx'
-        slm_found = [x for x in E_datafiles if datafile_num in x]
-        slm_found[0] = rawEtestpath+slm_found[0] # If this line errors, the test file is mislabled or doesn't exist 
+#     srs_data = pd.read_excel(slm_found[0],sheet_name='Summary')# data must be in Summary tab for RT meas.
+#     # could reduce this function by also passing the sheet to be read into the args. 
+#     # transfer to either master Pandas database or SQL database
 
-    print(slm_found[0])
+#     with ExcelWriter(
+#     rawReportpath+reportfile,
+#     mode="a",
+#     engine="openpyxl",
+#     if_sheet_exists="replace",
+#     ) as writer:
+#         srs_data.to_excel(writer, sheet_name=newsheetname) 
+#     time.sleep(1)
+#     # excel.Quit()
+#     return srs_data
 
-    srs_data = pd.read_excel(slm_found[0],sheet_name='Summary')# data must be in Summary tab for RT meas.
-    # could reduce this function by also passing the sheet to be read into the args. 
-    # transfer to either master Pandas database or SQL database
+### DATA CALC FUNCTIONS ###
 
-    with ExcelWriter(
-    rawReportpath+reportfile,
-    mode="a",
-    engine="openpyxl",
-    if_sheet_exists="replace",
-    ) as writer:
-        srs_data.to_excel(writer, sheet_name=newsheetname) 
-    time.sleep(1)
-    # excel.Quit()
-    return srs_data
-
-def calc_ATL_val(srs_overalloct,rec_overalloct,bkgrnd_overalloct,rt_thirty,parition_area,recieve_roomvol,ASTC_vollimit):
+def calc_ATL_val(srs_overalloct,rec_overalloct,bkgrnd_overalloct,rt_thirty,parition_area,recieve_roomvol):
     ASTC_vollimit = 883
     if recieve_roomvol > ASTC_vollimit:
         print('Using NIC calc, room volume too large')
@@ -175,7 +213,7 @@ def calc_AIIC_val(ATL_val):
     while (diff_negative < 8 and new_sum < 32):
         # print('starting loop')
         print('AIIC fit test value: ', AIIC_start)
-        for vals in STCCurve:
+        for vals in IIC_curve:
             New_curve.append(vals+AIIC_start)
         IIC_curve = New_curve - ATL_val
         # print('ASTC curve: ',ASTC_curve)
@@ -193,13 +231,15 @@ def calc_AIIC_val(ATL_val):
         # AIIC_curve_fitplotter(IIC_curve,New_curve)
         if new_sum > 32 or diff_negative > 8:
             print('Curve too high! AIIC fit: ', AIIC_start-1)
-            print('Result for test: ', find_test) 
-            print('-=-=-=-=-=-=-=-=-')
-            break 
+            return AIIC_start-1
+            # print('Result for test: ', find_test) 
+            # print('-=-=-=-=-=-=-=-=-')
+            # break 
         pos_diffs = []
         New_curve = []
         AIIC_start = AIIC_start + 1
         if AIIC_start >80: break
+
 
 def calc_ASTC_val(ATL_val):
     pos_diffs = list()
@@ -407,6 +447,7 @@ def create_report(curr_test, room_properties, single_test_dataframe, test_type):
         # all the code below
     # Kaulu by gentry testing ## EXAMPLE DATA CREATE LOOP FOR EACH TESTPLAN ENTRY
     testplan_path ='//DLA-04/Shared/KAILUA PROJECTS/2024/24-004 Kaulu by Gentry ASTC - AIIC testing/Documents/TestPlan_Kaulu_ASTM_testingv1.xlsx'
+    # need to modify for current project number
     # test_list = pd.read_excel(testplan_path)
     # testnums = test_list['Test Label']
     ### Pass over the testplan entry database 
@@ -418,6 +459,7 @@ def create_report(curr_test, room_properties, single_test_dataframe, test_type):
     #         "Recieve Room Name": rec_roomName,
     #         "Testdate": testdate,
     #         "ReportDate": reportdate,
+    #         "Project Number": projectnum,
     #         "Test number": find_report,
     #         "Source Vol" : source_vol,
     #         "Recieve Vol": rec_vol,
@@ -448,6 +490,7 @@ def create_report(curr_test, room_properties, single_test_dataframe, test_type):
     client_Name = "Gentry Builders, LLC"
     reportdate = "4-24-24"
     testdate = "4-3-24"
+    projectnum = "24-004"
     testnum = '1.1.1' # this will be the pulled var from the testplan
     rec_vol = "1441"
     source_vol = "3643"
@@ -465,40 +508,41 @@ def create_report(curr_test, room_properties, single_test_dataframe, test_type):
     test_assem_type = 'Floor-ceiling' ## will change AIIC vs ASTC
     receiver_room_name = '1st floor great room/kitchen'
 
-    
-
     #### database has raw OBA datasheet, needs to be cleaned for plotting
-    OBAdatasheet = 'OBA'
-    RTsummarysheet = 'Summary'
-    freqbands = ['63','125','250','500','1000','2000','4000','8000']
-
-    srs_OBAdata = pd.read_excel(srs_slm_file[0],OBAdatasheet)
-    recive_OBAdata = pd.read_excel(receive_slm_file[0],OBAdatasheet)
-    bkgrd_OBAdata = pd.read_excel(bkgrnd_slm_file[0],OBAdatasheet)
-    rt = pd.read_excel(rt_slm_file[0],RTsummarysheet)
-
-    transposed_srsOBAdata = srs_OBAdata.transpose()
-    srs_OBAdata = srs_OBAdata.dropna()
-
-    # Get the first row of variables as the new column names
-    new_column_names = transposed_srsOBAdata.iloc[0]
-
-    # Rename the columns of transposed_srsOBAdata
-    transposed_srsOBAdata = transposed_srsOBAdata.rename(columns=new_column_names)
-
-    # Remove the first row (variable labels)
-    transposed_srsOBAdata = transposed_srsOBAdata[1:]
-    onethird_srs = srs_OBAdata[6:10]
-    onethird_rec = recive_OBAdata[6:10]
-    onethird_bkgrd = bkgrd_OBAdata[6:10]
+    ## this is done inside the report generation section
 
 
+    # OBAdatasheet = 'OBA'
+    # RTsummarysheet = 'Summary'
+    # freqbands = ['63','125','250','500','1000','2000','4000','8000']
+
+    # srs_OBAdata = pd.read_excel(single_test_dataframe['srs_data'],OBAdatasheet)
+    # recive_OBAdata = pd.read_excel(single_test_dataframe['recive_data'],OBAdatasheet)
+    # bkgrd_OBAdata = pd.read_excel(single_test_dataframe['bkgrnd_data'],OBAdatasheet)
+    # rt = pd.read_excel(single_test_dataframe['rt'],RTsummarysheet)
+
+    # transposed_srsOBAdata = srs_OBAdata.transpose()
+    # srs_OBAdata = srs_OBAdata.dropna()
+
+    # # Get the first row of variables as the new column names
+    # new_column_names = transposed_srsOBAdata.iloc[0]
+
+    # # Rename the columns of transposed_srsOBAdata
+    # transposed_srsOBAdata = transposed_srsOBAdata.rename(columns=new_column_names)
+
+    # # Remove the first row (variable labels)
+    # transposed_srsOBAdata = transposed_srsOBAdata[1:]
+    # onethird_srs = srs_OBAdata[6:10]
+    # onethird_rec = recive_OBAdata[6:10]
+    # onethird_bkgrd = bkgrd_OBAdata[6:10]
 
 
+##### _+_+#__#+_#+_+_+_####################### REPORT GENERATION CODE ##############################
+    import matplotlib.pyplot as plt
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame, Paragraph, Table, TableStyle, Spacer,PageBreak, KeepInFrame
+    from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame, Paragraph, Table, TableStyle, Spacer,PageBreak, KeepInFrame, Image
     from reportlab.pdfgen import canvas
 
     from reportlab.lib.units import inch
@@ -518,19 +562,20 @@ def create_report(curr_test, room_properties, single_test_dataframe, test_type):
 
     #### -=-=--=-= 
 
-    # Document Setup new 
-    doc = BaseDocTemplate("report_with_header_footer.pdf", pagesize=letter,
+    # Document Setup 
+    # document name and page size
+    #  Example ouptut file name: '24-006 AIIC Test Report_1.1.1.pdf'
+    #  format: project_name + test_type + test_num + '.pdf'
+    doc_name = f'{projectnum} {test_type} Test Report_{testnum}.pdf'
+
+    doc = BaseDocTemplate(doc_name, pagesize=letter,
                         leftMargin=left_margin, rightMargin=right_margin,
                         topMargin=top_margin, bottomMargin=bottom_margin)
-
-
 
     # Define Frames for the header, main content, and footer
     header_frame = Frame(left_margin, letter[1] - top_margin - header_height, letter[0] - 2 * left_margin, header_height, id='header')
     main_frame = Frame(left_margin, bottom_margin + footer_height, letter[0] - 2 * left_margin, letter[1] - top_margin - header_height - footer_height - bottom_margin, id='main')
     footer_frame = Frame(left_margin, bottom_margin, letter[0] - 2 * left_margin, footer_height, id='footer')
-
-
 
     # Create styles
     styles = getSampleStyleSheet()
@@ -610,11 +655,25 @@ def create_report(curr_test, room_properties, single_test_dataframe, test_type):
     main_elements.append(Paragraph('<u>STANDARDS:</u>', styleHeading))
 
     # Standards table data
-    standards_data = [
-        ['ASTM E1007-14', Paragraph('Standard Test Method for Field Measurement of Tapping Machine Impact Sound Transmission Through Floor-Ceiling Assemblies and Associated Support Structure',styles['Normal'])],
-        ['ASTM E989-06(2012)', Paragraph('Standard Classification for Determination of Impact Insulation Class (IIC)',styles['Normal'])],
-        ['ASTM E2235-04(2012)', Paragraph('Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods',styles['Normal'])]
-    ]
+    if test_type == 'AIIC':
+        standards_data = [
+            ['ASTM E1007-14', Paragraph('Standard Test Method for Field Measurement of Tapping Machine Impact Sound Transmission Through Floor-Ceiling Assemblies and Associated Support Structure',styles['Normal'])],
+            ['ASTM E413-16', Paragraph('Standard Classification for Rating Sound Insulation',styles['Normal'])],
+            ['ASTM E1007-14', Paragraph('Standard Test Method for Field Measurement of Tapping Machine Impact Sound Transmission Through Floor-Ceiling Assemblies and Associated Support Structure',styles['Normal'])],
+            ['ASTM E989-06(2012)', Paragraph('Standard Classification for Determination of Impact Insulation Class (IIC)',styles['Normal'])],
+            ['ASTM E2235-04(2012)', Paragraph('Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods',styles['Normal'])]
+        ]
+    elif test_type == 'ASTC' or test_type == 'NIC':
+        standards_data = [
+            ['ASTM E336-16', Paragraph('Standard Test Method for Measurement of Airborne Sound Attenuation between Rooms in Buildings',styles['Normal'])],
+            ['ASTM E413-16', Paragraph('Classification for Rating Sound Insulation',styles['Normal'])],
+            ['ASTM E2235-04(2012)', Paragraph('Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods',styles['Normal'])]
+        ]
+    # standards_data = [
+    #     ['ASTM E1007-14', Paragraph('Standard Test Method for Field Measurement of Tapping Machine Impact Sound Transmission Through Floor-Ceiling Assemblies and Associated Support Structure',styles['Normal'])],
+    #     ['ASTM E989-06(2012)', Paragraph('Standard Classification for Determination of Impact Insulation Class (IIC)',styles['Normal'])],
+    #     ['ASTM E2235-04(2012)', Paragraph('Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods',styles['Normal'])]
+    # ]
 
     # Create the table
     standards_table = Table(standards_data, hAlign='LEFT')
@@ -645,7 +704,7 @@ def create_report(curr_test, room_properties, single_test_dataframe, test_type):
     main_elements.append(Paragraph("<u>TEST ASSEMBLY:</u>", styleHeading))
     main_elements.append(Spacer(1, 10))  # Adds some space 
     main_elements.append(Paragraph("The tested assembly was the"+test_assem_type+"The assembly was not field verified, and was based on information provided by the client and drawings for the project. The client advised that no slab treatment or self-leveling was applied. Results may vary if slab treatment or self-leveling or any adhesive is used in other installations."))
-    # END OF FIRST PAGE TEXT  - FOOTER function being written  ##-=-=-=-=-=-==- 
+    # ##### END OF FIRST PAGE TEXT  - ########
         
     main_elements.append(PageBreak())
     ## 2nd page text : equipment table and test procedure 
@@ -659,7 +718,7 @@ def create_report(curr_test, room_properties, single_test_dataframe, test_type):
 
     ## this should shift between meters - predefined, selected with GUI and lookup tabled
     # # will need to create a dynamic table 
-    if test_type = 'ASTC':
+    if test_type == 'ASTC':
         test_instrumentation_table = [
             ["Equipment Type","Manufacturer","Model Number","Serial Number",Paragraph("Last NIST Traceable Calibration"),Paragraph("Last Local Calibration")],
             ["Sound Level Meter 1", "Larson Davis","831","4328","10/24/2022","Apr 2024"],
@@ -672,7 +731,7 @@ def create_report(curr_test, room_properties, single_test_dataframe, test_type):
             ["Calibrator:","Larson Davis","CAL200","5955","10/26/2022","N/A"],
             ["Amplified Loudspeaker","QSC","K10","GAA530909","N/A","N/A"]
         ]
-    elif test_type = 'AIIC':
+    elif test_type == 'AIIC':
         ### AIIC table includes tapper 
         test_instrumentation_table = [["Equipment Type","Manufacturer","Model Number","Serial Number",Paragraph("Last NIST Traceable Calibration"),Paragraph("Last Local Calibration")],
         ["Tapping Machine:","Norsonics","CAL200","2775671","9/19/2022","N/A"],
@@ -704,21 +763,113 @@ def create_report(curr_test, room_properties, single_test_dataframe, test_type):
     main_elements.append(PageBreak())
     main_elements.append(Paragraph("<u>STATEMENT OF TEST RESULTS:</u>", styleHeading))
     #### Main calculation table section --- also split into AIIC, ASTC, NIC report results. 
+    # function returning a database table to display frequency, level, OBA of source, reciever, RT60, NR, ATL, Exceptions
+    ######### CALCS FOR PDF TABLES AND PLOTS WILL GO IN THIS SCRIPT ###########
+    freqThirdoct = single_test_dataframe['srs_data'].iloc[6]
+    frequencies = freqThirdoct[14:30]
+    # freqThirdoct.iloc[6]
+    if test_type == 'AIIC':
+        #dataframe for AIIC is in single_test_dataframe
 
+        onethird_srs = format_SLMdata(single_test_dataframe['srs_data'])
+        onethird_rec = format_SLMdata(single_test_dataframe['recive_data'])
+        onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
+        rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
+        calc_NR, sabines = calc_NR_val(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,room_properties['parition_area'],room_properties['Recieve Vol'],NIC_vollimit=883)
+        ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd)
+
+        Test_result_table = pd.DataFrame(
+            {
+                "Frequency": frequencies,
+                "Source OBA": onethird_srs,
+                "Reciever OBA": onethird_rec,
+                "Background OBA": onethird_bkgrd,
+                "RT60": rt_thirty,
+                "NR": calc_NR,
+                "ATL": ATL_val,
+                "Exceptions": AIIC_Exceptions
+            }
+        )
+        
+
+    elif test_type == 'ASTC':
+        Test_result_table = pd.DataFrame(
+            {
+                "Frequency": freqbands,
+                "Source OBA": onethird_srs,
+                "Reciever OBA": onethird_rec,
+                "Background OBA": onethird_bkgrd,
+                "ATL": rt['ATL'],
+                "Exceptions": ASTC_Exceptions
+            }
+        )
+    elif test_type == 'NIC':
+        Test_result_table = pd.DataFrame(
+            {
+                "Frequency": freqbands,
+                "Source OBA": onethird_srs,
+                "Reciever OBA": onethird_rec,
+                "Background OBA": onethird_bkgrd,
+                "NR": rt['NR'],
+                "Exceptions": NIC_exceptions
+            }
+        )
+    # Create the table - will change ASTC vs AIIC -=-= insert logic here
+    Test_result_table = Table(Test_result_table, hAlign='LEFT') ## hardcoded, change to table variable for selected test
+    Test_result_table.setStyle(TableStyle([
+        ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
+        ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN',(0,0), (-1,-1),'LEFT')
+    ]))
+    main_elements.append(Test_result_table)
     # test appended statements for exceptions 
-
     # test AIIC/ASTC result large text box 
     # take relevant variables for AIIC and ASTC tests and calculate the results, then insert them into the text box.
-    # 
-    # need proper formatting for this plot. 
+    if test_type == 'AIIC':
+        main_elements.append(Paragraph("The Apparent Impact Insulation Class (AIIC) was calculated. The AIIC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_data[0][0]))
+    elif test_type == 'ASTC':
+        main_elements.append(Paragraph("The Apparent Sound Transmission Class (ASTC) was calculated. The ASTC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The ASTC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_data[0][0]))
+    elif test_type == 'NIC':
+        main_elements.append(Paragraph("The Noise Isolation Class (NIC) was calculated. The NIC rating is based on Noise Reduction (NR), and includes the effects of noise flanking. The NIC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_data[0][0]))
+    main_elements.append(Paragraph("The results stated in this report represent only the specific construction and acoustical conditions present at the time of the test. Measurements performed in accordance with this test method on nominally identical constructions and acoustical conditions may produce different results."))
 
-    # # Function to build the document
-    # def build_document(doc):
-    #     # Attach header to the first frame of the page template
-    #     doc.addPageTemplates([PageTemplate(id='WithHeaderFooter', frames=[header_frame, main_frame, footer_frame], onPage=create_header, onPageEnd=create_footer)])
-    #     doc.build(main_elements)
+    main_elements.append(PageBreak())
+    ####### 3rd page - ASTC/NIC reference contour plot
+
+    # need proper formatting for this plot.
+    if test_type == 'AIIC':
+        plot_title = 'AIIC Reference Contour'
+        plt.plot(ATL_curve, freqbands)
+        plt.xlabel('Apparent Transmission Loss (dB)')
+        plt.ylabel('Frequency (Hz)')
+        plt.title('AIIC Reference Contour')
+        plt.grid()
+        plt.show()
+    elif test_type == 'ASTC':
+        plot_title = 'ASTC Reference Contour'
+        plt.plot(ATL_curve, freqbands)
+        plt.xlabel('Apparent Transmission Loss (dB)')
+        plt.ylabel('Frequency (Hz)')
+        plt.title('ASTC Reference Contour')
+        plt.grid()
+        plt.show()
+    elif test_type == 'NIC':
+        plot_title = 'NIC Reference Contour'
+        plt.plot(ATL_curve, freqbands)
+        plt.xlabel('Apparent Transmission Loss (dB)')
+        plt.ylabel('Frequency (Hz)')
+        plt.title('NIC Reference Contour')
+        plt.grid()
+        plt.show()
+
+
+    # Output a file string for the PDF made up of test number and test type
 
     # Build the document
-    # build_document(doc)
     doc.build(main_elements)
 

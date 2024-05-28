@@ -23,8 +23,36 @@ from os.path import isfile, join
 import tkinter as tk
 from tkinter import *
 
+### # FUNCTIONS FOR PULLING EXCEL DATA ########
 
-# Pulling SLM data function definition
+# this is a new function combines RT and ASTC datapulls
+def pull_testdata(self, find_datafile, datatype):
+    # pass datatype as '-831_Data.' or '-RT_Data.' to pull the correct data
+    raw_testpaths = {
+        'D': self.slm_data_d_path,
+        'E': self.slm_data_e_path,
+        # 'A': self.slm_data_a_path
+    }
+    datafiles = {}
+    for key, path in raw_testpaths.items():
+        datafiles[key] = [f for f in listdir(path) if isfile(join(path, f))]
+
+    if find_datafile[0] in datafiles:
+        datafile_num = datatype + find_datafile[1:] + '.xlsx'
+        slm_found = [x for x in datafiles[find_datafile[0]] if datafile_num in x]
+        slm_found[0] = raw_testpaths[find_datafile[0]] + slm_found[0]  # If this line errors, the test file is mislabeled or doesn't exist 
+
+    print(slm_found[0])
+    if datatype == '-831_Data.':
+        srs_data = pd.read_excel(slm_found[0], sheet_name='OBA')
+    elif datatype == '-RT_Data.':
+        srs_data = pd.read_excel(slm_found[0], sheet_name='Summary')  # data must be in Summary tab for RT meas.
+    # srs_data = pd.read_excel(slm_found[0], sheet_name='OBA')  # data must be in OBA tab
+    # potentially need a write to excel here...similar to previous function
+    # just for 
+    return srs_data
+
+# Pulling SLM data function definition OLD 
 def write_testdata(self,find_datafile, reportfile, newsheetname):
     rawDtestpath = self.slm_data_d_path
     rawEtestpath = self.slm_data_e_path
@@ -140,7 +168,6 @@ class FileLoaderApp(App):
         self.report_template_path = ''
         self.slm_data_d_path = ''
         self.slm_data_e_path = ''
-        self.slm_data_a_path = ''
         self.report_output_folder_path = ''
 
         # Layout
@@ -166,7 +193,7 @@ class FileLoaderApp(App):
         layout.add_widget(self.second_text_input)
 
         # Label for the third text entry box
-        layout.add_widget(Label(text='SLM Data D'))
+        layout.add_widget(Label(text='SLM Data Meter 1'))
 
         # Text Entry Box for the third path
         self.third_text_input = TextInput(multiline=False, hint_text='File Path 3')
@@ -174,7 +201,7 @@ class FileLoaderApp(App):
         layout.add_widget(self.third_text_input)
 
         # Label for the fourth text entry box
-        layout.add_widget(Label(text='SLM Data E'))
+        layout.add_widget(Label(text='SLM Data Meter 2'))
 
         # Text Entry Box for the fourth path
         self.fourth_text_input = TextInput(multiline=False, hint_text='File Path 4')
@@ -245,6 +272,7 @@ class FileLoaderApp(App):
 
     def load_data(self, instance):
         # # Access the text from all text boxes
+        # seems like just a debug step, may not need this once full output report PDF gen. is working since it pulls directly from the SLM datafiles. 
 
         first_text_input_value = sanitize_filepath(self.first_text_input.text)
         second_text_input_value = sanitize_filepath(self.second_text_input.text)
@@ -287,24 +315,24 @@ class FileLoaderApp(App):
         testnums = self.test_list['Test Label'] ## Determines the labels and number of excel files copied
         project_name =  self.test_list['Project Name'] # need to access a cell within template the project name to copy to final reports
         project_name = project_name.iloc[1]
-        reports =  [f for f in listdir(rawReportpath) if isfile(join(rawReportpath,f))]
+        # reports =  [f for f in listdir(rawReportpath) if isfile(join(rawReportpath,f))]
         # Display a message in the status label
-        self.status_label.text = 'Status: Generating Reports...'
-        self.status_label.text = 'Status: Copying Excel template per testplan...'
+        self.status_label.text = 'Status: All test files loaded, ready to generate reports'
+        # self.status_label.text = 'Status: Copying Excel template per testplan...'
         # for i in range(len(testnums)):
             # shutil.copy(rawReportpath+reports[0], outputfolder+'23-154 ASTC-NIC Test Report_'+testnums[i]+'_.xlsx')
-        # Add logic to generate reports
-        for index, testnum in enumerate(testnums):
-            shutil.copy(rawReportpath + reports[0], outputfolder + f'23-154 ASTC-NIC Test Report_{testnum}_.xlsx')    
+        # Add logic to generate reports - old excel copy method
+        # for index, testnum in enumerate(testnums):
+        #     shutil.copy(rawReportpath + reports[0], outputfolder + f'23-154 ASTC-NIC Test Report_{testnum}_.xlsx')    
         
-        self.status_label.text = 'Status: Data Loaded'
+        # self.status_label.text = 'Status: Data Loaded'
 
     def output_reports(self, instance):
         testplan_path = self.test_plan_path
         rawReportpath = self.report_output_folder_path
 
         test_list = pd.read_excel(testplan_path)
-        print('Test list:',test_list)
+        self.status_label.text = ('Test list:',test_list)
         testnums = test_list['Test Label'] ## Determines the labels and number of excel files copied
         project_name =  test_list['Project Name'] # need to access a cell within template the project name to copy to final reports
         # project_name =  test_list['Project Name'] # need to access a cell within template the project name to copy to final reports
@@ -347,7 +375,7 @@ class FileLoaderApp(App):
             expected_perf = curr_test['expected performance']
             annex_two = curr_test['Annex 2 used?']
             test_assem_type = curr_test['Test assembly Type']
-            
+
             # need to add these into the testplan excel sheet
             AIIC_test = curr_test['AIIC']
             NIC_test = curr_test['NIC'] 
@@ -372,6 +400,7 @@ class FileLoaderApp(App):
                     "Recieve Room Name": rec_roomName,
                     "Testdate": testdate,
                     "ReportDate": reportdate,
+                    "Project Name": project_name,
                     "Test number": find_report,
                     "Source Vol" : source_vol,
                     "Recieve Vol": rec_vol,
@@ -403,18 +432,30 @@ class FileLoaderApp(App):
                 find_posFour = curr_test['Position4']
                 find_poscarpet = curr_test['Carpet']
                 find_Tapsrs = curr_test['SourceTap']
-                ### older datapull from excel and write to report excel doc
-                srs_data = write_testdata(self,find_source,curr_report_file[0],'ASTC Source')
-                recive_data = write_testdata(self,find_rec,curr_report_file[0],'ASTC Receive')
-                bkgrnd_data = write_testdata(self,find_BNL,curr_report_file[0],'BNL')
-                rt = write_RTtestdata(self,find_RT,curr_report_file[0],'RT')
-                AIIC_pos1 = write_testdata(self,find_posOne,curr_report_file[0],'AIIC POS 1')
-                AIIC_pos2 = write_testdata(self,find_posTwo,curr_report_file[0],'AIIC POS 2')
-                AIIC_pos3 = write_testdata(self,find_posThree,curr_report_file[0],'AIIC POS 3')
-                AIIC_pos4 = write_testdata(self,find_posFour,curr_report_file[0],'AIIC POS 4')
-                AIIC_carpet = write_testdata(self,find_poscarpet,curr_report_file[0],'AIIC CARPET')
-                AIIC_source = write_testdata(self,find_Tapsrs,curr_report_file[0],'AIIC Source')
-
+                # '-831_Data.'
+                # '-RT_Data.'
+                ### older datapull from excel and write to each report excel doc
+                # srs_data = write_testdata(self,find_source,curr_report_file[0],'ASTC Source')
+                # recive_data = write_testdata(self,find_rec,curr_report_file[0],'ASTC Receive')
+                # bkgrnd_data = write_testdata(self,find_BNL,curr_report_file[0],'BNL')
+                # rt = write_RTtestdata(self,find_RT,curr_report_file[0],'RT')
+                # AIIC_pos1 = write_testdata(self,find_posOne,curr_report_file[0],'AIIC POS 1')
+                # AIIC_pos2 = write_testdata(self,find_posTwo,curr_report_file[0],'AIIC POS 2')
+                # AIIC_pos3 = write_testdata(self,find_posThree,curr_report_file[0],'AIIC POS 3')
+                # AIIC_pos4 = write_testdata(self,find_posFour,curr_report_file[0],'AIIC POS 4')
+                # AIIC_carpet = write_testdata(self,find_poscarpet,curr_report_file[0],'AIIC CARPET')
+                # AIIC_source = write_testdata(self,find_Tapsrs,curr_report_file[0],'AIIC Source')
+                
+                srs_data = pull_testdata(self,find_source,curr_report_file[0],'-831_Data.')
+                recive_data = pull_testdata(self,find_rec,curr_report_file[0],'-831_Data.')
+                bkgrnd_data = pull_testdata(self,find_BNL,curr_report_file[0],'-831_Data.')
+                rt = pull_testdata(self,find_RT,curr_report_file[0],'-RT_Data.')
+                AIIC_pos1 = pull_testdata(self,find_posOne,curr_report_file[0],'-831_Data.')
+                AIIC_pos2 = pull_testdata(self,find_posTwo,curr_report_file[0],'-831_Data.')
+                AIIC_pos3 = pull_testdata(self,find_posThree,curr_report_file[0],'-831_Data.')
+                AIIC_pos4 = pull_testdata(self,find_posFour,curr_report_file[0],'-831_Data.')
+                AIIC_carpet = pull_testdata(self,find_poscarpet,curr_report_file[0],'-831_Data.')
+                AIIC_source = pull_testdata(self,find_Tapsrs,curr_report_file[0],'-831_Data.')
                 single_AIICtest_data = {
                     'srs_data': pd.DataFrame(srs_data),
                     'recive_data': pd.DataFrame(recive_data),
@@ -438,10 +479,16 @@ class FileLoaderApp(App):
             find_RT = curr_test['RT']
             
             # old method to pull data from excel and write to report excel doc
-            srs_data = write_testdata(self,find_source,curr_report_file[0],'ASTC Source')
-            recive_data = write_testdata(self,find_rec,curr_report_file[0],'ASTC Receive')
-            bkgrnd_data = write_testdata(self,find_BNL,curr_report_file[0],'BNL')
-            rt = write_RTtestdata(self,find_RT,curr_report_file[0],'RT')
+            # reving to pull_testdata function
+            # srs_data = write_testdata(self,find_source,curr_report_file[0],'ASTC Source')
+            # recive_data = write_testdata(self,find_rec,curr_report_file[0],'ASTC Receive')
+            # bkgrnd_data = write_testdata(self,find_BNL,curr_report_file[0],'BNL')
+            # rt = write_RTtestdata(self,find_RT,curr_report_file[0],'RT')
+
+            srs_data = pull_testdata(self,find_source,curr_report_file[0],'-831_Data.')
+            recive_data = pull_testdata(self,find_rec,curr_report_file[0],'-831_Data.')
+            bkgrnd_data = pull_testdata(self,find_BNL,curr_report_file[0],'-831_Data.')
+            rt = pull_testdata(self,find_RT,curr_report_file[0],'-RT_Data.')
      
             # ## UNTESTED, needs validating
             single_ASTCtest_data = {
@@ -451,7 +498,13 @@ class FileLoaderApp(App):
             'rt': pd.DataFrame(rt),
             'room_properties': pd.DataFrame(room_properties)
             }
-
+            single_NICtest_data = {
+            'srs_data': pd.DataFrame(srs_data),
+            'recive_data': pd.DataFrame(recive_data),
+            'bkgrnd_data': pd.DataFrame(bkgrnd_data),
+            'rt': pd.DataFrame(rt),
+            'room_properties': pd.DataFrame(room_properties)
+            }
             raw_report = rawReportpath+curr_report_file[0]
         
             #### write room dimensions ####
@@ -504,19 +557,17 @@ class FileLoaderApp(App):
             #### open excel file and write the reports to PDF ###
             # lol wil output wherever the file explorer in VS is currently. Probably should fix this. 
         
-            # Open/Read Excel File - NEED TO TOTALLY REWORK THIS
-            ## - new funnction from stc_calc_dev3 needs to be plugged in here - create_report
+           
+            ## - new funnction from stc_calc_dev3 needs to be plugged in here - create_report- passing to report generator v1.py
            
             print("writing to report file:")
+            print("Test report file name: ", curr_report_file[0])
             print(raw_report)
             ## need logic here to determine if NIC or ASTC or AIIC , and report one or the other 
-            if curr_test['NIC'] == 1 and curr_test['ASTC'] == 1:
-                create_report(curr_test, room_properties, single_ASTCtest_data, 'ASTC')
-                # create_report(curr_test, room_properties, single_NICtest_data, 'NIC') # still need NIC report format
-            elif curr_test['ASTC'] == 1:
+            if curr_test['ASTC'] == 1:
                 create_report(curr_test, room_properties, single_ASTCtest_data, 'ASTC')
             elif curr_test['NIC'] == 1:
-                # create_report(curr_test, room_properties, single_AIICtest_data, 'NIC') # still need NIC report format
+                create_report(curr_test, room_properties, single_NICtest_data, 'NIC') # still need NIC report format
             elif curr_test['AIIC'] == 1:
                 create_report(curr_test, room_properties, single_AIICtest_data, 'AIIC')
             
