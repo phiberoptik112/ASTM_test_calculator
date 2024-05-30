@@ -54,9 +54,6 @@ def sanitize_filepath(filepath):
 #         srs_data.to_excel(writer, sheet_name=newsheetname) #writes to report file
 #     time.sleep(1)
 
-
-
-    
 def pull_testdata(self, find_datafile, datatype):
     # pass datatype as '-831_Data.' or '-RT_Data.' to pull the correct data
     raw_testpaths = {
