@@ -22,6 +22,10 @@ from os.path import isfile, join
 import tkinter as tk
 from tkinter import *
 
+
+# Import Report generatorv1.py
+from Report_generatorv1 import create_report
+
 ### # FUNCTIONS FOR PULLING EXCEL DATA ########
 import matplotlib.pyplot as plt
 
@@ -38,6 +42,7 @@ def plot_curves(STCCurve, ASTC_curve):
     plt.show()
 
 # this is a new function combines RT and ASTC datapulls
+
 def pull_testdata(self, find_datafile, datatype):
     # pass datatype as '-831_Data.' or '-RT_Data.' to pull the correct data
     raw_testpaths = {
@@ -153,8 +158,8 @@ def pull_testplan_data(self,curr_test):
             "Recieve Room Name": curr_test['Receiving Room'],
             "Testdate": curr_test['Test Date'],
             "ReportDate": curr_test['Report Date'],
-            "Project Name": project_name,
-            "Test number": find_report,
+            "Project Name": curr_test['Project Name'],
+            "Test number": curr_test['Test Label'],
             "Source Vol" : curr_test['source room vol'],
             "Recieve Vol": curr_test['receive room vol'],
             "Partition area": curr_test['partition area'],
@@ -180,6 +185,10 @@ def pull_testplan_data(self,curr_test):
     if curr_test['AIIC_test'] == 1:
         print("AIIC testing enabled, copying data...")
 ### IIC variables  #### When extending to IIC data
+        find_source = curr_test['Source']
+        find_rec = curr_test['Recieve '] #trailing whitespace? be sure to verify this is consistent in the excel file
+        find_BNL = curr_test['BNL']
+        find_RT = curr_test['RT']
         find_posOne = curr_test['Position1']
         find_posTwo = curr_test['Position2']
         find_posThree = curr_test['Position3']
@@ -210,9 +219,9 @@ def pull_testplan_data(self,curr_test):
             'AIIC_carpet': pd.DataFrame(AIIC_carpet),
             'room_properties': pd.DataFrame(room_properties)
         }
-        return single_AIICtest_data, room_properties
+        return single_AIICtest_data
     
-    elif ASTC_test == 1:
+    elif curr_test['ASTC_test'] == 1:
         print("AIIC data not enabled")
         print("ASTC or NIC test enabled, copying data...")
 
@@ -223,10 +232,11 @@ def pull_testplan_data(self,curr_test):
             'rt': pd.DataFrame(rt),
             'room_properties': pd.DataFrame(room_properties)
             }
+        return single_ASTCtest_data
         
        
 
-    elif NIC_test == 1:
+    elif curr_test['NIC_test'] == 1:
         srs_data = pull_testdata(self,curr_test['Source'],'-831_Data.')
         recive_data = pull_testdata(self, curr_test['Recieve '],'-831_Data.')
         bkgrnd_data = pull_testdata(self,curr_test['BNL'],'-831_Data.')
@@ -239,7 +249,7 @@ def pull_testplan_data(self,curr_test):
             'rt': pd.DataFrame(rt),
             'room_properties': pd.DataFrame(room_properties)
             }
-        return single_NICtest_data, room_properties
+        return single_NICtest_data
     
 
     
@@ -336,10 +346,10 @@ class FileLoaderApp(App):
         layout.add_widget(self.fifth_text_input)
 
         # CheckBox for AIIC Testing
-        self.aiic_testing_checkbox = CheckBox(active=False, size_hint=(None, None))
-        self.aiic_testing_checkbox.bind(active=self.on_aiic_testing_checkbox_active)
-        layout.add_widget(Label(text='AIIC Testing'))
-        layout.add_widget(self.aiic_testing_checkbox)
+        # self.aiic_testing_checkbox = CheckBox(active=False, size_hint=(None, None))
+        # self.aiic_testing_checkbox.bind(active=self.on_aiic_testing_checkbox_active)
+        # layout.add_widget(Label(text='AIIC Testing'))
+        # layout.add_widget(self.aiic_testing_checkbox)
 
         # Load Data Button
         load_button = Button(text='Load Data', on_press=self.load_data)
@@ -497,8 +507,8 @@ class FileLoaderApp(App):
         # print the found test in the status box
         status_text_box.insert(tk.END, foundtest) # must come before mainloop
         report_string = '_'+foundtest+'_' 
-        status_text_box.insert(tk.END,f'Report string: '{report_string})
-        status_text_box.insert(tk.END,f'Report list: '{reports})
+        status_text_box.insert(tk.END, f"Report string: '{report_string}'")
+        status_text_box.insert(tk.END, f"Report list: '{reports}'")
         curr_report_file = [x for x in reports if report_string in x]
         print('Current report file: ',curr_report_file)
         print(curr_report_file[0]) #print the name of the report file being used
@@ -550,17 +560,19 @@ class FileLoaderApp(App):
 
             ## need logic here to determine if NIC or ASTC or AIIC , and report one or the other 
             if NIC_test == 1:
-                single_NICtest_data,room_properties = pull_testplan_data(self,curr_test)
-                create_report(curr_test, room_properties, single_NICtest_data, 'NIC') # still need NIC report format
+                single_NICtest_data = pull_testplan_data(self,curr_test)
+                create_report(curr_test, single_NICtest_data, 'NIC') # still need NIC report format
             elif ASTC_test == 1:
-                single_ASTCtest_data,room_properties = pull_testplan_data(self,curr_test)
-                create_report(curr_test, room_properties, single_ASTCtest_data, 'ASTC')
+                single_ASTCtest_data = pull_testplan_data(self,curr_test)
+                create_report(curr_test, single_ASTCtest_data, 'ASTC')
             elif AIIC_test == 1:
-                single_ASTCtest_data,room_properties = pull_testplan_data(self,curr_test)
-                create_report(curr_test, room_properties, single_AIICtest_data, 'AIIC')
+                single_AIICtest_data = pull_testplan_data(self,curr_test)
+                create_report(curr_test, single_AIICtest_data, 'AIIC')
+            else:
+                print('No test type selected, skipping test...')
+                # some sort of error checking needed here
+                continue
             
-
-        
         print('Generating Reports...')
         self.status_label.text = 'Status: Reports Generated'
 
