@@ -1,4 +1,5 @@
 import pandas as pd
+from pandas import ExcelWriter
 import numpy as np
 import matplotlib.pyplot as plot
 import matplotlib.dates as mdates
@@ -14,6 +15,63 @@ from os import listdir, walk
 from os.path import isfile, join
 import xlsxwriter
 from bokeh.plotting import figure, show
+from dataclasses import dataclass
+
+
+def sanitize_filepath(filepath):
+    ##"""Sanitize a file path by replacing forward slashes with backslashes."""
+    filepath = filepath.replace('T:', '//DLA-04/Shared/')
+    filepath = filepath.replace('\\','/')
+    # need to add a line to append a / at the end of the filename
+    return filepath
+
+def write_testdata(find_datafile, reportfile, newsheetname):
+    if find_datafile[0] =='D':
+        datafile_num = find_datafile[1:]
+        datafile_num = '-831_Data.'+datafile_num+'.xlsx'
+        slm_found = [x for x in D_datafiles if datafile_num in x]
+        slm_found[0] = rawDtestpath+slm_found[0]
+        # print(srs_slm_found)
+    elif find_datafile[0] == 'E':
+        datafile_num = find_datafile[1:]
+        datafile_num = '-831_Data.'+datafile_num+'.xlsx'
+        slm_found = [x for x in E_datafiles if datafile_num in x]
+        slm_found[0] = rawEtestpath+slm_found[0]
+
+    print(slm_found[0])
+
+    srs_data = pd.read_excel(slm_found[0],sheet_name='OBA')
+    with ExcelWriter(
+    rawReportpath+reportfile,
+    mode="a",
+    engine="openpyxl",
+    if_sheet_exists="replace",
+    ) as writer:
+        srs_data.to_excel(writer, sheet_name=newsheetname) 
+
+def write_RTtestdata(find_datafile, reportfile,newsheetname):
+    if find_datafile[0] =='D':
+        datafile_num = find_datafile[1:]
+        datafile_num = '-RT_Data.'+datafile_num+'.xlsx'
+        slm_found = [x for x in D_datafiles if datafile_num in x]
+        slm_found[0] = rawDtestpath+slm_found[0]
+        # print(srs_slm_found)
+    elif find_datafile[0] == 'E':
+        datafile_num = find_datafile[1:]
+        datafile_num = '-RT_Data.'+datafile_num+'.xlsx'
+        slm_found = [x for x in E_datafiles if datafile_num in x]
+        slm_found[0] = rawEtestpath+slm_found[0]
+
+    print(slm_found[0])
+
+    srs_data = pd.read_excel(slm_found[0],sheet_name='Summary')
+    with ExcelWriter(
+    rawReportpath+reportfile,
+    mode="a",
+    engine="openpyxl",
+    if_sheet_exists="replace",
+    ) as writer:
+        srs_data.to_excel(writer, sheet_name=newsheetname) 
 
 def retrieve_meter_paths(foundtest):
     currsrs = foundtest['Source']
@@ -83,6 +141,43 @@ def retrieve_meter_paths(foundtest):
             # print(rec_slm_found)
             rt_slm_file.append(rawEtestpath+rt_slm_found[0])
 
+def calc_ASTC_val(ATL_val):
+    pos_diffs = list()
+    diff_negative=0
+    diff_positive=0 
+    ASTC_start = 20
+    New_curve =list()
+    new_sum = 0
+    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
+    while (diff_negative < 8 and new_sum < 32):
+        # print('starting loop')
+        print('ASTC fit test value: ', ASTC_start)
+        for vals in STCCurve:
+            New_curve.append(vals+ASTC_start)
+        ASTC_curve = New_curve - ATL_val
+        # print('ASTC curve: ',ASTC_curve)
+
+        diff_negative =  np.max(ASTC_curve - ATL_val)
+        print('Max, single diff: ', diff_negative)
+        for val in ASTC_curve:
+            if val > 0:
+                pos_diffs.append(np.round(val))
+            else:
+                pos_diffs.append(0)
+        # print(pos_diffs)
+        new_sum = np.sum(pos_diffs)
+        print('Sum Positive diffs: ', new_sum)
+        
+        if new_sum > 32 or diff_negative > 8:
+            print('Curve too high! ASTC fit: ', ASTC_start-1) 
+            break 
+        pos_diffs = []
+        New_curve = []
+        ASTC_start = ASTC_start + 1
+        
+        
+        if ASTC_start >80: break
+        
 # testplan file loading. Enter testplan with test numbers in 'Test Label' Column 
 testplan_path ='//DLA-04/Shared/KAILUA PROJECTS/2023/23-001 Hickam AFB Acoustical Testing/Documents/Python_devstuff/INCOMING - PAFWC STC Testing Plan List_SRBR_Aprilrev1.xlsx'
 testplanfile = pd.read_excel(testplan_path)
@@ -99,11 +194,7 @@ print('Using hardcoded SLM Paths for D and E meters')
 
 # Test files to calculate ASTC for:
 tests_to_run = [
-    '2.1',
-    '2.2',
-    '2.3',
-    '2.4',
-    '2.5',
+    '2.1'
 ]
 # apparently, in the excel doc these strings need to be 2.1.0 to show up... weird. 
 # need to establish room volumes per test - in testplan file
@@ -117,18 +208,19 @@ for find_test in tests_to_run:
     index = indices[0,0]
     # print(index)
     print(testplanfile.iloc[index])
-    foundtest = testplanfile.iloc[index] # structure with test info
+    foundtest = testplanfile.iloc[index] # structure with test info, found from excel testplan
+
     srs_slm_file = list()
     receive_slm_file = list()
     bkgrnd_slm_file = list()
     rt_slm_file = list()
-    retrieve_meter_paths(foundtest)
+    retrieve_meter_paths(foundtest) # pull data from files into lists 
     # found all the files associated with that test
     #room volumes in cubic meters
     recieve_roomvol = foundtest['source room vol']
     source_roomvol = foundtest['receive room vol']
     parition_area = foundtest['partition area']
-    ASTC_vollimit = 883
+    ASTC_vollimit = 883 # cubic feet?
     if recieve_roomvol > ASTC_vollimit:
         print('Using NIC calc, room volume too large')
     OBAdatasheet = 'OBA'
@@ -148,8 +240,8 @@ for find_test in tests_to_run:
     rt_thirty = rt_thirty[25:41]
     rt_thirty = rt_thirty/1000 #convert to seconds
     constant = np.int32(20.047*np.sqrt(273.15+20))
-    #constant contour 
-    # STC_contour = [28,31,34,37,40,43,44,45,46,47,48,48,48,48,48,48]
+  
+ 
     # rt_thirty = np.array(rt_thirty, dtype=int)
     # print(rt_thirty)
     intermed = 30/rt_thirty
@@ -160,11 +252,8 @@ for find_test in tests_to_run:
     # print('sabines: ', sabines)
     recieve_corr = list()
     recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
-    print('rec vs background:',recieve_vsBkgrnd)
-    for i in range(len(recieve_vsBkgrnd)):
-        val = recieve_vsBkgrnd[i]
-        print('val:', recieve_vsBkgrnd[i])
-        print('count: ',i)
+    # print('rec vs background:',recieve_vsBkgrnd)
+    for i, val in enumerate(recieve_vsBkgrnd):
         if val < 5:
             recieve_corr.append(rec_overalloct.iloc[i]-2)
         elif val < 10:
@@ -174,7 +263,7 @@ for find_test in tests_to_run:
         # print('-=-=-=-=-')
         # print('recieve_corr: ',recieve_corr)
     recieve_corr = np.round(recieve_corr,1)
-    #ATL calc
+    #Apparent Transmission Loss calc
     ATL_val = srs_overalloct - recieve_corr+10*(np.log10(parition_area/sabines))
     # print(ATL_val)
     # ASTC curve fit 
@@ -204,7 +293,7 @@ for find_test in tests_to_run:
         # print(pos_diffs)
         new_sum = np.sum(pos_diffs)
         print('Sum Positive diffs: ', new_sum)
-        
+        ASTC_curve_fitplotter(ASTC_curve,New_curve)
         if new_sum > 32 or diff_negative > 8:
             print('Curve too high! ASTC fit: ', ASTC_start-1)
             print('Result for test: ', find_test) 
@@ -215,3 +304,4 @@ for find_test in tests_to_run:
         ASTC_start = ASTC_start + 1
         if ASTC_start >80: break
         
+## Once this is all properly working, need to format and plot the ASTC curve with the ATL

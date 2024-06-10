@@ -439,7 +439,7 @@ statement_test_results_text =' STATEMENT OF TEST RESULTS: '
 ## do i put the GUI here YES - ASTC GUI proto.py works - just need to add in the reportlab formatting and get going.
 # wrap the following into a funciton - take in the testplan entry, and return the reportlab formatted pdf output path
 
-def create_report(curr_test, room_properties, single_test_dataframe, test_type):
+def create_report(curr_test, single_test_dataframe, test_type):
         # all the code below
     # Kaulu by gentry testing ## EXAMPLE DATA CREATE LOOP FOR EACH TESTPLAN ENTRY
     testplan_path ='//DLA-04/Shared/KAILUA PROJECTS/2024/24-004 Kaulu by Gentry ASTC - AIIC testing/Documents/TestPlan_Kaulu_ASTM_testingv1.xlsx'

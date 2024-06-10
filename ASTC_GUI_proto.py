@@ -24,7 +24,7 @@ from tkinter import *
 
 
 # Import Report generatorv1.py
-from Report_generatorv1 import create_report
+from Report_generatorv1 import create_report, calc_ASTC_val,calc_AIIC_val, pull_testdata, pull_testplan_data, sanitize_filepath 
 
 ### # FUNCTIONS FOR PULLING EXCEL DATA ########
 import matplotlib.pyplot as plt
@@ -43,7 +43,7 @@ def plot_curves(STCCurve, ASTC_curve):
 
 # this is a new function combines RT and ASTC datapulls
 
-def pull_testdata(self, find_datafile, datatype):
+def RAW_SLM_datapull(self, find_datafile, datatype):
     # pass datatype as '-831_Data.' or '-RT_Data.' to pull the correct data
     raw_testpaths = {
         'D': self.slm_data_d_path,
@@ -195,16 +195,16 @@ def pull_testplan_data(self,curr_test):
         find_posFour = curr_test['Position4']
         find_poscarpet = curr_test['Carpet']
         find_Tapsrs = curr_test['SourceTap']
-        srs_data = pull_testdata(self,find_source,'-831_Data.')
-        recive_data = pull_testdata(self,find_rec,'-831_Data.')
-        bkgrnd_data = pull_testdata(self,find_BNL,'-831_Data.')
-        rt = pull_testdata(self,find_RT,'-RT_Data.')
-        AIIC_pos1 = pull_testdata(self,find_posOne,'-831_Data.')
-        AIIC_pos2 = pull_testdata(self,find_posTwo,'-831_Data.')
-        AIIC_pos3 = pull_testdata(self,find_posThree,'-831_Data.')
-        AIIC_pos4 = pull_testdata(self,find_posFour,'-831_Data.')
-        AIIC_carpet = pull_testdata(self,find_poscarpet,'-831_Data.')
-        AIIC_source = pull_testdata(self,find_Tapsrs,'-831_Data.')
+        srs_data = RAW_SLM_datapull(self,find_source,'-831_Data.')
+        recive_data = RAW_SLM_datapull(self,find_rec,'-831_Data.')
+        bkgrnd_data = RAW_SLM_datapull(self,find_BNL,'-831_Data.')
+        rt = RAW_SLM_datapull(self,find_RT,'-RT_Data.')
+        AIIC_pos1 = RAW_SLM_datapull(self,find_posOne,'-831_Data.')
+        AIIC_pos2 = RAW_SLM_datapull(self,find_posTwo,'-831_Data.')
+        AIIC_pos3 = RAW_SLM_datapull(self,find_posThree,'-831_Data.')
+        AIIC_pos4 = RAW_SLM_datapull(self,find_posFour,'-831_Data.')
+        AIIC_carpet = RAW_SLM_datapull(self,find_poscarpet,'-831_Data.')
+        AIIC_source = RAW_SLM_datapull(self,find_Tapsrs,'-831_Data.')
         
         single_AIICtest_data = {
             'srs_data': pd.DataFrame(srs_data),
@@ -222,8 +222,10 @@ def pull_testplan_data(self,curr_test):
         return single_AIICtest_data
     
     elif curr_test['ASTC_test'] == 1:
-        print("AIIC data not enabled")
-        print("ASTC or NIC test enabled, copying data...")
+        srs_data = RAW_SLM_datapull(self,curr_test['Source'],'-831_Data.')
+        recive_data = RAW_SLM_datapull(self, curr_test['Recieve '],'-831_Data.')
+        bkgrnd_data = RAW_SLM_datapull(self,curr_test['BNL'],'-831_Data.')
+        rt = RAW_SLM_datapull(self,curr_test['RT'],'-RT_Data.')
 
         single_ASTCtest_data = {
             'srs_data': pd.DataFrame(srs_data),
@@ -237,10 +239,10 @@ def pull_testplan_data(self,curr_test):
        
 
     elif curr_test['NIC_test'] == 1:
-        srs_data = pull_testdata(self,curr_test['Source'],'-831_Data.')
-        recive_data = pull_testdata(self, curr_test['Recieve '],'-831_Data.')
-        bkgrnd_data = pull_testdata(self,curr_test['BNL'],'-831_Data.')
-        rt = pull_testdata(self,curr_test['RT'],'-RT_Data.')
+        srs_data = RAW_SLM_datapull(self,curr_test['Source'],'-831_Data.')
+        recive_data = RAW_SLM_datapull(self, curr_test['Recieve '],'-831_Data.')
+        bkgrnd_data = RAW_SLM_datapull(self,curr_test['BNL'],'-831_Data.')
+        rt = RAW_SLM_datapull(self,curr_test['RT'],'-RT_Data.')
 
         single_NICtest_data = {
             'srs_data': pd.DataFrame(srs_data),
@@ -277,7 +279,7 @@ from kivy.uix.gridlayout import GridLayout
 
 class TestListPopup(GridLayout):
     def __init__(self, test_list, **kwargs):
-        super(TestListPopup, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.cols = len(test_list.columns)  # Set the number of columns based on DataFrame columns
 
         for column in test_list.columns:
@@ -288,6 +290,19 @@ class TestListPopup(GridLayout):
                 # Add TextInput for each cell in the DataFrame
                 text_input = TextInput(text=str(row[column]), multiline=False)
                 self.add_widget(text_input)
+# class TestListPopup(GridLayout):
+#     def __init__(self, test_list, **kwargs):
+#         super(TestListPopup, self).__init__(**kwargs)
+#         self.cols = len(test_list.columns)  # Set the number of columns based on DataFrame columns
+
+#         for column in test_list.columns:
+#             self.add_widget(Label(text=column))  # Add column headers
+
+#         for index, row in test_list.iterrows():
+#             for column in test_list.columns:
+#                 # Add TextInput for each cell in the DataFrame
+#                 text_input = TextInput(text=str(row[column]), multiline=False)
+#                 self.add_widget(text_input)
 
 # GPT code - kivy GUI 
 class FileLoaderApp(App):
@@ -561,13 +576,13 @@ class FileLoaderApp(App):
             ## need logic here to determine if NIC or ASTC or AIIC , and report one or the other 
             if NIC_test == 1:
                 single_NICtest_data = pull_testplan_data(self,curr_test)
-                create_report(curr_test, single_NICtest_data, 'NIC') # still need NIC report format
+                create_report(curr_test, single_NICtest_data,test_type='NIC') # still need NIC report format
             elif ASTC_test == 1:
                 single_ASTCtest_data = pull_testplan_data(self,curr_test)
-                create_report(curr_test, single_ASTCtest_data, 'ASTC')
+                create_report(curr_test, single_ASTCtest_data, test_type='ASTC')
             elif AIIC_test == 1:
                 single_AIICtest_data = pull_testplan_data(self,curr_test)
-                create_report(curr_test, single_AIICtest_data, 'AIIC')
+                create_report(curr_test, single_AIICtest_data, test_type='AIIC')
             else:
                 print('No test type selected, skipping test...')
                 # some sort of error checking needed here
