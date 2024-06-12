@@ -54,7 +54,7 @@ def sanitize_filepath(filepath):
 #         srs_data.to_excel(writer, sheet_name=newsheetname) #writes to report file
 #     time.sleep(1)
 
-def pull_testdata(self, find_datafile, datatype):
+def RAW_SLM_datapull(self, find_datafile, datatype):
     # pass datatype as '-831_Data.' or '-RT_Data.' to pull the correct data
     raw_testpaths = {
         'D': self.slm_data_d_path,
@@ -84,32 +84,45 @@ def format_SLMdata(self, srs_data):
     srs_thirdoct = srs_thirdoct[14:30] # select only the frequency bands of interest
     return srs_thirdoct
 
-def calc_NR_val(srs_overalloct, rec_overalloct, bkgrnd_overalloct, rt_thirty, parition_area, recieve_roomvol, NIC_vollimit):
+def calc_NR_new(srs_overalloct, rec_overalloct, bkgrnd_overalloct, rt_thirty, recieve_roomvol, NIC_vollimit,testtype):
     NIC_vollimit = 150  # cu. ft.
     if recieve_roomvol > NIC_vollimit:
         print('Using NIC calc, room volume too large')
-    constant = np.int32(20.047 * np.sqrt(273.15 + 20))
-    intermed = 30 / rt_thirty
-    thisval = np.int32(recieve_roomvol * intermed)
-    sabines = thisval / constant
-    sabines = np.round(sabines*(0.921))        
+    #constant = np.int32(20.047 * np.sqrt(273.15 + 20)) #  wut is this...
+    # intermed = 30 / rt_thirty  # was i compensating for RT calcs?
+   
+    sabines = 0.049*(recieve_roomvol/rt_thirty)  # this produces accurate sabines values
+
+    # thisval = np.int32(recieve_roomvol * intermed)
+    # sabines = thisval / constant
+    # sabines = np.round(sabines*(0.921))        
     recieve_corr = list()
     recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
     print('rec vs background:',recieve_vsBkgrnd)
-    for i, val in enumerate(recieve_vsBkgrnd):
-        print('val:', val)
-        print('count: ', i)
-        if val < 5:
-            recieve_corr.append(rec_overalloct.iloc[i]-2)
-        elif val < 10:
-            recieve_corr.append(np.log10(10**(rec_overalloct.iloc[i]/10)-10**(bkgrnd_overalloct.iloc[i]/10)))
-        else:
-            recieve_corr.append(rec_overalloct.iloc[i])
+    if testtype == 'AIIC':
+        for i, val in enumerate(recieve_vsBkgrnd):
+            if val < 5:
+                recieve_corr.append(rec_overalloct.iloc[i]-2)
+            else:
+                recieve_corr.append(10*np.log10(10**(rec_overalloct.iloc[i]/10)-10**(bkgrnd_overalloct.iloc[i]/10)))   
+    elif testtype == 'ASTC':
+        for i, val in enumerate(recieve_vsBkgrnd):
+            print('val:', val)
+            print('count: ', i)
+            if val < 5:
+                recieve_corr.append(rec_overalloct.iloc[i]-2)
+            elif val < 10:
+                recieve_corr.append(10*np.log10(10**(rec_overalloct.iloc[i]/10)-10**(bkgrnd_overalloct.iloc[i]/10)))
+            else:
+                recieve_corr.append(rec_overalloct.iloc[i])
         # print('-=-=-=-=-')
         # print('recieve_corr: ',recieve_corr)
     recieve_corr = np.round(recieve_corr,1)
     NR_val = srs_overalloct - recieve_corr
-    return NR_val, sabines
+    # Normalized_recieve = recieve_corr / srs_overalloct
+    sabines = pd.to_numeric(sabines, errors='coerce')
+    Normalized_recieve = recieve_corr-10*(np.log10(108/sabines))
+    return NR_val, sabines,recieve_corr, Normalized_recieve
 
 # #### database has raw OBA datasheet, needs to be cleaned for plotting
 # OBAdatasheet = 'OBA'
@@ -174,7 +187,7 @@ def calc_NR_val(srs_overalloct, rec_overalloct, bkgrnd_overalloct, rt_thirty, pa
 #     return srs_data
 
 ### DATA CALC FUNCTIONS ###
-
+## OLD ATL calc, needs rework 
 def calc_ATL_val(srs_overalloct,rec_overalloct,bkgrnd_overalloct,rt_thirty,parition_area,recieve_roomvol):
     ASTC_vollimit = 883
     if recieve_roomvol > ASTC_vollimit:
@@ -197,46 +210,62 @@ def calc_ATL_val(srs_overalloct,rec_overalloct,bkgrnd_overalloct,rt_thirty,parit
     ATL_val = srs_overalloct - recieve_corr+10*(np.log10(parition_area/sabines))
     return ATL_val
 
-## UNTESTED, needs validating 
-def calc_AIIC_val(ATL_val):
+## functional. need to verify with excel doc calcs
+def calc_AIIC_val(Normalized_recieve_IIC):
     pos_diffs = list()
-    diff_negative = 0
-    diff_positive = 0
-    AIIC_start = 0
-    New_curve = list()
+    diff_negative_min = 0
+    AIIC_start = 94
+    AIIC_contour_val = 16
+    IIC_contour = list()
+    AIIC_curve= list()
     new_sum = 0
-    IIC_curve = [2,2,2,2,2,2,2,1,-110,-1,-2,-3,-6,-9,-12,-15,-18]
-    while (diff_negative < 8 and new_sum < 32):
-        # print('starting loop')
-        print('AIIC fit test value: ', AIIC_start)
-        for vals in IIC_curve:
-            New_curve.append(vals+AIIC_start)
-        IIC_curve = New_curve - ATL_val
-        # print('ASTC curve: ',ASTC_curve)
+    diff_negative_max = 0
+    IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
+    # initial application of the IIC curve to the first AIIC start value 
+    for vals in IIC_curve:
+        IIC_contour.append(vals+AIIC_start)
+    Contour_curve_result = IIC_contour - Normalized_recieve_IIC
+    print('Normalized recieve ANISPL: ', Normalized_recieve_IIC)
 
-        diff_negative =  np.max(IIC_curve - ATL_val)
-        print('Max, single diff: ', diff_negative)
-        for val in IIC_curve:
+    while (diff_negative_max < 8 and new_sum < 32):
+        print('Inside loop, current AIIC contour: ', AIIC_contour_val)
+        print('Contour curve (IIC curve minus ANISPL): ',Contour_curve_result)
+        
+        diff_negative =  Normalized_recieve_IIC-IIC_contour
+        print('diff negative: ', diff_negative)
+
+        diff_negative_max =  np.max(diff_negative)
+        diff_negative = pd.to_numeric(diff_negative, errors='coerce')
+        diff_negative = np.array(diff_negative)
+
+        print('Max, single diff: ', diff_negative_max)
+        for val in diff_negative:
             if val > 0:
                 pos_diffs.append(np.round(val))
             else:
                 pos_diffs.append(0)
-        # print(pos_diffs)
+        print('positive diffs: ',pos_diffs)
         new_sum = np.sum(pos_diffs)
         print('Sum Positive diffs: ', new_sum)
-        # AIIC_curve_fitplotter(IIC_curve,New_curve)
-        if new_sum > 32 or diff_negative > 8:
-            print('Curve too high! AIIC fit: ', AIIC_start-1)
-            return AIIC_start-1
-            # print('Result for test: ', find_test) 
-            # print('-=-=-=-=-=-=-=-=-')
-            # break 
+        print('Evaluating sums and differences vs 32, 8: ', new_sum, diff_negative_max)
+        if new_sum > 32 or diff_negative_max > 8:
+            print('Difference condition met! AIIC value: ', AIIC_contour_val) # 
+            print('AIIC result curve: ', Contour_curve_result)
+            return AIIC_contour_val, Contour_curve_result
+        # condition not met, resetting arrays
         pos_diffs = []
-        New_curve = []
-        AIIC_start = AIIC_start + 1
-        if AIIC_start >80: break
+        IIC_contour = []
+        print('difference condition not met, subtracting 1 from AIIC start and recalculating the IIC contour')
+        AIIC_start = AIIC_start - 1
+        AIIC_contour_val = AIIC_contour_val + 1
+        print('AIIC start: ', AIIC_start)
+        print('AIIC contour value: ', AIIC_contour_val)
+        for vals in IIC_curve:
+            IIC_contour.append(vals+AIIC_start)
+        Contour_curve_result = IIC_contour - Normalized_recieve_IIC
+        if AIIC_start <10: break
 
-
+# need to validate
 def calc_ASTC_val(ATL_val):
     pos_diffs = list()
     diff_negative=0
@@ -766,13 +795,30 @@ def create_report(curr_test, single_test_dataframe, test_type):
     # freqThirdoct.iloc[6]
     if test_type == 'AIIC':
         #dataframe for AIIC is in single_test_dataframe
+        onethird_srs = format_SLMdata(single_AIICtest_data['AIIC_source']) 
+        average_pos = []
+        for i in range(1, 5):
+            pos_input = f'AIIC_pos{i}'
+            pos_data = format_SLMdata(single_AIICtest_data[pos_input])
+            average_pos.append(pos_data)
 
-        onethird_srs = format_SLMdata(single_test_dataframe['srs_data'])
-        onethird_rec = format_SLMdata(single_test_dataframe['recive_data'])
-        onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
-        rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
-        calc_NR, sabines = calc_NR_val(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,room_properties['parition_area'],room_properties['Recieve Vol'],NIC_vollimit=883)
-        ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd)
+        onethird_rec_Total = sum(average_pos) / len(average_pos)
+        # onethird_rec_Total = format_SLMdata(single_AIICtest_data['AIIC_pos1'])# this needs to be an average of the 4 tapper positions, stored in a dataframe of the average of the 4 dataframes octave band results. 
+
+
+        onethird_bkgrd = format_SLMdata(single_AIICtest_data['bkgrnd_data'])
+        rt_thirty = single_AIICtest_data['rt']['Unnamed: 10'][25:41]/1000
+
+        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_val(onethird_srs, onethird_rec_Total, onethird_bkgrd, rt_thirty,room_properties['Recieve Vol'][0],NIC_vollimit=883)
+        
+        # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,rt_thirty,room_properties['Partition area'][0],room_properties['Recieve Vol'][0])
+        AIIC_curve, IIC_curve = calc_AIIC_val(Nrec_ANISPL)
+        # onethird_srs = format_SLMdata(single_test_dataframe['srs_data'])
+        # onethird_rec = format_SLMdata(single_test_dataframe['recive_data'])
+        # onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
+        # rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
+        # calc_NR, sabines = calc_NR_val(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,room_properties['parition_area'],room_properties['Recieve Vol'],NIC_vollimit=883)
+        # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd)
 
         Test_result_table = pd.DataFrame(
             {
