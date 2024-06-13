@@ -18,7 +18,7 @@ def sanitize_filepath(filepath):
     # need to add a line to append a / at the end of the filename
     return filepath
 
-#### ADDITION TO MAKE IT METER LETTER AGNOSTIC - METER 1 and 2 #### STILL NEED TO DO THIS
+#### ADDITION TO MAKE IT METER LETTER AGNOSTIC - rolled change in to RAW_SLM_datapull- just need to add the folders and the function will search through all of them for the correct file.
 
 # writing meter data to report file function definition
 # def write_testdata(self,find_datafile, reportfile, newsheetname):
@@ -54,6 +54,7 @@ def sanitize_filepath(filepath):
 #         srs_data.to_excel(writer, sheet_name=newsheetname) #writes to report file
 #     time.sleep(1)
 
+# this raw datapaths method relies on only 2 paths being passed from the GUI - will we need more paths? seems like testing is always limited to 2 meters...
 def RAW_SLM_datapull(self, find_datafile, datatype):
     # pass datatype as '-831_Data.' or '-RT_Data.' to pull the correct data
     raw_testpaths = {
@@ -187,37 +188,49 @@ def calc_NR_new(srs_overalloct, rec_overalloct, bkgrnd_overalloct, rt_thirty, re
 #     return srs_data
 
 ### DATA CALC FUNCTIONS ###
-## OLD ATL calc, needs rework 
-def calc_ATL_val(srs_overalloct,rec_overalloct,bkgrnd_overalloct,rt_thirty,parition_area,recieve_roomvol):
+
+# ATL calc, reworked and funtional - use Recieve room recording, not the tapper level for this calc. this does not take the tapper into account
+def calc_ATL_val(srs_overalloct,rec_overalloct,bkgrnd_overalloct,parition_area,recieve_roomvol,sabines):
     ASTC_vollimit = 883
     if recieve_roomvol > ASTC_vollimit:
         print('Using NIC calc, room volume too large')
-    constant = np.int32(20.047*np.sqrt(273.15+20))
-    intermed = 30/rt_thirty
-    thisval = np.int32(recieve_roomvol*intermed)
-    sabines =thisval/constant
-    sabines = np.round(sabines*(0.921))
     recieve_corr = list()
+    bkgrnd_overalloct = pd.to_numeric(bkgrnd_overalloct, errors='coerce')
+    bkgrnd_overalloct = np.array(bkgrnd_overalloct)
+    rec_overalloct = pd.to_numeric(rec_overalloct, errors='coerce')
+    rec_overalloct = np.array(rec_overalloct)
+    
     recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
+    print('recieve vs background:',recieve_vsBkgrnd)
+    recieve_vsBkgrnd = pd.to_numeric(recieve_vsBkgrnd, errors='coerce')
+    recieve_vsBkgrnd = np.array(recieve_vsBkgrnd)
+
     for i, val in enumerate(recieve_vsBkgrnd):
         if val < 5:
-            recieve_corr.append(rec_overalloct.iloc[i]-2)
+            recieve_corr.append(rec_overalloct[i]-2)
         elif val < 10:
-            recieve_corr.append(np.log10(10**(rec_overalloct.iloc[i]/10)-10**(bkgrnd_overalloct.iloc[i]/10)))
+            recieve_corr.append(10*np.log10(10**(rec_overalloct[i]/10)-10**(bkgrnd_overalloct[i]/10)))
         else:
-            recieve_corr.append(rec_overalloct.iloc[i])
+            recieve_corr.append(rec_overalloct[i])
     recieve_corr = np.round(recieve_corr,1)
+    print('corrected recieve: ',recieve_corr)
+    
+    sabines = pd.to_numeric(sabines, errors='coerce')
+    #convert sabines to array
+    sabines = np.array(sabines)
+    print('sabines: ',sabines)
+    srs_overalloct = pd.to_numeric(srs_overalloct, errors='coerce')
+    srs_overalloct = np.array(srs_overalloct)
+    print('srs_overalloct: ',srs_overalloct)
     ATL_val = srs_overalloct - recieve_corr+10*(np.log10(parition_area/sabines))
     return ATL_val
 
 ## functional. need to verify with excel doc calcs
 def calc_AIIC_val(Normalized_recieve_IIC):
     pos_diffs = list()
-    diff_negative_min = 0
     AIIC_start = 94
     AIIC_contour_val = 16
     IIC_contour = list()
-    AIIC_curve= list()
     new_sum = 0
     diff_negative_max = 0
     IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
@@ -564,6 +577,7 @@ def create_report(curr_test, single_test_dataframe, test_type):
 
 ##### _+_+#__#+_#+_+_+_####################### REPORT GENERATION CODE ##############################
     import matplotlib.pyplot as plt
+    import matplotlib.ticker as ticker
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -791,28 +805,39 @@ def create_report(curr_test, single_test_dataframe, test_type):
     # function returning a database table to display frequency, level, OBA of source, reciever, RT60, NR, ATL, Exceptions
     ######### CALCS FOR PDF TABLES AND PLOTS WILL GO IN THIS SCRIPT ###########
     freqThirdoct = single_test_dataframe['srs_data'].iloc[6]
-    frequencies = freqThirdoct[14:30]
+    # frequencies = freqThirdoct[14:30]
+    frequencies =[125,160,200,250,315,400,500,630,800,1000,1250,1600,2000,2500,3150,4000]
     # freqThirdoct.iloc[6]
     if test_type == 'AIIC':
         #dataframe for AIIC is in single_test_dataframe
         onethird_srs = format_SLMdata(single_AIICtest_data['AIIC_source']) 
         average_pos = []
+        # get average of 4 tapper positions for recieve total OBA
         for i in range(1, 5):
             pos_input = f'AIIC_pos{i}'
             pos_data = format_SLMdata(single_AIICtest_data[pos_input])
             average_pos.append(pos_data)
 
         onethird_rec_Total = sum(average_pos) / len(average_pos)
-        # onethird_rec_Total = format_SLMdata(single_AIICtest_data['AIIC_pos1'])# this needs to be an average of the 4 tapper positions, stored in a dataframe of the average of the 4 dataframes octave band results. 
+        # this needs to be an average of the 4 tapper positions, stored in a dataframe of the average of the 4 dataframes octave band results. 
 
 
         onethird_bkgrd = format_SLMdata(single_AIICtest_data['bkgrnd_data'])
         rt_thirty = single_AIICtest_data['rt']['Unnamed: 10'][25:41]/1000
 
-        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_val(onethird_srs, onethird_rec_Total, onethird_bkgrd, rt_thirty,room_properties['Recieve Vol'][0],NIC_vollimit=883)
+        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_new(onethird_srs, onethird_rec_Total, onethird_bkgrd, rt_thirty,room_properties['Recieve Vol'][0],NIC_vollimit=883,testtype='AIIC')
         
         # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,rt_thirty,room_properties['Partition area'][0],room_properties['Recieve Vol'][0])
-        AIIC_curve, IIC_curve = calc_AIIC_val(Nrec_ANISPL)
+        AIIC_contour_val, Contour_curve_result = calc_AIIC_val(Nrec_ANISPL)
+
+        IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
+        IIC_contour_final = list()
+        # initial application of the IIC curve to the first AIIC start value 
+        for vals in IIC_curve:
+            IIC_contour_final.append(vals+(110-AIIC_contour_val))
+        print(IIC_contour_final)
+
+
         # onethird_srs = format_SLMdata(single_test_dataframe['srs_data'])
         # onethird_rec = format_SLMdata(single_test_dataframe['recive_data'])
         # onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
@@ -823,25 +848,29 @@ def create_report(curr_test, single_test_dataframe, test_type):
         Test_result_table = pd.DataFrame(
             {
                 "Frequency": frequencies,
-                "Source OBA": onethird_srs,
-                "Reciever OBA": onethird_rec,
-                "Background OBA": onethird_bkgrd,
-                "RT60": rt_thirty,
-                "NR": calc_NR,
-                "ATL": ATL_val,
-                "Exceptions": AIIC_Exceptions
+                "Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)	": Nrec_ANISPL,
+                "Average Receiver Background Level": onethird_bkgrd,
+                "Average RT60 (Seconds)": rt_thirty,
+                "Exceptions noted to ASTM E1007-14": AIIC_Exceptions
             }
         )
         
 
     elif test_type == 'ASTC':
+        
+        ATL_val,corrected_STC_recieve = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,room_properties['Partition area'][0],room_properties['Recieve Vol'][0],sabines)
+        
+        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,room_properties['Recieve Vol'][0],NIC_vollimit=883,testtype='ASTC')
+
         Test_result_table = pd.DataFrame(
             {
                 "Frequency": freqbands,
-                "Source OBA": onethird_srs,
-                "Reciever OBA": onethird_rec,
-                "Background OBA": onethird_bkgrd,
-                "ATL": rt['ATL'],
+                "L1, Average Source Room Level (dB)": onethird_srs,
+                "L2, Average Corrected Receiver Room Level (dB)":corrected_STC_recieve,
+                "Average Receiver Background Level (dB)": onethird_bkgrd,
+                "Average RT60 (Seconds)": rt_thirty,
+                "Noise Reduction, NR (dB)": calc_NR,
+                "Apparent Transmission Loss, ATL (dB)": ATL_val,
                 "Exceptions": ASTC_Exceptions
             }
         )
