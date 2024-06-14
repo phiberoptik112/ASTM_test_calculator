@@ -10,7 +10,8 @@ from openpyxl import cell
 from openpyxl.utils import get_column_letter
 import xlsxwriter
 import time
-
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 def sanitize_filepath(filepath):
     ##"""Sanitize a file path by replacing forward slashes with backslashes."""
     filepath = filepath.replace('T:', '//DLA-04/Shared/')
@@ -317,6 +318,24 @@ def calc_ASTC_val(ATL_val):
         
         if ASTC_start >80: break
 
+# need to validate
+def plot_curves(frequencies,Ref_curve, Field_curve, Ref_label, Field_label):
+    # pass labels for both curves, depending on AIIC or ASTC 
+    # AIIC will be Nrec_ANISPL, ASTC will be ATL_val
+    plt.figure(figsize=(10, 6))
+    plt.plot(frequencies, Ref_curve, label=Ref_label)
+    plt.plot(frequencies, Field_curve, label=Field_label)
+    plt.xlabel('Frequency')
+    plt.ylabel('Sound Pressure Level (dB)')
+    plt.grid(True)
+    plt.tick_params(axis='x', rotation=45)
+    plt.xticks(frequencies)
+    plt.xscale('log')
+    plt.gca().get_xaxis().set_major_formatter(plt.ScalarFormatter())  # Format x-ticks as scalars
+    plt.gca().xaxis.set_major_locator(ticker.FixedLocator(frequencies))  # Force all x-ticks to display
+    plt.title('Reference vs Measured')
+    plt.legend()
+    plt.show()
 # need to write a big overall wrapper function here that will go through the testplan, depending on what test type, pull the data from each excel file, write the data to the database variables for that test and then use those database variables to plot the data in the report.
 # for each testplan entry, first write the room properties database: 
 # Organize the variables into a dictionary
@@ -490,62 +509,6 @@ def create_report(curr_test, single_test_dataframe, test_type):
     # testnums = test_list['Test Label']
     ### Pass over the testplan entry database 
 
-    ##passinf over this roomproperties database
-    # room_properties = pd.DataFrame(
-    #     {
-    #         "Source Room Name": srs_roomName,
-    #         "Recieve Room Name": rec_roomName,
-    #         "Testdate": testdate,
-    #         "ReportDate": reportdate,
-    #         "Project Number": projectnum,
-    #         "Test number": find_report,
-    #         "Source Vol" : source_vol,
-    #         "Recieve Vol": rec_vol,
-    #         "Partition area": partition_area,
-    #         "Partition dim.": partition_dim,
-    #         "Source room Finish" : source_rm_finish,
-    #         "Recieve room Finish": rec_rm_finish,
-    #         "Srs Floor Descrip.": srs_floor_descrip,
-    #         "Srs Ceiling Descrip.": srs_ceiling_descrip,
-    #         "Srs Walls Descrip.": srs_walls_descrip,
-    #         "Rec Floor Descrip.": rec_floor_descrip,
-    #         "Rec Ceiling Descrip.": rec_ceiling_descrip,
-    #         "Rec Walls Descrip.": rec_walls_descrip,          
-    #         "Tested Assembly": tested_assem,
-    #         "Expected Performance": expected_perf,
-    #         "Annex 2 used?": annex_two,
-    #         "Test assem. type": test_assem_type,
-    #         "NIC reporting Note": NICreporting_Note
-    #     },
-    #     index=[0]
-    # )
-    # old loop of data, will correspond to new dataframe values
-
-    #### temp variables for testing - will be an import function from the testplan
-    source_room_name = "2nd Floor Bed 3"
-    rec_roomName = "1st Floor Bed 3"
-    sitename = "Ka'ulu by Gentry"
-    client_Name = "Gentry Builders, LLC"
-    reportdate = "4-24-24"
-    testdate = "4-3-24"
-    projectnum = "24-004"
-    testnum = '1.1.1' # this will be the pulled var from the testplan
-    rec_vol = "1441"
-    source_vol = "3643"
-    tested_assem = "partition"
-    partition_area = "1444"
-    partition_dim = "12x14"
-    source_rm_floor = 'LVT'
-    source_rm_walls = 'gyp'
-    source_rm_finish = 'unfinished'
-    source_rm_ceiling = 'gyp'
-    receiver_rm_floor = 'LVT'
-    receiver_rm_walls = 'gyp'
-    receiver_rm_finish = 'unfinished'
-    receiver_rm_ceiling = 'gyp'
-    test_assem_type = 'Floor-ceiling' ## will change AIIC vs ASTC
-    receiver_room_name = '1st floor great room/kitchen'
-
     #### database has raw OBA datasheet, needs to be cleaned for plotting
     ## this is done inside the report generation section
 
@@ -605,7 +568,7 @@ def create_report(curr_test, single_test_dataframe, test_type):
     # document name and page size
     #  Example ouptut file name: '24-006 AIIC Test Report_1.1.1.pdf'
     #  format: project_name + test_type + test_num + '.pdf'
-    doc_name = f'{projectnum} {test_type} Test Report_{testnum}.pdf'
+    doc_name = f'{single_test_dataframe['room_properties']['Project_Name'][0]} {test_type} Test Report_{single_test_dataframe['room_properties']['Test_Label'][0]}.pdf'
 
     doc = BaseDocTemplate(doc_name, pagesize=letter,
                         leftMargin=left_margin, rightMargin=right_margin,
@@ -643,7 +606,7 @@ def create_report(curr_test, single_test_dataframe, test_type):
         # elements.append(Paragraph("<b>Apparent Impact Insulation Class (AIIC)</b>", custom_title_style))
         elements.append(Spacer(1, 10))
         leftside_data = [
-            ["Report Date:", reportdate],
+            ["Report Date:", single_test_dataframe['room_properties']['Report_Date'][0]],
             ['Test Date:', testdate],
             ['DLAA Test No', testnum]
         ]
@@ -729,15 +692,16 @@ def create_report(curr_test, single_test_dataframe, test_type):
 
     # Add the table to the elements list
     main_elements.append(standards_table)
-
+    ## these elements are in the single test dataframe, room_properties
+    ### 
     # Heading 'TEST ENVIRONMENT'
     main_elements.append(Paragraph("<u>TEST ENVIRONMENT:</u>", styleHeading))
-    main_elements.append(Paragraph('The source room was '+source_room_name+'. The space was'+source_rm_finish+'. The floor was '+source_rm_floor+'. The ceiling was '+source_rm_ceiling+". The walls were"+source_rm_walls+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+source_vol+"cu. ft."))
+    main_elements.append(Paragraph('The source room was '+source_room_name+'. The space was'+source_rm_finish+'. The floor was '+source_rm_floor+'. The ceiling was '+source_rm_ceiling+". The walls were"+source_rm_walls+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+single_test_dataframe['room_properties']['source_room_vol'][0]+"cu. ft."))
     main_elements.append(Spacer(1, 10))  # Adds some space 
     ### Recieve room paragraph
     main_elements.append(Paragraph('The receiver room was '+receiver_room_name+'. The space was'+receiver_rm_finish+'. The floor was '+receiver_rm_floor+'. The ceiling was '+receiver_rm_ceiling+". The walls were"+receiver_rm_walls+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+rec_vol+"cu. ft."))
     main_elements.append(Spacer(1, 10))  # Adds some space 
-    main_elements.append(Paragraph('The test assembly measured approximately '+partition_dim+", and had an area of approximately "+partition_area+"sq. ft."))
+    main_elements.append(Paragraph('The test assembly measured approximately '+single_test_dataframe['room_properties']['partition_dim'][0]+", and had an area of approximately "+single_test_dataframe['room_properties']['partition_area'][0]+"sq. ft."))
     main_elements.append(Spacer(1, 10))  # Adds some space 
     # Heading 'TEST ENVIRONMENT'
     main_elements.append(Paragraph("<u>TEST ASSEMBLY:</u>", styleHeading))
@@ -804,26 +768,26 @@ def create_report(curr_test, single_test_dataframe, test_type):
     #### Main calculation table section --- also split into AIIC, ASTC, NIC report results. 
     # function returning a database table to display frequency, level, OBA of source, reciever, RT60, NR, ATL, Exceptions
     ######### CALCS FOR PDF TABLES AND PLOTS WILL GO IN THIS SCRIPT ###########
-    freqThirdoct = single_test_dataframe['srs_data'].iloc[6]
+    # freqThirdoct = single_test_dataframe['srs_data'].iloc[6]
     # frequencies = freqThirdoct[14:30]
     frequencies =[125,160,200,250,315,400,500,630,800,1000,1250,1600,2000,2500,3150,4000]
     # freqThirdoct.iloc[6]
     if test_type == 'AIIC':
         #dataframe for AIIC is in single_test_dataframe
-        onethird_srs = format_SLMdata(single_AIICtest_data['AIIC_source']) 
+        onethird_srs = format_SLMdata(single_test_dataframe['AIIC_source']) 
         average_pos = []
         # get average of 4 tapper positions for recieve total OBA
         for i in range(1, 5):
             pos_input = f'AIIC_pos{i}'
-            pos_data = format_SLMdata(single_AIICtest_data[pos_input])
+            pos_data = format_SLMdata(single_test_dataframe[pos_input])
             average_pos.append(pos_data)
 
         onethird_rec_Total = sum(average_pos) / len(average_pos)
         # this needs to be an average of the 4 tapper positions, stored in a dataframe of the average of the 4 dataframes octave band results. 
 
 
-        onethird_bkgrd = format_SLMdata(single_AIICtest_data['bkgrnd_data'])
-        rt_thirty = single_AIICtest_data['rt']['Unnamed: 10'][25:41]/1000
+        onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
+        rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
 
         calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_new(onethird_srs, onethird_rec_Total, onethird_bkgrd, rt_thirty,room_properties['Recieve Vol'][0],NIC_vollimit=883,testtype='AIIC')
         
@@ -835,8 +799,8 @@ def create_report(curr_test, single_test_dataframe, test_type):
         # initial application of the IIC curve to the first AIIC start value 
         for vals in IIC_curve:
             IIC_contour_final.append(vals+(110-AIIC_contour_val))
-        print(IIC_contour_final)
-
+        # print(IIC_contour_final)
+        #### Contour_final is the AIIC contour that needs to be plotted vs the ANISPL curve- we have everything to plot the graphs and the results table  ######
 
         # onethird_srs = format_SLMdata(single_test_dataframe['srs_data'])
         # onethird_rec = format_SLMdata(single_test_dataframe['recive_data'])
@@ -844,6 +808,7 @@ def create_report(curr_test, single_test_dataframe, test_type):
         # rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
         # calc_NR, sabines = calc_NR_val(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,room_properties['parition_area'],room_properties['Recieve Vol'],NIC_vollimit=883)
         # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd)
+
 
         Test_result_table = pd.DataFrame(
             {
@@ -854,17 +819,20 @@ def create_report(curr_test, single_test_dataframe, test_type):
                 "Exceptions noted to ASTM E1007-14": AIIC_Exceptions
             }
         )
-        
 
     elif test_type == 'ASTC':
-        
+        onethird_rec = format_SLMdata(single_test_dataframe['recive_data'])
+        onethird_srs = format_SLMdata(single_test_dataframe['srs_data'])
+        onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
+        rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
+
         ATL_val,corrected_STC_recieve = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,room_properties['Partition area'][0],room_properties['Recieve Vol'][0],sabines)
-        
+
         calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,room_properties['Recieve Vol'][0],NIC_vollimit=883,testtype='ASTC')
 
         Test_result_table = pd.DataFrame(
             {
-                "Frequency": freqbands,
+                "Frequency": frequencies,
                 "L1, Average Source Room Level (dB)": onethird_srs,
                 "L2, Average Corrected Receiver Room Level (dB)":corrected_STC_recieve,
                 "Average Receiver Background Level (dB)": onethird_bkgrd,
@@ -885,7 +853,7 @@ def create_report(curr_test, single_test_dataframe, test_type):
                 "Exceptions": NIC_exceptions
             }
         )
-    # Create the table - will change ASTC vs AIIC -=-= insert logic here
+    
     Test_result_table = Table(Test_result_table, hAlign='LEFT') ## hardcoded, change to table variable for selected test
     Test_result_table.setStyle(TableStyle([
         ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),

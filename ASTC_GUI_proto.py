@@ -24,27 +24,15 @@ from tkinter import *
 
 
 # Import Report generatorv1.py
-from Report_generatorv1 import create_report, calc_ASTC_val,calc_AIIC_val, pull_testdata, pull_testplan_data, sanitize_filepath 
+from Report_generatorv1 import create_report, calc_ASTC_val,calc_AIIC_val, pull_testdata, sanitize_filepath 
 
 ### # FUNCTIONS FOR PULLING EXCEL DATA ########
 import matplotlib.pyplot as plt
 
-def plot_curves(STCCurve, ASTC_curve):
-    plt.figure(figsize=(10, 6))
-    plt.plot(STCCurve, label='STC Curve')
-    plt.plot(ASTC_curve, label='ASTC Curve')
-    plt.xlabel('Index')
-    plt.ylabel('Value')
-    plt.grid(True)
-    plt.tick_params(axis='x', rotation=45)
-    plt.title('STC Curve vs ASTC Curve')
-    plt.legend()
-    plt.show()
-
 # this is a new function combines RT and ASTC datapulls
-
 def RAW_SLM_datapull(self, find_datafile, datatype):
     # pass datatype as '-831_Data.' or '-RT_Data.' to pull the correct data
+    # if the self method doesn't pass correctly, may need to re-write
     raw_testpaths = {
         'D': self.slm_data_d_path,
         'E': self.slm_data_e_path,
@@ -154,28 +142,31 @@ def pull_testplan_data(self,curr_test):
 
     room_properties = pd.DataFrame(
         {
-            "Source Room Name": curr_test['Source Room'],
-            "Recieve Room Name": curr_test['Receiving Room'],
-            "Testdate": curr_test['Test Date'],
-            "ReportDate": curr_test['Report Date'],
-            "Project Name": curr_test['Project Name'],
-            "Test number": curr_test['Test Label'],
-            "Source Vol" : curr_test['source room vol'],
-            "Recieve Vol": curr_test['receive room vol'],
-            "Partition area": curr_test['partition area'],
-            "Partition dim.": curr_test['partition dim'],
-            "Source room Finish" : curr_test['source room finish'],
-            "Recieve room Finish": curr_test['receive room finish'],
+            "Source Room Name": curr_test['Source_Room'],
+            "Recieve Room Name": curr_test['Receiving_Room'],
+            "Testdate": curr_test['Test_Date'],
+            "ReportDate": curr_test['Report_Date'],
+            "Project Name": curr_test['Project_Name'],
+            "Test number": curr_test['Test_Label'],
+            "Source Vol" : curr_test['source_room_vol'],
+            "Recieve Vol": curr_test['receive_room_vol'],
+            "Partition area": curr_test['partition_area'],
+            "Partition dim.": curr_test['partition_dim'],
+            "Source room Finish" : curr_test['source_room_finish'],
+            "Recieve room Finish": curr_test['receive_room_finish'],
             "Srs Floor Descrip.": curr_test['srs_floor'],
             "Srs Ceiling Descrip.": curr_test['srs_ceiling'],
             "Srs Walls Descrip.": curr_test['srs_Walls'],
             "Rec Floor Descrip.": curr_test['rec_floor'],
             "Rec Ceiling Descrip.": curr_test['rec_ceiling'],
             "Rec Walls Descrip.": curr_test['rec_Wall'],          
-            "Tested Assembly": curr_test['tested assembly'],
-            "Expected Performance": curr_test['expected performance'],
-            "Annex 2 used?": curr_test['Annex 2 used?'],
-            "Test assem. type": curr_test['Test assembly Type'],
+            "Tested Assembly": curr_test['tested_assembly'],
+            "Expected Performance": curr_test['expected_performance'],
+            "Annex 2 used?": curr_test['Annex_2_used?'],
+            "Test assem. type": curr_test['Test_assembly_Type'],
+            "AIIC_test": curr_test['AIIC_test'],
+            "NIC_test": curr_test['NIC_test'],
+            "ASTC_test": curr_test['ASTC_test'],
             "NIC reporting Note": NICreporting_Note
         },
         index=[0]
