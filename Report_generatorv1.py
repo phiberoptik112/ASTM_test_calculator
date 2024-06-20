@@ -75,10 +75,18 @@ def RAW_SLM_datapull(self, find_datafile, datatype):
     print(slm_found[0])
     if datatype == '-831_Data.':
         srs_data = pd.read_excel(slm_found[0], sheet_name='OBA')
-    elif datatype == '-RT_Data.':
+    elif datatype == '-RT_Data.': ## may change to -RT60Pink. for RT60 data
         srs_data = pd.read_excel(slm_found[0], sheet_name='Summary')  # data must be in Summary tab for RT meas.
     # srs_data = pd.read_excel(slm_found[0], sheet_name='OBA')  # data must be in OBA tab
     # potentially need a write to excel here...similar to previous function
+        srs_data = pd.read_excel(slm_found[0],sheet_name='OBA') # data must be in OBA tab
+        with ExcelWriter(
+        rawReportpath+reportfile, # should be in self.report 
+        mode="a",
+        engine="openpyxl",
+        if_sheet_exists="replace",
+        ) as writer:
+            srs_data.to_excel(writer, sheet_name=newsheetname) #writes to report file
     return srs_data
 
 def format_SLMdata(self, srs_data):
@@ -319,23 +327,27 @@ def calc_ASTC_val(ATL_val):
         if ASTC_start >80: break
 
 # need to validate
-def plot_curves(frequencies,Ref_curve, Field_curve, Ref_label, Field_label):
+def plot_curves(frequencies,Y_label,Ref_curve, Field_curve,Ref_label, Field_label):
     # pass labels for both curves, depending on AIIC or ASTC 
     # AIIC will be Nrec_ANISPL, ASTC will be ATL_val
     plt.figure(figsize=(10, 6))
-    plt.plot(frequencies, Ref_curve, label=Ref_label)
-    plt.plot(frequencies, Field_curve, label=Field_label)
+    plt.plot(frequencies, Ref_curve, label=Ref_label, color='red')
+    plt.plot(frequencies, Field_curve, label=Field_label, color='black', marker='s', linestyle='--')
     plt.xlabel('Frequency')
-    plt.ylabel('Sound Pressure Level (dB)')
+    plt.ylabel(Y_label)
     plt.grid(True)
     plt.tick_params(axis='x', rotation=45)
     plt.xticks(frequencies)
     plt.xscale('log')
     plt.gca().get_xaxis().set_major_formatter(plt.ScalarFormatter())  # Format x-ticks as scalars
     plt.gca().xaxis.set_major_locator(ticker.FixedLocator(frequencies))  # Force all x-ticks to display
-    plt.title('Reference vs Measured')
+    # plt.title('Reference vs Measured')
     plt.legend()
     plt.show()
+    fig = plt.get_figure()
+    fig.savefig('plot.png')
+    plot_fig = Image('plot.png')
+    return plot_fig
 # need to write a big overall wrapper function here that will go through the testplan, depending on what test type, pull the data from each excel file, write the data to the database variables for that test and then use those database variables to plot the data in the report.
 # for each testplan entry, first write the room properties database: 
 # Organize the variables into a dictionary
@@ -500,7 +512,7 @@ statement_test_results_text =' STATEMENT OF TEST RESULTS: '
 ## do i put the GUI here YES - ASTC GUI proto.py works - just need to add in the reportlab formatting and get going.
 # wrap the following into a funciton - take in the testplan entry, and return the reportlab formatted pdf output path
 
-def create_report(curr_test, single_test_dataframe, test_type):
+def create_report(self,curr_test, single_test_dataframe, test_type):
         # all the code below
     # Kaulu by gentry testing ## EXAMPLE DATA CREATE LOOP FOR EACH TESTPLAN ENTRY
     testplan_path ='//DLA-04/Shared/KAILUA PROJECTS/2024/24-004 Kaulu by Gentry ASTC - AIIC testing/Documents/TestPlan_Kaulu_ASTM_testingv1.xlsx'
@@ -607,13 +619,13 @@ def create_report(curr_test, single_test_dataframe, test_type):
         elements.append(Spacer(1, 10))
         leftside_data = [
             ["Report Date:", single_test_dataframe['room_properties']['Report_Date'][0]],
-            ['Test Date:', testdate],
-            ['DLAA Test No', testnum]
+            ['Test Date:', single_test_dataframe['room_properties']['Test_Date'][0]],
+            ['DLAA Test No', single_test_dataframe['room_properties']['Test_Label'][0]]
         ]
         rightside_data = [
-            ["Source Room:", source_room_name],
-            ["Receiver Room:", rec_roomName],
-            ["Test Assembly:", tested_assem]
+            ["Source Room:", single_test_dataframe['room_properties']['Source_Room'][0]],
+            ["Receiver Room:", single_test_dataframe['room_properties']['Receiving_Room'][0]],
+            ["Test Assembly:", single_test_dataframe['room_properties']['tested_assembly'][0]]
         ]
 
         table_left = Table(leftside_data)
@@ -800,15 +812,9 @@ def create_report(curr_test, single_test_dataframe, test_type):
         for vals in IIC_curve:
             IIC_contour_final.append(vals+(110-AIIC_contour_val))
         # print(IIC_contour_final)
-        #### Contour_final is the AIIC contour that needs to be plotted vs the ANISPL curve- we have everything to plot the graphs and the results table  ######
-
-        # onethird_srs = format_SLMdata(single_test_dataframe['srs_data'])
-        # onethird_rec = format_SLMdata(single_test_dataframe['recive_data'])
-        # onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
-        # rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
-        # calc_NR, sabines = calc_NR_val(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,room_properties['parition_area'],room_properties['Recieve Vol'],NIC_vollimit=883)
-        # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd)
-
+        #### Contour_final is the AIIC contour that needs to be plotted vs the ANISPL curve- we have everything to plot the graphs and the results table  #####
+        Ref_label = f'AIIC {AIIC_contour_val} Contour'
+        Field_IIC_label = 'Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)'
 
         Test_result_table = pd.DataFrame(
             {
@@ -882,13 +888,9 @@ def create_report(curr_test, single_test_dataframe, test_type):
 
     # need proper formatting for this plot.
     if test_type == 'AIIC':
-        plot_title = 'AIIC Reference Contour'
-        plt.plot(ATL_curve, freqbands)
-        plt.xlabel('Apparent Transmission Loss (dB)')
-        plt.ylabel('Frequency (Hz)')
-        plt.title('AIIC Reference Contour')
-        plt.grid()
-        plt.show()
+       plot_img = plot_curves(frequencies, IIC_contour_final,Nrec_ANISPL,Ref_label, Field_IIC_label)
+       main_elements.append(plot_img)
+
     elif test_type == 'ASTC':
         plot_title = 'ASTC Reference Contour'
         plt.plot(ATL_curve, freqbands)

@@ -567,13 +567,13 @@ class FileLoaderApp(App):
             ## need logic here to determine if NIC or ASTC or AIIC , and report one or the other 
             if NIC_test == 1:
                 single_NICtest_data = pull_testplan_data(self,curr_test)
-                create_report(curr_test, single_NICtest_data,test_type='NIC') # still need NIC report format
+                create_report(self,curr_test, single_NICtest_data,test_type='NIC') # still need NIC report format
             elif ASTC_test == 1:
                 single_ASTCtest_data = pull_testplan_data(self,curr_test)
-                create_report(curr_test, single_ASTCtest_data, test_type='ASTC')
+                create_report(self,curr_test, single_ASTCtest_data, test_type='ASTC')
             elif AIIC_test == 1:
                 single_AIICtest_data = pull_testplan_data(self,curr_test)
-                create_report(curr_test, single_AIICtest_data, test_type='AIIC')
+                create_report(self,curr_test, single_AIICtest_data, test_type='AIIC')
             else:
                 print('No test type selected, skipping test...')
                 # some sort of error checking needed here
