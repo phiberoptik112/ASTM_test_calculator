@@ -12,6 +12,10 @@ import xlsxwriter
 import time
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from IPython.display import display, Image
+from matplotlib import ticker
+import os
+
 def sanitize_filepath(filepath):
     ##"""Sanitize a file path by replacing forward slashes with backslashes."""
     filepath = filepath.replace('T:', '//DLA-04/Shared/')
@@ -708,17 +712,17 @@ def create_report(self,curr_test, single_test_dataframe, test_type):
     ### 
     # Heading 'TEST ENVIRONMENT'
     main_elements.append(Paragraph("<u>TEST ENVIRONMENT:</u>", styleHeading))
-    main_elements.append(Paragraph('The source room was '+source_room_name+'. The space was'+source_rm_finish+'. The floor was '+source_rm_floor+'. The ceiling was '+source_rm_ceiling+". The walls were"+source_rm_walls+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+single_test_dataframe['room_properties']['source_room_vol'][0]+"cu. ft."))
+    main_elements.append(Paragraph('The source room was '+single_test_dataframe['room_properties']['Source_Room'][0]+'. The space was'+single_test_dataframe['room_properties']['source_room_finish'][0]+'. The floor was '+single_test_dataframe['room_properties']['srs_floor'][0]+'. The ceiling was '+single_test_dataframe['room_properties']['srs_ceiling'][0]+". The walls were"+single_test_dataframe['room_properties']['srs_walls'][0]+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+single_test_dataframe['room_properties']['source_room_vol'][0]+"cu. ft."))
     main_elements.append(Spacer(1, 10))  # Adds some space 
     ### Recieve room paragraph
-    main_elements.append(Paragraph('The receiver room was '+receiver_room_name+'. The space was'+receiver_rm_finish+'. The floor was '+receiver_rm_floor+'. The ceiling was '+receiver_rm_ceiling+". The walls were"+receiver_rm_walls+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+rec_vol+"cu. ft."))
+    main_elements.append(Paragraph('The receiver room was '+single_test_dataframe['room_properties']['Receiving_Room'][0]+'. The space was'+single_test_dataframe['room_properties']['receiver_room_finish'][0]+'. The floor was '+single_test_dataframe['room_properties']['rec_floor'][0]+'. The ceiling was '+single_test_dataframe['room_properties']['rec_ceiling'][0]+". The walls were"+single_test_dataframe['room_properties']['rec_Wall'][0]+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+single_test_dataframe['room_properties']['receive_room_vol'][0]+"cu. ft."))
     main_elements.append(Spacer(1, 10))  # Adds some space 
     main_elements.append(Paragraph('The test assembly measured approximately '+single_test_dataframe['room_properties']['partition_dim'][0]+", and had an area of approximately "+single_test_dataframe['room_properties']['partition_area'][0]+"sq. ft."))
     main_elements.append(Spacer(1, 10))  # Adds some space 
     # Heading 'TEST ENVIRONMENT'
     main_elements.append(Paragraph("<u>TEST ASSEMBLY:</u>", styleHeading))
     main_elements.append(Spacer(1, 10))  # Adds some space 
-    main_elements.append(Paragraph("The tested assembly was the"+test_assem_type+"The assembly was not field verified, and was based on information provided by the client and drawings for the project. The client advised that no slab treatment or self-leveling was applied. Results may vary if slab treatment or self-leveling or any adhesive is used in other installations."))
+    main_elements.append(Paragraph("The tested assembly was the"+single_test_dataframe['room_properties']['Test_Assembly_Type'][0]+"The assembly was not field verified, and was based on information provided by the client and drawings for the project. The client advised that no slab treatment or self-leveling was applied. Results may vary if slab treatment or self-leveling or any adhesive is used in other installations."))
     # ##### END OF FIRST PAGE TEXT  - ########
         
     main_elements.append(PageBreak())
@@ -888,17 +892,14 @@ def create_report(self,curr_test, single_test_dataframe, test_type):
 
     # need proper formatting for this plot.
     if test_type == 'AIIC':
-       plot_img = plot_curves(frequencies, IIC_contour_final,Nrec_ANISPL,Ref_label, Field_IIC_label)
+       IIC_yAxis = 'Sound Pressure Level (dB)'
+       plot_img = plot_curves(frequencies,IIC_yAxis, IIC_contour_final,Nrec_ANISPL,Ref_label, Field_IIC_label)
        main_elements.append(plot_img)
 
     elif test_type == 'ASTC':
-        plot_title = 'ASTC Reference Contour'
-        plt.plot(ATL_curve, freqbands)
-        plt.xlabel('Apparent Transmission Loss (dB)')
-        plt.ylabel('Frequency (Hz)')
-        plt.title('ASTC Reference Contour')
-        plt.grid()
-        plt.show()
+        ASTCyAxis = 'Transmission Loss (dB)'
+        plot_img = plot_curves(frequencies, ASTCyAxis, ASTC_contour_final,Nrec_ANISPL,Ref_label, Field_IIC_label)
+        main_elements.append(plot_img)
     elif test_type == 'NIC':
         plot_title = 'NIC Reference Contour'
         plt.plot(ATL_curve, freqbands)
