@@ -16,6 +16,9 @@ from IPython.display import display, Image
 from matplotlib import ticker
 import os
 
+# config file with constants
+from config import *
+
 def sanitize_filepath(filepath):
     ##"""Sanitize a file path by replacing forward slashes with backslashes."""
     filepath = filepath.replace('T:', '//DLA-04/Shared/')
@@ -23,41 +26,32 @@ def sanitize_filepath(filepath):
     # need to add a line to append a / at the end of the filename
     return filepath
 
-#### ADDITION TO MAKE IT METER LETTER AGNOSTIC - rolled change in to RAW_SLM_datapull- just need to add the folders and the function will search through all of them for the correct file.
+from reportlab.lib import colors
+from reportlab.platypus import Table, TableStyle
+def create_tables(data, col_width=None, row_heights=None, style=None):
+    table = Table(data, colWidths=col_width, rowHeights=row_heights)
 
-# writing meter data to report file function definition
-# def write_testdata(self,find_datafile, reportfile, newsheetname):
-#     rawDtestpath = self.slm_data_d_path
-#     rawEtestpath = self.slm_data_e_path
-#     rawAtestpath = self.slm_data_e_path
-#     rawReportpath = self.report_output_folder_path
-#     D_datafiles = [f for f in listdir(rawDtestpath) if isfile(join(rawDtestpath,f))]
-#     E_datafiles = [f for f in listdir(rawEtestpath) if isfile(join(rawEtestpath,f))]
-#     E_datafiles = [f for f in listdir(rawEtestpath) if isfile(join(rawEtestpath,f))]
+    if style is None:
+        style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 14),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('TEXTWRAP', (0, 1), (-1, -1)),
+            ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+            ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 12),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 12),
+            ('TOPPADDING', (0, 1), (-1, -1), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ])
+    table.setStyle(style)
+    return table
 
-#     if find_datafile[0] =='A': ## REPLACE WITH METER 1 - NEED TO DEFINE IN TESTPLAN ##
-#         datafile_num = find_datafile[1:]
-#         datafile_num = '-831_Data.'+datafile_num+'.xlsx'
-#         slm_found = [x for x in A_datafiles if datafile_num in x]
-#         slm_found[0] = rawAtestpath+slm_found[0]# If this line errors, the test file is mislabled or doesn't exist 
-#         # print(srs_slm_found)
-#     elif find_datafile[0] == 'E':
-#         datafile_num = find_datafile[1:]
-#         datafile_num = '-831_Data.'+datafile_num+'.xlsx'
-#         slm_found = [x for x in E_datafiles if datafile_num in x]
-#         slm_found[0] = rawEtestpath+slm_found[0]# If this line errors, the test file is mislabled or doesn't exist 
-
-#     print(slm_found[0])
-
-#     srs_data = pd.read_excel(slm_found[0],sheet_name='OBA') # data must be in OBA tab
-#     with ExcelWriter(
-#     rawReportpath+reportfile,
-#     mode="a",
-#     engine="openpyxl",
-#     if_sheet_exists="replace",
-#     ) as writer:
-#         srs_data.to_excel(writer, sheet_name=newsheetname) #writes to report file
-#     time.sleep(1)
 
 # this raw datapaths method relies on only 2 paths being passed from the GUI - will we need more paths? seems like testing is always limited to 2 meters...
 def RAW_SLM_datapull(self, find_datafile, datatype):
@@ -359,21 +353,21 @@ def plot_curves(frequencies,Y_label,Ref_curve, Field_curve,Ref_label, Field_labe
 
 # _=-=-=-=--=-=-=-_+_=-=-=-=-=-=-_+_=-=-=-=-=-= Text lookups for report print -=-=-=-=-=-=-=- 
 
-stockNIC_note = ["The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver and/or source room was greater than the maximum allowed per E336-16, Paragraph 9.4.1.2.",
-                 "The receiver and/or source room was not an enclosed space.",
-                 "The receiver and/or source room has a volume less than the minimum volume requirement of 25 m3 (883 cu. ft.).",
-                 "The receiver and/or source room has one or more dimensions less than the minimum requirement of 2.3 m (7.5 ft.)."]
+# stockNIC_note = ["The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver and/or source room was greater than the maximum allowed per E336-16, Paragraph 9.4.1.2.",
+#                  "The receiver and/or source room was not an enclosed space.",
+#                  "The receiver and/or source room has a volume less than the minimum volume requirement of 25 m3 (883 cu. ft.).",
+#                  "The receiver and/or source room has one or more dimensions less than the minimum requirement of 2.3 m (7.5 ft.)."]
 
-ISR_ony_report = "The receiver room had a volume less than the minimum volume requirement of 40 m3."
-stockISR_notes = ["The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver room was greater than the maximum allowed per E1007-16, Paragraph 10.3.1 and 10.4.5.",
-"The receiver and/or source room was not an enclosed space.", 
-"The receiver and/or source room has a volume less than the minimum volume requirement of 40 m3 (1413 cu. ft.).",
-"The receiver and/or source room has one or more dimensions less than the minimum requirement of 2.3 m (7.5 ft.)."]
+# ISR_ony_report = "The receiver room had a volume less than the minimum volume requirement of 40 m3."
+# stockISR_notes = ["The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver room was greater than the maximum allowed per E1007-16, Paragraph 10.3.1 and 10.4.5.",
+# "The receiver and/or source room was not an enclosed space.", 
+# "The receiver and/or source room has a volume less than the minimum volume requirement of 40 m3 (1413 cu. ft.).",
+# "The receiver and/or source room has one or more dimensions less than the minimum requirement of 2.3 m (7.5 ft.)."]
 
-#standards 
-standards_text = (("ASTC Test Procedure ASTM E336-16",	"Standard Test Method for Measurement of Airborne Sound Attenuation between Rooms in Buildings"),("STC Calculation	ASTM E413-16",	"Classification for Rating Sound Insulation"),("AIIC Test Procedure	ASTM E1007-14",	"Standard Test Method for Field Measurement of Tapping Machine Impact Sound Transmission Through Floor-Ceiling Assemblies and Associated Support Structure"),
-("IIC Calculation	ASTM E989-06(2012)",	"Standard Classification for Determination of Impact Insulation Class (IIC)"),
-("RT60 Test Procedure	ASTM E2235-04(2012)",	"Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods"))
+# #standards 
+# standards_text = (("ASTC Test Procedure ASTM E336-16",	"Standard Test Method for Measurement of Airborne Sound Attenuation between Rooms in Buildings"),("STC Calculation	ASTM E413-16",	"Classification for Rating Sound Insulation"),("AIIC Test Procedure	ASTM E1007-14",	"Standard Test Method for Field Measurement of Tapping Machine Impact Sound Transmission Through Floor-Ceiling Assemblies and Associated Support Structure"),
+# ("IIC Calculation	ASTM E989-06(2012)",	"Standard Classification for Determination of Impact Insulation Class (IIC)"),
+# ("RT60 Test Procedure	ASTM E2235-04(2012)",	"Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods"))
 
 # refer to single standards like this : standards_text[0][0]
 
@@ -389,29 +383,29 @@ standards_text = (("ASTC Test Procedure ASTM E336-16",	"Standard Test Method for
 #code:
 # =CONCATENATE('SLM Data'!B20,'SLM Data'!$C$20, 'SLM Data'!B21,'SLM Data'!$C$21,'SLM Data'!$B$22, 'SLM Data'!$C$22, 'SLM Data'!$B$23, 'SLM Data'!$C$23, 'SLM Data'!$B$24,'SLM Data'!$C$24,". ",'SLM Data'!$C$25,'SLM Data'!$C$26," The source room had a volume of approximately ",'SLM Data'!C16," cu. ft.")
 
-# test procedure 
-test_procedure_pg = 'Determination of space-average sound pressure levels was performed via the manually scanned microphones techique, described in ' + standards_text[0][0] + ', Paragraph 11.4.3.3.'+ 'The source room was selected in accordance with ASTM E336-11 Paragraph 9.2.5, which states that "If a corridor must be used as one of the spaces for measurement of ATL or FTL, it shall be used as the source space."'
-# code:
-# =CONCATENATE("The test was performaned in general accordance with ",AIIC or ASTC or NIC,". Determination of Space-Average Levels performed via the manually scanned microphones techique, described in ",'SLM Data'!C59,", Paragraph 11.4.2.2.")
-# The test was performaned in general accordance with ASTM E1007-14. Determination of Space-Average Levels performed via the manually scanned microphones techique, described in ASTM E1007-14, Paragraph 11.4.2.2.								
+# # test procedure 
+# test_procedure_pg = 'Determination of space-average sound pressure levels was performed via the manually scanned microphones techique, described in ' + standards_text[0][0] + ', Paragraph 11.4.3.3.'+ 'The source room was selected in accordance with ASTM E336-11 Paragraph 9.2.5, which states that "If a corridor must be used as one of the spaces for measurement of ATL or FTL, it shall be used as the source space."'
+# # code:
+# # =CONCATENATE("The test was performaned in general accordance with ",AIIC or ASTC or NIC,". Determination of Space-Average Levels performed via the manually scanned microphones techique, described in ",'SLM Data'!C59,", Paragraph 11.4.2.2.")
+# # The test was performaned in general accordance with ASTM E1007-14. Determination of Space-Average Levels performed via the manually scanned microphones techique, described in ASTM E1007-14, Paragraph 11.4.2.2.								
 
-flanking_text = "Flanking transmission was not evaluated."
+# flanking_text = "Flanking transmission was not evaluated."
 
-# To evaluate room absorption, 1 microphone was used to measure 4 decays at 4 locations around the receiving room for a total of 16 measurements, per ASTM E2235-04(2012).								
+# # To evaluate room absorption, 1 microphone was used to measure 4 decays at 4 locations around the receiving room for a total of 16 measurements, per ASTM E2235-04(2012).								
 
-RT_text = "To evaluate room absorption, 1 microphone was used to measure 4 decays at 4 locations around the receiving room for a total of 16 measurements, per"+standards_text[4][0]
+# RT_text = "To evaluate room absorption, 1 microphone was used to measure 4 decays at 4 locations around the receiving room for a total of 16 measurements, per"+standards_text[4][0]
 
-# ASTC and NIC final result and blurb
+# # ASTC and NIC final result and blurb
 
-# ASTC result, concat with this: 
-ASTC_results_ATverbage = ' was calculated. The ASTC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The ASTC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of'
+# # ASTC result, concat with this: 
+# ASTC_results_ATverbage = ' was calculated. The ASTC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The ASTC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of'
 
-#NIC results, concat with this:
-NIC_results_NRverbage = ' was calculated. The NIC rating is based on Noise Reduction (NR), and includes the effects of noise flanking. The NIC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of'
-# after results
-results_blurb = 'The results stated in this report represent only the specific construction and acoustical conditions present at the time of the test. Measurements performed in accordance with this test method on nominally identical constructions and acoustical conditions may produce different results.'
+# #NIC results, concat with this:
+# NIC_results_NRverbage = ' was calculated. The NIC rating is based on Noise Reduction (NR), and includes the effects of noise flanking. The NIC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of'
+# # after results
+# results_blurb = 'The results stated in this report represent only the specific construction and acoustical conditions present at the time of the test. Measurements performed in accordance with this test method on nominally identical constructions and acoustical conditions may produce different results.'
 
-#test instrumentation
+# #test instrumentation
 # table with SLM serial, micpreamp, mic, calibrator, speaker, noise gen.
 # LOGIC NEEDED: 
 #  import very simply spreadsheet with this information preloaded, and pull from the spreadsheet
@@ -426,90 +420,8 @@ results_blurb = 'The results stated in this report represent only the specific c
         # layout.add_widget(self.fifth_text_input)
 
 
-Equip_type_list = [ "Sound Level Meter 1",
-"Microphone Pre-Amp:",
-"Microphone:",
-"Calibrator:",
-"Sound Level Meter 2",
-"Microphone Pre-Amp:",
-"Microphone:",
-"Calibrator:",
-"Amplified Loudspeakers",
-"Noise Generator:"
-]
-
-Manuf_list = ["Larson Davis",
-"Larson Davis",
-"Larson Davis",
-"Larson Davis",
-"Larson Davis",
-"Larson Davis",
-"Larson Davis",
-"Larson Davis",
-"QSC",
-"NTi Audio"
-]
-
-Model_numlist = ["831",
-"PRM831",
-"377B20",
-"CAL200",
-"831",
-"PRM831",
-"377B20",
-"CAL200",
-"K10",
-"MR-PRO"
-]
-
-Serial_numList = ["3784",
-"051188",	
-"301698",	
-"2775671",	
-"4328",	
-"046469",	
-"168830",	
-"5955",	
-"GAA530909",	
-"0162"
-]
-
-Last_NISTcal_list = ["[9/19/2022",
-"9/19/2022",
-"9/16/2022",
-"9/19/2022",
-"10/24/2022",
-"10/24/2022",
-"10/20/2022",
-"10/26/2022",
-"N/A",
-"N/A"
-]
-LastLocalcalLIst = ["Apr 2024",
-"Apr 2024",
-"Apr 2024",
-"N/A",
-"Apr 2024",
-"Apr 2024",
-"Apr 2024",
-"N/A",
-"N/A",
-"N/A"
-]
-test_instrumentation = pd.DataFrame(
-    {
-        "Equipment Type": Equip_type_list,
-        "Manufacturer": Manuf_list,
-        "Model Number": Model_numlist,
-        "Serial Number": Serial_numList,
-        "Last NIST Tracable Calibration": Last_NISTcal_list,
-        "Last Local Calibration" : LastLocalcalLIst
-    },
-        # index=[0]
-)    
-
-## STATEMENT OF TEST RESULTS 
-statement_test_results_text =' STATEMENT OF TEST RESULTS: '
+# ## STATEMENT OF TEST RESULTS 
+# statement_test_results_text =' STATEMENT OF TEST RESULTS: '
 
 ###################################
 ####_+#_+_+_#+_#+_#+_####_######################################
@@ -519,39 +431,6 @@ statement_test_results_text =' STATEMENT OF TEST RESULTS: '
 def create_report(self,curr_test, single_test_dataframe, test_type):
         # all the code below
     # Kaulu by gentry testing ## EXAMPLE DATA CREATE LOOP FOR EACH TESTPLAN ENTRY
-    testplan_path ='//DLA-04/Shared/KAILUA PROJECTS/2024/24-004 Kaulu by Gentry ASTC - AIIC testing/Documents/TestPlan_Kaulu_ASTM_testingv1.xlsx'
-    # need to modify for current project number
-    # test_list = pd.read_excel(testplan_path)
-    # testnums = test_list['Test Label']
-    ### Pass over the testplan entry database 
-
-    #### database has raw OBA datasheet, needs to be cleaned for plotting
-    ## this is done inside the report generation section
-
-
-    # OBAdatasheet = 'OBA'
-    # RTsummarysheet = 'Summary'
-    # freqbands = ['63','125','250','500','1000','2000','4000','8000']
-
-    # srs_OBAdata = pd.read_excel(single_test_dataframe['srs_data'],OBAdatasheet)
-    # recive_OBAdata = pd.read_excel(single_test_dataframe['recive_data'],OBAdatasheet)
-    # bkgrd_OBAdata = pd.read_excel(single_test_dataframe['bkgrnd_data'],OBAdatasheet)
-    # rt = pd.read_excel(single_test_dataframe['rt'],RTsummarysheet)
-
-    # transposed_srsOBAdata = srs_OBAdata.transpose()
-    # srs_OBAdata = srs_OBAdata.dropna()
-
-    # # Get the first row of variables as the new column names
-    # new_column_names = transposed_srsOBAdata.iloc[0]
-
-    # # Rename the columns of transposed_srsOBAdata
-    # transposed_srsOBAdata = transposed_srsOBAdata.rename(columns=new_column_names)
-
-    # # Remove the first row (variable labels)
-    # transposed_srsOBAdata = transposed_srsOBAdata[1:]
-    # onethird_srs = srs_OBAdata[6:10]
-    # onethird_rec = recive_OBAdata[6:10]
-    # onethird_bkgrd = bkgrd_OBAdata[6:10]
 
 
 ##### _+_+#__#+_#+_+_+_####################### REPORT GENERATION CODE ##############################
@@ -568,12 +447,12 @@ def create_report(self,curr_test, single_test_dataframe, test_type):
     ######## =--=-=-=--= 
     ### custom margins
     # Specify custom margins (in points, where 1 inch equals 72 points)
-    left_margin = right_margin = 0.75 * 72  # 0.75 inches
-    top_margin = 0.25 * 72 # 0.25 inch
-    bottom_margin = 1 * 72  # 1 inch
-    header_height = 2 * inch
-    footer_height = 0.5 * inch
-    main_content_height = letter[1] - top_margin - bottom_margin - header_height - footer_height
+    # left_margin = right_margin = 0.75 * 72  # 0.75 inches
+    # top_margin = 0.25 * 72 # 0.25 inch
+    # bottom_margin = 1 * 72  # 1 inch
+    # header_height = 2 * inch
+    # footer_height = 0.5 * inch
+    # main_content_height = letter[1] - top_margin - bottom_margin - header_height - footer_height
 
     # # Create a document with custom page templates
     # doc = BaseDocTemplate("report_with_header.pdf", pagesize=letter)
@@ -862,7 +741,7 @@ def create_report(self,curr_test, single_test_dataframe, test_type):
     elif test_type == 'NIC':
         Test_result_table = pd.DataFrame(
             {
-                "Frequency": freqbands,
+                "Frequency": frequencies,
                 "Source OBA": onethird_srs,
                 "Reciever OBA": onethird_rec,
                 "Background OBA": onethird_bkgrd,
