@@ -246,12 +246,6 @@ def pull_testplan_data(self,curr_test):
     
 
     
-def sanitize_filepath(filepath):
-    ##"""Sanitize a file path by replacing forward slashes with backslashes."""
-    filepath = filepath.replace('T:', '//DLA-04/Shared/')
-    filepath = filepath.replace('\\','/')
-    # need to add a line to append a / at the end of the filename
-    return filepath
 ################ ## # # ###############
     # End of function section #
 #######################################

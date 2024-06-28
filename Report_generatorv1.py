@@ -93,7 +93,7 @@ def RAW_SLM_datapull(self, find_datafile, datatype):
             srs_data.to_excel(writer, sheet_name=newsheetname) #writes to report file
     return srs_data
 
-def format_SLMdata(self, srs_data):
+def format_SLMdata(srs_data):
     srs_thirdoct = srs_data.iloc[7] # hardcoded to SLM export data format
     srs_thirdoct = srs_thirdoct[14:30] # select only the frequency bands of interest
     return srs_thirdoct
@@ -347,7 +347,7 @@ def plot_curves(frequencies,Y_label,Ref_curve, Field_curve,Ref_label, Field_labe
     plt.gca().xaxis.set_major_locator(ticker.FixedLocator(frequencies))  # Force all x-ticks to display
     # plt.title('Reference vs Measured')
     plt.legend()
-    plt.show()
+    # plt.show()
     fig = plt.get_figure()
     fig.savefig('plot.png')
     plot_fig = Image('plot.png')
@@ -584,8 +584,8 @@ def create_report(self,curr_test, single_test_dataframe, test_type):
     # document name and page size
     #  Example ouptut file name: '24-006 AIIC Test Report_1.1.1.pdf'
     #  format: project_name + test_type + test_num + '.pdf'
-    doc_name = f'{single_test_dataframe['room_properties']['Project_Name'][0]} {test_type} Test Report_{single_test_dataframe['room_properties']['Test_Label'][0]}.pdf'
-
+    # doc_name = f"{single_test_dataframe['room_properties']['Project_Name'][0]} {test_type} Test Report_{single_test_dataframe['room_properties']['Test_Label'][0]}.pdf"
+    doc_name = f"{single_test_dataframe['room_properties']['Project_Name'][0]} {test_type} Test Report_{single_test_dataframe['room_properties']['Test_Label'][0]}.pdf"
     doc = BaseDocTemplate(doc_name, pagesize=letter,
                         leftMargin=left_margin, rightMargin=right_margin,
                         topMargin=top_margin, bottomMargin=bottom_margin)
@@ -830,16 +830,23 @@ def create_report(self,curr_test, single_test_dataframe, test_type):
             }
         )
 
+
     elif test_type == 'ASTC':
+        ## obtain SLM data from overall dataframe
         onethird_rec = format_SLMdata(single_test_dataframe['recive_data'])
         onethird_srs = format_SLMdata(single_test_dataframe['srs_data'])
         onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
         rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
-
+        # Calculation of ATL
         ATL_val,corrected_STC_recieve = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,room_properties['Partition area'][0],room_properties['Recieve Vol'][0],sabines)
-
+        # Calculation of NR
         calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,room_properties['Recieve Vol'][0],NIC_vollimit=883,testtype='ASTC')
-
+        # creating reference curve for ASTC graph
+        STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
+        ASTC_contour_final = list()
+        for vals in STCCurve:
+            ASTC_contour_final.append(vals+(ATL_val))
+        
         Test_result_table = pd.DataFrame(
             {
                 "Frequency": frequencies,
@@ -893,21 +900,21 @@ def create_report(self,curr_test, single_test_dataframe, test_type):
     # need proper formatting for this plot.
     if test_type == 'AIIC':
        IIC_yAxis = 'Sound Pressure Level (dB)'
-       plot_img = plot_curves(frequencies,IIC_yAxis, IIC_contour_final,Nrec_ANISPL,Ref_label, Field_IIC_label)
-       main_elements.append(plot_img)
+       AIIC_plot_img = plot_curves(frequencies,IIC_yAxis, IIC_contour_final,Nrec_ANISPL,Ref_label, Field_IIC_label)
+       plot_image = Image(AIIC_plot_img, 6*inch, 4*inch)
+       main_elements.append(plot_image)
 
     elif test_type == 'ASTC':
         ASTCyAxis = 'Transmission Loss (dB)'
-        plot_img = plot_curves(frequencies, ASTCyAxis, ASTC_contour_final,Nrec_ANISPL,Ref_label, Field_IIC_label)
+        ASTC_plot_img = plot_curves(frequencies, ASTCyAxis, ASTC_contour_final,Nrec_ANISPL,Ref_label, Field_IIC_label)
+        plot_img = Image(ASTC_plot_img, 6*inch, 4*inch)
         main_elements.append(plot_img)
+        
     elif test_type == 'NIC':
-        plot_title = 'NIC Reference Contour'
-        plt.plot(ATL_curve, freqbands)
-        plt.xlabel('Apparent Transmission Loss (dB)')
-        plt.ylabel('Frequency (Hz)')
-        plt.title('NIC Reference Contour')
-        plt.grid()
-        plt.show()
+        ASTCyAxis = 'Transmission Loss (dB)'
+        NIC_plot_img = plot_curves(frequencies, ASTCyAxis, ASTC_contour_final,Nrec_ANISPL,Ref_label, Field_IIC_label)
+        plot_img = Image(NIC_plot_img, 6*inch, 4*inch)
+        main_elements.append(plot_img)
 
 
     # Output a file string for the PDF made up of test number and test type
