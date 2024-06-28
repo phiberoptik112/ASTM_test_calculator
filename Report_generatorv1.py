@@ -805,7 +805,7 @@ def create_report(self,curr_test, single_test_dataframe, test_type):
         onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
         rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
 
-        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_new(onethird_srs, onethird_rec_Total, onethird_bkgrd, rt_thirty,room_properties['Recieve Vol'][0],NIC_vollimit=883,testtype='AIIC')
+        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_new(onethird_srs, onethird_rec_Total, onethird_bkgrd, rt_thirty,single_test_dataframe['room_properties']['receive_room_vol'][0],NIC_vollimit=883,testtype='AIIC')
         
         # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,rt_thirty,room_properties['Partition area'][0],room_properties['Recieve Vol'][0])
         AIIC_contour_val, Contour_curve_result = calc_AIIC_val(Nrec_ANISPL)
@@ -838,9 +838,9 @@ def create_report(self,curr_test, single_test_dataframe, test_type):
         onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
         rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
         # Calculation of ATL
-        ATL_val,corrected_STC_recieve = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,room_properties['Partition area'][0],room_properties['Recieve Vol'][0],sabines)
+        ATL_val,corrected_STC_recieve = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,single_test_dataframe['room_properties']['partition_area'][0],single_test_dataframe['room_properties']['receive_room_vol'][0],sabines)
         # Calculation of NR
-        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,room_properties['Recieve Vol'][0],NIC_vollimit=883,testtype='ASTC')
+        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,single_test_dataframe['room_properties']['receive_room_vol'][0],NIC_vollimit=883,testtype='ASTC')
         # creating reference curve for ASTC graph
         STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
         ASTC_contour_final = list()
@@ -909,7 +909,7 @@ def create_report(self,curr_test, single_test_dataframe, test_type):
         ASTC_plot_img = plot_curves(frequencies, ASTCyAxis, ASTC_contour_final,Nrec_ANISPL,Ref_label, Field_IIC_label)
         plot_img = Image(ASTC_plot_img, 6*inch, 4*inch)
         main_elements.append(plot_img)
-        
+
     elif test_type == 'NIC':
         ASTCyAxis = 'Transmission Loss (dB)'
         NIC_plot_img = plot_curves(frequencies, ASTCyAxis, ASTC_contour_final,Nrec_ANISPL,Ref_label, Field_IIC_label)
