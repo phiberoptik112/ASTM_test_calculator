@@ -24,7 +24,7 @@ from tkinter import *
 
 
 # Import Report generatorv1.py
-from Report_generatorv1 import create_report, calc_ASTC_val,calc_AIIC_val, pull_testdata, sanitize_filepath 
+from Report_generatorv1 import create_report, calc_ASTC_val,calc_AIIC_val, RAW_SLM_datapull, sanitize_filepath,calc_NR_new,calc_ATL_val
 
 ### # FUNCTIONS FOR PULLING EXCEL DATA ########
 import matplotlib.pyplot as plt
@@ -75,6 +75,8 @@ def pull_testplan_data(self,curr_test):
 
     room_properties = pd.DataFrame(
         {
+            "Site Name": curr_test['Site_Name'],
+            "Client Name": curr_test['Client_Name'],
             "Source Room Name": curr_test['Source_Room'],
             "Recieve Room Name": curr_test['Receiving_Room'],
             "Testdate": curr_test['Test_Date'],

@@ -133,66 +133,6 @@ def calc_NR_new(srs_overalloct, rec_overalloct, bkgrnd_overalloct, rt_thirty, re
     return NR_val, sabines,recieve_corr, Normalized_recieve
 
 # #### database has raw OBA datasheet, needs to be cleaned for plotting
-# OBAdatasheet = 'OBA'
-# RTsummarysheet = 'Summary'
-# freqbands = ['63','125','250','500','1000','2000','4000','8000']
-# srs_OBAdata = pd.read_excel(srs_slm_file[0],OBAdatasheet)
-# recive_OBAdata = pd.read_excel(receive_slm_file[0],OBAdatasheet)
-# bkgrd_OBAdata = pd.read_excel(bkgrnd_slm_file[0],OBAdatasheet)
-# rt = pd.read_excel(rt_slm_file[0],RTsummarysheet)
-
-# transposed_srsOBAdata = srs_OBAdata.transpose()
-# srs_OBAdata = srs_OBAdata.dropna()
-
-# # Get the first row of variables as the new column names
-# new_column_names = transposed_srsOBAdata.iloc[0]
-
-# # Rename the columns of transposed_srsOBAdata
-# transposed_srsOBAdata = transposed_srsOBAdata.rename(columns=new_column_names)
-
-# # Remove the first row (variable labels)
-# transposed_srsOBAdata = transposed_srsOBAdata[1:]
-# onethird_srs = srs_OBAdata[6:10]
-# onethird_rec = recive_OBAdata[6:10]
-# onethird_bkgrd = bkgrd_OBAdata[6:10]
-
-# OLD function, will not be used, just reference.
-# def write_RTtestdata(find_datafile, reportfile,newsheetname):
-#     rawDtestpath = self.slm_data_d_path
-#     rawEtestpath = self.slm_data_e_path
-#     # rawAtestpath = self.slm_data_a_path
-#     rawReportpath = self.report_output_folder_path
-#     # A_datafiles = [f for f in listdir(rawDtestpath) if isfile(join(rawDtestpath,f))]
-#     D_datafiles = [f for f in listdir(rawDtestpath) if isfile(join(rawDtestpath,f))]
-#     E_datafiles = [f for f in listdir(rawEtestpath) if isfile(join(rawEtestpath,f))]
-#     if find_datafile[0] =='A':
-#         datafile_num = find_datafile[1:]
-#         datafile_num = '-RT_Data.'+datafile_num+'.xlsx'
-#         slm_found = [x for x in A_datafiles if datafile_num in x]
-#         slm_found[0] = rawAtestpath+slm_found[0]# If this line errors, the test file is mislabled or doesn't exist 
-#         # print(srs_slm_found)
-#     elif find_datafile[0] == 'E':
-#         datafile_num = find_datafile[1:]
-#         datafile_num = '-RT_Data.'+datafile_num+'.xlsx'
-#         slm_found = [x for x in E_datafiles if datafile_num in x]
-#         slm_found[0] = rawEtestpath+slm_found[0] # If this line errors, the test file is mislabled or doesn't exist 
-
-#     print(slm_found[0])
-
-#     srs_data = pd.read_excel(slm_found[0],sheet_name='Summary')# data must be in Summary tab for RT meas.
-#     # could reduce this function by also passing the sheet to be read into the args. 
-#     # transfer to either master Pandas database or SQL database
-
-#     with ExcelWriter(
-#     rawReportpath+reportfile,
-#     mode="a",
-#     engine="openpyxl",
-#     if_sheet_exists="replace",
-#     ) as writer:
-#         srs_data.to_excel(writer, sheet_name=newsheetname) 
-#     time.sleep(1)
-#     # excel.Quit()
-#     return srs_data
 
 ### DATA CALC FUNCTIONS ###
 
@@ -351,77 +291,7 @@ def plot_curves(frequencies,Y_label,Ref_curve, Field_curve,Ref_label, Field_labe
 # Organize the variables into a dictionary
 
 
-# _=-=-=-=--=-=-=-_+_=-=-=-=-=-=-_+_=-=-=-=-=-= Text lookups for report print -=-=-=-=-=-=-=- 
 
-# stockNIC_note = ["The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver and/or source room was greater than the maximum allowed per E336-16, Paragraph 9.4.1.2.",
-#                  "The receiver and/or source room was not an enclosed space.",
-#                  "The receiver and/or source room has a volume less than the minimum volume requirement of 25 m3 (883 cu. ft.).",
-#                  "The receiver and/or source room has one or more dimensions less than the minimum requirement of 2.3 m (7.5 ft.)."]
-
-# ISR_ony_report = "The receiver room had a volume less than the minimum volume requirement of 40 m3."
-# stockISR_notes = ["The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver room was greater than the maximum allowed per E1007-16, Paragraph 10.3.1 and 10.4.5.",
-# "The receiver and/or source room was not an enclosed space.", 
-# "The receiver and/or source room has a volume less than the minimum volume requirement of 40 m3 (1413 cu. ft.).",
-# "The receiver and/or source room has one or more dimensions less than the minimum requirement of 2.3 m (7.5 ft.)."]
-
-# #standards 
-# standards_text = (("ASTC Test Procedure ASTM E336-16",	"Standard Test Method for Measurement of Airborne Sound Attenuation between Rooms in Buildings"),("STC Calculation	ASTM E413-16",	"Classification for Rating Sound Insulation"),("AIIC Test Procedure	ASTM E1007-14",	"Standard Test Method for Field Measurement of Tapping Machine Impact Sound Transmission Through Floor-Ceiling Assemblies and Associated Support Structure"),
-# ("IIC Calculation	ASTM E989-06(2012)",	"Standard Classification for Determination of Impact Insulation Class (IIC)"),
-# ("RT60 Test Procedure	ASTM E2235-04(2012)",	"Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods"))
-
-# refer to single standards like this : standards_text[0][0]
-
-##statement of conformance 
-#Testing was conducted in general accordance with ASTM E1007-14, with all exceptions noted below. 
-#All requirements for measuring and reporting Absorption Normalized Impact Sound Pressure Level (ANISPL) and Apparent Impact Insulation Class (AIIC) were met.								
-# code: =CONCATENATE("Testing was conducted in general accordance with ",AIIC or ASTC or NIC", with all exceptions noted below. All requirements for measuring and reporting Apparent Transmission Loss (ATL) and Apparent Sound Transmission Class (ASTC) were met.")
-
-
-# test environment 
-#text: 
-# The source room was 2nd Floor Bed 1. The space was finished, unfurnished. The floor was Carpet. The ceiling was gyp. The walls were gyp. All doors and windows were closed during the testing period. The source room had a volume of approximately 1176 cu. ft.								
-#code:
-# =CONCATENATE('SLM Data'!B20,'SLM Data'!$C$20, 'SLM Data'!B21,'SLM Data'!$C$21,'SLM Data'!$B$22, 'SLM Data'!$C$22, 'SLM Data'!$B$23, 'SLM Data'!$C$23, 'SLM Data'!$B$24,'SLM Data'!$C$24,". ",'SLM Data'!$C$25,'SLM Data'!$C$26," The source room had a volume of approximately ",'SLM Data'!C16," cu. ft.")
-
-# # test procedure 
-# test_procedure_pg = 'Determination of space-average sound pressure levels was performed via the manually scanned microphones techique, described in ' + standards_text[0][0] + ', Paragraph 11.4.3.3.'+ 'The source room was selected in accordance with ASTM E336-11 Paragraph 9.2.5, which states that "If a corridor must be used as one of the spaces for measurement of ATL or FTL, it shall be used as the source space."'
-# # code:
-# # =CONCATENATE("The test was performaned in general accordance with ",AIIC or ASTC or NIC,". Determination of Space-Average Levels performed via the manually scanned microphones techique, described in ",'SLM Data'!C59,", Paragraph 11.4.2.2.")
-# # The test was performaned in general accordance with ASTM E1007-14. Determination of Space-Average Levels performed via the manually scanned microphones techique, described in ASTM E1007-14, Paragraph 11.4.2.2.								
-
-# flanking_text = "Flanking transmission was not evaluated."
-
-# # To evaluate room absorption, 1 microphone was used to measure 4 decays at 4 locations around the receiving room for a total of 16 measurements, per ASTM E2235-04(2012).								
-
-# RT_text = "To evaluate room absorption, 1 microphone was used to measure 4 decays at 4 locations around the receiving room for a total of 16 measurements, per"+standards_text[4][0]
-
-# # ASTC and NIC final result and blurb
-
-# # ASTC result, concat with this: 
-# ASTC_results_ATverbage = ' was calculated. The ASTC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The ASTC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of'
-
-# #NIC results, concat with this:
-# NIC_results_NRverbage = ' was calculated. The NIC rating is based on Noise Reduction (NR), and includes the effects of noise flanking. The NIC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of'
-# # after results
-# results_blurb = 'The results stated in this report represent only the specific construction and acoustical conditions present at the time of the test. Measurements performed in accordance with this test method on nominally identical constructions and acoustical conditions may produce different results.'
-
-# #test instrumentation
-# table with SLM serial, micpreamp, mic, calibrator, speaker, noise gen.
-# LOGIC NEEDED: 
-#  import very simply spreadsheet with this information preloaded, and pull from the spreadsheet
-#  or select from a menu of all the SLMs, calibrators, tapping machine, speaker.
-#  
-# Example text Entry Box for the fifth path - must be inside a kivy app and build application:
-# class FileLoaderApp(App):
-#     def build(self):
-
-        # self.fifth_text_input = TextInput(multiline=False, hint_text='File Path 5')
-        # self.fifth_text_input.bind(on_text_validate=self.on_text_validate)
-        # layout.add_widget(self.fifth_text_input)
-
-
-# ## STATEMENT OF TEST RESULTS 
-# statement_test_results_text =' STATEMENT OF TEST RESULTS: '
 
 ###################################
 ####_+#_+_+_#+_#+_#+_####_######################################
@@ -519,9 +389,9 @@ def create_report(self,curr_test, single_test_dataframe, test_type):
         table_combined_lr = Table([[table_left, table_right]], colWidths=[doc.width / 2.0] * 2)
         elements.append(KeepInFrame(maxWidth=doc.width, maxHeight=header_height, content=[table_combined_lr], hAlign='LEFT'))
         elements.append(Spacer(1, 10))
-        elements.append(Paragraph('Test site: ' + sitename, styles['Normal']))
+        elements.append(Paragraph('Test site: ' + single_test_dataframe['room_properties']['Site_Name'][0], styles['Normal']))
         elements.append(Spacer(1, 5))
-        elements.append(Paragraph('Client: ' + client_Name, styles['Normal']))
+        elements.append(Paragraph('Client: ' + single_test_dataframe['room_properties']['Client_Name'][0], styles['Normal']))
         return elements
 
     # Define a function to draw the header and footer
