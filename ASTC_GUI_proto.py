@@ -388,7 +388,7 @@ class FileLoaderApp(App):
         print('File Paths:', [sanitized_values[0], sanitized_values[1], sanitized_values[2], sanitized_values[3], sanitized_values[4]])
                 # Access the text from all text boxes
         testplan_path = self.test_plan_path
-        rawReportpath = self.report_template_path
+        # rawReportpath = self.report_template_path
         rawDtestpath = self.slm_data_d_path
         rawEtestpath = self.slm_data_e_path
         outputfolder = self.report_output_folder_path
@@ -455,6 +455,8 @@ class FileLoaderApp(App):
         # Add logic to calculate single test results
         print('Single Test:', single_test_text_input_value)
         # Display a message in the status label
+        self.status_label.text = f'Status: Calculating Single Test {single_test_text_input_value}...'
+        
         self.status_label.text = f'Status: Single Test {single_test_text_input_value} Calculated'
 
     def output_reports(self, instance):
