@@ -247,20 +247,12 @@ class FileLoaderApp(App):
         self.first_text_input = TextInput(multiline=False, hint_text='File Path 1')
         self.first_text_input.bind(on_text_validate=self.on_text_validate)
         layout.add_widget(self.first_text_input)
-        
-        # Label for the second text entry box
-        layout.add_widget(Label(text='Excel Report Template Path, will be PDF report export folder:'))
-
-        # Text Entry Box for the second path
-        self.second_text_input = TextInput(multiline=False, hint_text='File Path 2')
-        self.second_text_input.bind(on_text_validate=self.on_text_validate)
-        layout.add_widget(self.second_text_input)
 
         # Label for the third text entry box
         layout.add_widget(Label(text='SLM Data Meter 1'))
 
         # Text Entry Box for the third path
-        self.third_text_input = TextInput(multiline=False, hint_text='File Path 3')
+        self.third_text_input = TextInput(multiline=False, hint_text='SLM Data Meter 1')
         self.third_text_input.bind(on_text_validate=self.on_text_validate)
         layout.add_widget(self.third_text_input)
 
@@ -268,7 +260,7 @@ class FileLoaderApp(App):
         layout.add_widget(Label(text='SLM Data Meter 2'))
 
         # Text Entry Box for the fourth path
-        self.fourth_text_input = TextInput(multiline=False, hint_text='File Path 4')
+        self.fourth_text_input = TextInput(multiline=False, hint_text='SLM Data Meter 2')
         self.fourth_text_input.bind(on_text_validate=self.on_text_validate)
         layout.add_widget(self.fourth_text_input)
 
@@ -276,7 +268,7 @@ class FileLoaderApp(App):
         layout.add_widget(Label(text='Excel Report per test Output Folder path: '))
 
         # Text Entry Box for the fifth path
-        self.fifth_text_input = TextInput(multiline=False, hint_text='File Path 5')
+        self.fifth_text_input = TextInput(multiline=False, hint_text='Output Path')
         self.fifth_text_input.bind(on_text_validate=self.on_text_validate)
         layout.add_widget(self.fifth_text_input)
 
@@ -411,53 +403,6 @@ class FileLoaderApp(App):
         
         # self.status_label.text = 'Status: Data Loaded'
 
-    def calculate_single_test(self, instance):
-        # NEED TO DEBUG
-        # Access the text from the single test text input box
-        single_test_text_input_value = self.single_test_text_input.text
-        # Display a message in the status label
-        self.status_label.text = f'Status: Calculating Single Test {single_test_text_input_value}...'
-        # open another window to display the test results
-        window = tk.Tk()
-        window.title(f'Single Test Results for: {single_test_text_input_value}')
-        window.geometry("400x400")
-        # Create a status text box
-        status_text_box = tk.Text(window, height=10, width=40)
-        status_text_box.pack()
-        # single test find 
-        testplan_path = self.test_plan_path
-        testplanfile = pd.read_excel(testplan_path) # 
-        rawReportpath = self.report_output_folder_path
-        reports =  [f for f in listdir(rawReportpath) if isfile(join(rawReportpath,f))]
-
-        # find_test = '0.1.1'
-        find_test = single_test_text_input_value
-        mask = testplanfile.applymap(lambda x: find_test in x if isinstance(x,str) else False).to_numpy()
-        indices = np.argwhere(mask) 
-        # print(indices)
-        index = indices[0,0]
-        # print(index)
-        status_text_box.insert(tk.END,testplanfile.iloc[index])
-        foundtest = testplanfile.iloc[index]
-        # print the found test in the status box
-        status_text_box.insert(tk.END, foundtest) # must come before mainloop
-        report_string = '_'+foundtest+'_' 
-        status_text_box.insert(tk.END, f"Report string: '{report_string}'")
-        status_text_box.insert(tk.END, f"Report list: '{reports}'")
-        curr_report_file = [x for x in reports if report_string in x]
-        print('Current report file: ',curr_report_file)
-        print(curr_report_file[0]) #print the name of the report file being used
-        print('Current Test:', foundtest)
-
-
-        window.mainloop()
-
-        # Add logic to calculate single test results
-        print('Single Test:', single_test_text_input_value)
-        # Display a message in the status label
-        self.status_label.text = f'Status: Calculating Single Test {single_test_text_input_value}...'
-        
-        self.status_label.text = f'Status: Single Test {single_test_text_input_value} Calculated'
 
     def output_reports(self, instance):
         testplan_path = self.test_plan_path
@@ -512,6 +457,55 @@ class FileLoaderApp(App):
             
         print('Generating Reports...')
         self.status_label.text = 'Status: Reports Generated'
+
+    def calculate_single_test(self, instance):
+        # NEED TO DEBUG
+        # Access the text from the single test text input box
+        single_test_text_input_value = self.single_test_text_input.text
+        # Display a message in the status label
+        self.status_label.text = f'Status: Calculating Single Test {single_test_text_input_value}...'
+        # open another window to display the test results
+        window = tk.Tk()
+        window.title(f'Single Test Results for: {single_test_text_input_value}')
+        window.geometry("400x400")
+        # Create a status text box
+        status_text_box = tk.Text(window, height=10, width=40)
+        status_text_box.pack()
+        # single test find 
+        testplan_path = self.test_plan_path
+        testplanfile = pd.read_excel(testplan_path) # 
+        rawReportpath = self.report_output_folder_path
+        reports =  [f for f in listdir(rawReportpath) if isfile(join(rawReportpath,f))]
+
+        # find_test = '0.1.1'
+        find_test = single_test_text_input_value
+        mask = testplanfile.applymap(lambda x: find_test in x if isinstance(x,str) else False).to_numpy()
+        indices = np.argwhere(mask) 
+        # print(indices)
+        index = indices[0,0]
+        # print(index)
+        status_text_box.insert(tk.END,testplanfile.iloc[index])
+        foundtest = testplanfile.iloc[index]
+        # print the found test in the status box
+        status_text_box.insert(tk.END, foundtest) # must come before mainloop
+        report_string = '_'+foundtest+'_' 
+        status_text_box.insert(tk.END, f"Report string: '{report_string}'")
+        status_text_box.insert(tk.END, f"Report list: '{reports}'")
+        curr_report_file = [x for x in reports if report_string in x]
+        print('Current report file: ',curr_report_file)
+        print(curr_report_file[0]) #print the name of the report file being used
+        print('Current Test:', foundtest)
+        
+        output_reports(self, instance)
+
+        window.mainloop()
+
+        # Add logic to calculate single test results
+        print('Single Test:', single_test_text_input_value)
+        # Display a message in the status label
+        self.status_label.text = f'Status: Calculating Single Test {single_test_text_input_value}...'
+        
+        self.status_label.text = f'Status: Single Test {single_test_text_input_value} Calculated'
 
 ## this report display window should appear after the reports are generated, after the output_reports function has run. do i need to pass it more info? TBD.
 def display_report_window(report_paths, testplan, test_results):
