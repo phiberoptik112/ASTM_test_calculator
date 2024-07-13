@@ -244,39 +244,32 @@ class FileLoaderApp(App):
         layout.add_widget(Label(text='Test Plan path and filename:'))
 
         # Text Entry Boxes
-        self.first_text_input = TextInput(multiline=False, hint_text='File Path 1')
-        self.first_text_input.bind(on_text_validate=self.on_text_validate)
-        layout.add_widget(self.first_text_input)
+        self.test_plan_path = TextInput(multiline=False, hint_text='test_plan_path')
+        self.test_plan_path.bind(on_text_validate=self.on_text_validate)
+        layout.add_widget(self.test_plan_path)
 
-        # Label for the third text entry box
         layout.add_widget(Label(text='SLM Data Meter 1'))
 
-        # Text Entry Box for the third path
-        self.third_text_input = TextInput(multiline=False, hint_text='SLM Data Meter 1')
-        self.third_text_input.bind(on_text_validate=self.on_text_validate)
-        layout.add_widget(self.third_text_input)
+        # Text Entry Box for SLM data 1
+        self.slm_data_d_path = TextInput(multiline=False, hint_text='SLM Data Meter 1')
+        self.slm_data_d_path.bind(on_text_validate=self.on_text_validate)
+        layout.add_widget(self.slm_data_d_path)
 
         # Label for the fourth text entry box
         layout.add_widget(Label(text='SLM Data Meter 2'))
 
         # Text Entry Box for the fourth path
-        self.fourth_text_input = TextInput(multiline=False, hint_text='SLM Data Meter 2')
-        self.fourth_text_input.bind(on_text_validate=self.on_text_validate)
-        layout.add_widget(self.fourth_text_input)
+        self.slm_data_e_path = TextInput(multiline=False, hint_text='SLM Data Meter 2')
+        self.slm_data_e_path.bind(on_text_validate=self.on_text_validate)
+        layout.add_widget(self.slm_data_e_path)
 
         # Label for the fifth text entry box
         layout.add_widget(Label(text='Excel Report per test Output Folder path: '))
 
         # Text Entry Box for the fifth path
-        self.fifth_text_input = TextInput(multiline=False, hint_text='Output Path')
-        self.fifth_text_input.bind(on_text_validate=self.on_text_validate)
-        layout.add_widget(self.fifth_text_input)
-
-        # CheckBox for AIIC Testing
-        # self.aiic_testing_checkbox = CheckBox(active=False, size_hint=(None, None))
-        # self.aiic_testing_checkbox.bind(active=self.on_aiic_testing_checkbox_active)
-        # layout.add_widget(Label(text='AIIC Testing'))
-        # layout.add_widget(self.aiic_testing_checkbox)
+        self.output_folder_path = TextInput(multiline=False, hint_text='Output Path')
+        self.output_folder_path.bind(on_text_validate=self.on_text_validate)
+        layout.add_widget(self.output_folder_path)
 
         # Load Data Button
         load_button = Button(text='Load Data', on_press=self.load_data)
@@ -305,11 +298,11 @@ class FileLoaderApp(App):
         # Check if the widget is a TextInput before updating instance variables
         if isinstance(instance, TextInput):
             # Update instance variables with the entered text
-            if instance is self.first_text_input:
+            if instance is self.test_plan_path:
                 self.test_plan_path = sanitize_filepath(instance.text)
                 instance.text = self.test_plan_path
-            elif instance is self.second_text_input:
-                self.report_template_path = sanitize_filepath(instance.text)
+            elif instance is self.output_folder_path:
+                self.output_folder_path = sanitize_filepath(instance.text)
                 instance.text = self.report_template_path
             elif instance is self.third_text_input:
                 self.slm_data_d_path = sanitize_filepath(instance.text)
@@ -317,17 +310,9 @@ class FileLoaderApp(App):
             elif instance is self.fourth_text_input:
                 self.slm_data_e_path = sanitize_filepath(instance.text)
                 instance.text = self.slm_data_e_path
-            elif instance is self.fifth_text_input:
-                self.report_output_folder_path = sanitize_filepath(instance.text)
-                instance.text = self.report_output_folder_path
-
-    def on_aiic_testing_checkbox_active(self, instance, value):
-        # Handle checkbox state change
-        if value:
-            print("AIIC Testing Enabled")
-            # You can assign values to curr_test here or add logic based on checkbox state
-        else:
-            print("AIIC Testing Disabled")
+            elif instance is self.single_test_text_input:
+                self.single_test_text_input = sanitize_filepath(instance.text)
+                instance.text = self.single_test_text_input
             
     def show_test_list_popup(self, instance):
         # Create a popup with the TestListPopup content
@@ -338,7 +323,7 @@ class FileLoaderApp(App):
     def load_data(self, instance):
         # # Access the text from all text boxes
         # seems like just a debug step, may not need this once full output report PDF gen. is working since it pulls directly from the SLM datafiles. 
-        text_input_fields = [self.first_text_input, self.second_text_input, self.third_text_input, self.fourth_text_input, self.fifth_text_input]
+        text_input_fields = [self.test_plan_path, self.output_folder_path, self.slm_data_d_path, self.slm_data_e_path, self.fifth_text_input]
         sanitized_values = [sanitize_filepath(field.text) for field in text_input_fields]
         # first_text_input_value = sanitize_filepath(self.first_text_input.text)
         # second_text_input_value = sanitize_filepath(self.second_text_input.text)
@@ -352,7 +337,8 @@ class FileLoaderApp(App):
             'report_template_path': sanitized_values[1],
             'slm_data_d_path': sanitized_values[2],
             'slm_data_e_path': sanitized_values[3],
-            'report_output_folder_path': sanitized_values[4]
+            'report_output_folder_path': sanitized_values[4],
+            'single_test_text_input': sanitized_values[5]
         }
         
         for attr, value in input_values.items():
@@ -370,6 +356,7 @@ class FileLoaderApp(App):
         print('Value from the third text box:', sanitized_values[2])
         print('Value from the fourth text box:', sanitized_values[3])
         print('Value from the fifth text box:', sanitized_values[4])
+        print('Value from the single test text box:', sanitized_values[5])
 
         # Display a message in the status label
         self.status_label.text = 'Status: Loading Data...'
@@ -377,7 +364,7 @@ class FileLoaderApp(App):
         print('Arguments received by load_data:', instance, self.test_plan_path, self.report_template_path, self.slm_data_d_path, self.slm_data_e_path, self.report_output_folder_path)
 
         # For demonstration purposes, let's just print the file paths
-        print('File Paths:', [sanitized_values[0], sanitized_values[1], sanitized_values[2], sanitized_values[3], sanitized_values[4]])
+        print('File Paths:', [sanitized_values[0], sanitized_values[1], sanitized_values[2], sanitized_values[3], sanitized_values[4], sanitized_values[5]])
                 # Access the text from all text boxes
         testplan_path = self.test_plan_path
         # rawReportpath = self.report_template_path
@@ -395,12 +382,6 @@ class FileLoaderApp(App):
         # Display a message in the status label
         self.status_label.text = 'Status: All test files loaded, ready to generate reports'
         # self.status_label.text = 'Status: Copying Excel template per testplan...'
-        # for i in range(len(testnums)):
-            # shutil.copy(rawReportpath+reports[0], outputfolder+'23-154 ASTC-NIC Test Report_'+testnums[i]+'_.xlsx')
-        # Add logic to generate reports - old excel copy method
-        # for index, testnum in enumerate(testnums):
-        #     shutil.copy(rawReportpath + reports[0], outputfolder + f'23-154 ASTC-NIC Test Report_{testnum}_.xlsx')    
-        
         # self.status_label.text = 'Status: Data Loaded'
 
 
@@ -422,7 +403,6 @@ class FileLoaderApp(App):
             # list entry with all test data
             curr_test = test_list.iloc[i]
             print('Current Test:', curr_test)
-            aiic_testing_enabled = self.aiic_testing_checkbox.active
             find_report = curr_test['Test Label'] # using the test entry to find the report file name
             report_string = '_'+find_report+'_' 
             print('Report string: ', report_string)
@@ -435,10 +415,8 @@ class FileLoaderApp(App):
             AIIC_test = curr_test['AIIC']
             NIC_test = curr_test['NIC'] 
             ASTC_test = curr_test['ASTC']
-           
             # print("writing to report file:")
             print("Test report file name: ", curr_report_file[0])
-            # print(raw_report)
 
             ## need logic here to determine if NIC or ASTC or AIIC , and report one or the other 
             if NIC_test == 1:
