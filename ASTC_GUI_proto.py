@@ -378,63 +378,76 @@ class FileLoaderApp(App):
         testnums = self.test_list['Test Label'] ## Determines the labels and number of excel files copied
         project_name =  self.test_list['Project Name'] # need to access a cell within template the project name to copy to final reports
         project_name = project_name.iloc[1]
-        # reports =  [f for f in listdir(rawReportpath) if isfile(join(rawReportpath,f))]
+
         # Display a message in the status label
         self.status_label.text = 'Status: All test files loaded, ready to generate reports'
-        # self.status_label.text = 'Status: Copying Excel template per testplan...'
-        # self.status_label.text = 'Status: Data Loaded'
 
 
+
+    # def output_reports(self, instance):
+    #     testplan_path = self.test_plan_path
+    #     reportOutputfolder = self.report_output_folder_path
+
+    #     test_list = pd.read_excel(testplan_path)
+    #     # this test_list is the dataframe of all test data
+    #     self.status_label.text = ('Test list:',test_list)
+    #     testnums = test_list['Test Label'] ## 
+
+    #     # Main loop through all test data
+    #     for i in range(len(testnums)):
+    #         # list entry with all test data
+    #         curr_test = test_list.iloc[i]
+
+    #         # print('Current Test:', curr_test)
+    #         # find_report = curr_test['Test Label'] # using the test entry to find the report file name
+    #         # report_string = '_'+find_report+'_' 
+    #         # print('Report string: ', report_string)
+
+    #         print('Current Test:', curr_test)
+    #         # single_test_dataframe  = pull_testplan_data(self,curr_test)
+    #         AIIC_test = curr_test['AIIC']
+    #         NIC_test = curr_test['NIC'] 
+    #         ASTC_test = curr_test['ASTC']
+    #         # print("writing to report file:")
+
+    #         ## need logic here to determine if NIC or ASTC or AIIC , and report one or the other 
+    #         print('In output reports, current test:', curr_test)
+    #         self.status_label.text = 'Status: Reporting test: ' + curr_test['Test Label']
+    #         if NIC_test == 1:
+    #             single_NICtest_data = pull_testplan_data(self,curr_test)
+    #             create_report(self,curr_test, single_NICtest_data,test_type='NIC') # still need NIC report format
+    #         elif ASTC_test == 1:
+    #             single_ASTCtest_data = pull_testplan_data(self,curr_test)
+    #             create_report(self,curr_test, single_ASTCtest_data, test_type='ASTC')
+    #         elif AIIC_test == 1:
+    #             single_AIICtest_data = pull_testplan_data(self,curr_test)
+    #             create_report(self,curr_test, single_AIICtest_data, test_type='AIIC')
+    #         else:
+    #             print('No test type selected, skipping test...')
+    #             # some sort of error checking needed here
+    #             continue
     def output_reports(self, instance):
         testplan_path = self.test_plan_path
-        rawReportpath = self.report_output_folder_path
+        reportOutputfolder = self.report_output_folder_path
 
         test_list = pd.read_excel(testplan_path)
-        self.status_label.text = ('Test list:',test_list)
-        testnums = test_list['Test Label'] ## Determines the labels and number of excel files copied
-        project_name =  test_list['Project Name'] # need to access a cell within template the project name to copy to final reports
-        # project_name =  test_list['Project Name'] # need to access a cell within template the project name to copy to final reports
-        project_name = project_name.iloc[1]
+        self.status_label.text = ('Test list:', test_list)
+        testnums = test_list['Test Label']
         
-        reports =  [f for f in listdir(rawReportpath) if isfile(join(rawReportpath,f))]
-
-        # Main loop through all test data
         for i in range(len(testnums)):
-            # list entry with all test data
             curr_test = test_list.iloc[i]
             print('Current Test:', curr_test)
-            find_report = curr_test['Test Label'] # using the test entry to find the report file name
-            report_string = '_'+find_report+'_' 
-            print('Report string: ', report_string)
-            print('Report list: ', reports)
-            curr_report_file = [x for x in reports if report_string in x]
-            print('Current report file: ',curr_report_file)
-            print(curr_report_file[0]) #print the name of the report file being used
-            print('Current Test:', curr_test)
-            # single_test_dataframe  = pull_testplan_data(self,curr_test)
-            AIIC_test = curr_test['AIIC']
-            NIC_test = curr_test['NIC'] 
-            ASTC_test = curr_test['ASTC']
-            # print("writing to report file:")
-            print("Test report file name: ", curr_report_file[0])
+            self.status_label.text = 'Status: Reporting test: ' + curr_test['Test Label']
 
-            ## need logic here to determine if NIC or ASTC or AIIC , and report one or the other 
-            if NIC_test == 1:
-                single_NICtest_data = pull_testplan_data(self,curr_test)
-                create_report(self,curr_test, single_NICtest_data,test_type='NIC') # still need NIC report format
-            elif ASTC_test == 1:
-                single_ASTCtest_data = pull_testplan_data(self,curr_test)
-                create_report(self,curr_test, single_ASTCtest_data, test_type='ASTC')
-            elif AIIC_test == 1:
-                single_AIICtest_data = pull_testplan_data(self,curr_test)
-                create_report(self,curr_test, single_AIICtest_data, test_type='AIIC')
+            # Determine the test type and generate the report
+            for test_type in ['NIC', 'ASTC', 'AIIC']:
+                if curr_test[test_type] == 1:
+                    test_data = pull_testplan_data(self, curr_test)
+                    create_report(self, curr_test, test_data, test_type=test_type)
+                    break
             else:
                 print('No test type selected, skipping test...')
-                # some sort of error checking needed here
-                continue
-            
-        print('Generating Reports...')
-        self.status_label.text = 'Status: Reports Generated'
+        
 
     def calculate_single_test(self, instance):
         # NEED TO DEBUG
@@ -474,6 +487,7 @@ class FileLoaderApp(App):
         print(curr_report_file[0]) #print the name of the report file being used
         print('Current Test:', foundtest)
         
+        # output reports function takes in the entire instance, we need to pass it the foundtest 
         output_reports(self, instance)
 
         window.mainloop()

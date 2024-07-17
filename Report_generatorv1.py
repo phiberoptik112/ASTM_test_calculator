@@ -290,9 +290,6 @@ def plot_curves(frequencies,Y_label,Ref_curve, Field_curve,Ref_label, Field_labe
 # for each testplan entry, first write the room properties database: 
 # Organize the variables into a dictionary
 
-
-
-
 ###################################
 ####_+#_+_+_#+_#+_#+_####_######################################
 ## do i put the GUI here YES - ASTC GUI proto.py works - just need to add in the reportlab formatting and get going.
@@ -301,7 +298,6 @@ def plot_curves(frequencies,Y_label,Ref_curve, Field_curve,Ref_label, Field_labe
 def create_report(self,curr_test, single_test_dataframe, test_type):
         # all the code below
     # Kaulu by gentry testing ## EXAMPLE DATA CREATE LOOP FOR EACH TESTPLAN ENTRY
-
 
 ##### _+_+#__#+_#+_+_+_####################### REPORT GENERATION CODE ##############################
     import matplotlib.pyplot as plt
@@ -335,6 +331,8 @@ def create_report(self,curr_test, single_test_dataframe, test_type):
     #  format: project_name + test_type + test_num + '.pdf'
     # doc_name = f"{single_test_dataframe['room_properties']['Project_Name'][0]} {test_type} Test Report_{single_test_dataframe['room_properties']['Test_Label'][0]}.pdf"
     doc_name = f"{single_test_dataframe['room_properties']['Project_Name'][0]} {test_type} Test Report_{single_test_dataframe['room_properties']['Test_Label'][0]}.pdf"
+
+    
     doc = BaseDocTemplate(doc_name, pagesize=letter,
                         leftMargin=left_margin, rightMargin=right_margin,
                         topMargin=top_margin, bottomMargin=bottom_margin)
@@ -667,7 +665,10 @@ def create_report(self,curr_test, single_test_dataframe, test_type):
 
 
     # Output a file string for the PDF made up of test number and test type
+    output_file = f"{self.output_folder_path}/Report_{curr_test}_{test_type}.pdf"
 
     # Build the document
     doc.build(main_elements)
 
+    # Save the document as a PDF
+    doc.save(output_file)
