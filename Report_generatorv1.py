@@ -78,13 +78,6 @@ def RAW_SLM_datapull(self, find_datafile, datatype):
     # srs_data = pd.read_excel(slm_found[0], sheet_name='OBA')  # data must be in OBA tab
     # potentially need a write to excel here...similar to previous function
         srs_data = pd.read_excel(slm_found[0],sheet_name='OBA') # data must be in OBA tab
-        with ExcelWriter(
-        rawReportpath+reportfile, # should be in self.report 
-        mode="a",
-        engine="openpyxl",
-        if_sheet_exists="replace",
-        ) as writer:
-            srs_data.to_excel(writer, sheet_name=newsheetname) #writes to report file
     return srs_data
 
 def format_SLMdata(srs_data):
@@ -295,7 +288,7 @@ def plot_curves(frequencies,Y_label,Ref_curve, Field_curve,Ref_label, Field_labe
 ## do i put the GUI here YES - ASTC GUI proto.py works - just need to add in the reportlab formatting and get going.
 # wrap the following into a funciton - take in the testplan entry, and return the reportlab formatted pdf output path
 
-def create_report(self,curr_test, single_test_dataframe, test_type):
+def create_report(self,curr_test, single_test_dataframe, reportOutputfolder,test_type):
         # all the code below
     # Kaulu by gentry testing ## EXAMPLE DATA CREATE LOOP FOR EACH TESTPLAN ENTRY
 
@@ -665,7 +658,7 @@ def create_report(self,curr_test, single_test_dataframe, test_type):
 
 
     # Output a file string for the PDF made up of test number and test type
-    output_file = f"{self.output_folder_path}/Report_{curr_test}_{test_type}.pdf"
+    output_file = f"{reportOutputfolder}/Report_{curr_test}_{test_type}.pdf"
 
     # Build the document
     doc.build(main_elements)

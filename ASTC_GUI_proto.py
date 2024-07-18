@@ -21,7 +21,7 @@ from os import listdir, walk
 from os.path import isfile, join
 import tkinter as tk
 from tkinter import *
-
+from config import *
 
 # Import Report generatorv1.py
 from Report_generatorv1 import create_report, calc_ASTC_val,calc_AIIC_val, RAW_SLM_datapull, sanitize_filepath,calc_NR_new,calc_ATL_val
@@ -30,32 +30,6 @@ from Report_generatorv1 import create_report, calc_ASTC_val,calc_AIIC_val, RAW_S
 import matplotlib.pyplot as plt
 
 # this is a new function combines RT and ASTC datapulls
-def RAW_SLM_datapull(self, find_datafile, datatype):
-    # pass datatype as '-831_Data.' or '-RT_Data.' to pull the correct data
-    # if the self method doesn't pass correctly, may need to re-write
-    raw_testpaths = {
-        'D': self.slm_data_d_path,
-        'E': self.slm_data_e_path,
-        # 'A': self.slm_data_a_path
-    }
-    datafiles = {}
-    for key, path in raw_testpaths.items():
-        datafiles[key] = [f for f in listdir(path) if isfile(join(path, f))]
-
-    if find_datafile[0] in datafiles:
-        datafile_num = datatype + find_datafile[1:] + '.xlsx'
-        slm_found = [x for x in datafiles[find_datafile[0]] if datafile_num in x]
-        slm_found[0] = raw_testpaths[find_datafile[0]] + slm_found[0]  # If this line errors, the test file is mislabeled or doesn't exist 
-
-    print(slm_found[0])
-    if datatype == '-831_Data.':
-        srs_data = pd.read_excel(slm_found[0], sheet_name='OBA')
-    elif datatype == '-RT_Data.':
-        srs_data = pd.read_excel(slm_found[0], sheet_name='Summary')  # data must be in Summary tab for RT meas.
-    # srs_data = pd.read_excel(slm_found[0], sheet_name='OBA')  # data must be in OBA tab
-    # potentially need a write to excel here...similar to previous function
-    # just for 
-    return srs_data
 
  # creating a subfunction to return the dataframe from the testplan test list
  # pass it the current test number and the test list
@@ -145,7 +119,7 @@ def pull_testplan_data(self,curr_test):
         }
         return single_AIICtest_data
     
-    elif curr_test['ASTC_test'] == 1:
+    if curr_test['ASTC_test'] == 1:
         srs_data = RAW_SLM_datapull(self,curr_test['Source'],'-831_Data.')
         recive_data = RAW_SLM_datapull(self, curr_test['Recieve '],'-831_Data.')
         bkgrnd_data = RAW_SLM_datapull(self,curr_test['BNL'],'-831_Data.')
@@ -162,7 +136,7 @@ def pull_testplan_data(self,curr_test):
         
        
 
-    elif curr_test['NIC_test'] == 1:
+    if curr_test['NIC_test'] == 1:
         srs_data = RAW_SLM_datapull(self,curr_test['Source'],'-831_Data.')
         recive_data = RAW_SLM_datapull(self, curr_test['Recieve '],'-831_Data.')
         bkgrnd_data = RAW_SLM_datapull(self,curr_test['BNL'],'-831_Data.')
@@ -208,19 +182,6 @@ class TestListPopup(GridLayout):
                 # Add TextInput for each cell in the DataFrame
                 text_input = TextInput(text=str(row[column]), multiline=False)
                 self.add_widget(text_input)
-# class TestListPopup(GridLayout):
-#     def __init__(self, test_list, **kwargs):
-#         super(TestListPopup, self).__init__(**kwargs)
-#         self.cols = len(test_list.columns)  # Set the number of columns based on DataFrame columns
-
-#         for column in test_list.columns:
-#             self.add_widget(Label(text=column))  # Add column headers
-
-#         for index, row in test_list.iterrows():
-#             for column in test_list.columns:
-#                 # Add TextInput for each cell in the DataFrame
-#                 text_input = TextInput(text=str(row[column]), multiline=False)
-#                 self.add_widget(text_input)
 
 # GPT code - kivy GUI 
 class FileLoaderApp(App):
@@ -323,11 +284,6 @@ class FileLoaderApp(App):
         # seems like just a debug step, may not need this once full output report PDF gen. is working since it pulls directly from the SLM datafiles. 
         text_input_fields = [self.test_plan_path, self.output_folder_path, self.slm_data_d_path, self.slm_data_e_path, self.fifth_text_input]
         sanitized_values = [sanitize_filepath(field.text) for field in text_input_fields]
-        # first_text_input_value = sanitize_filepath(self.first_text_input.text)
-        # second_text_input_value = sanitize_filepath(self.second_text_input.text)
-        # third_text_input_value = sanitize_filepath(self.third_text_input.text)
-        # fourth_text_input_value = sanitize_filepath(self.fourth_text_input.text)
-        # fifth_text_input_value = sanitize_filepath(self.fifth_text_input.text)
 
         #refactoring to use a dictionary for the input values
         input_values = {
@@ -341,12 +297,6 @@ class FileLoaderApp(App):
         
         for attr, value in input_values.items():
             setattr(self, attr, value)
-        # self.test_plan_path = first_text_input_value
-        # self.report_template_path = second_text_input_value
-        # self.slm_data_d_path = third_text_input_value
-        # self.slm_data_e_path = fourth_text_input_value
-        # self.report_output_folder_path = fifth_text_input_value
-
             # Update instance variables with the text from the text input boxes
 
         print('Value from the first text box:', sanitized_values[0])
@@ -380,48 +330,7 @@ class FileLoaderApp(App):
         # Display a message in the status label
         self.status_label.text = 'Status: All test files loaded, ready to generate reports'
 
-    # def output_reports(self, instance):
-    #     testplan_path = self.test_plan_path
-    #     reportOutputfolder = self.report_output_folder_path
-
-    #     test_list = pd.read_excel(testplan_path)
-    #     # this test_list is the dataframe of all test data
-    #     self.status_label.text = ('Test list:',test_list)
-    #     testnums = test_list['Test Label'] ## 
-
-    #     # Main loop through all test data
-    #     for i in range(len(testnums)):
-    #         # list entry with all test data
-    #         curr_test = test_list.iloc[i]
-
-    #         # print('Current Test:', curr_test)
-    #         # find_report = curr_test['Test Label'] # using the test entry to find the report file name
-    #         # report_string = '_'+find_report+'_' 
-    #         # print('Report string: ', report_string)
-
-    #         print('Current Test:', curr_test)
-    #         # single_test_dataframe  = pull_testplan_data(self,curr_test)
-    #         AIIC_test = curr_test['AIIC']
-    #         NIC_test = curr_test['NIC'] 
-    #         ASTC_test = curr_test['ASTC']
-    #         # print("writing to report file:")
-
-    #         ## need logic here to determine if NIC or ASTC or AIIC , and report one or the other 
-    #         print('In output reports, current test:', curr_test)
-    #         self.status_label.text = 'Status: Reporting test: ' + curr_test['Test Label']
-    #         if NIC_test == 1:
-    #             single_NICtest_data = pull_testplan_data(self,curr_test)
-    #             create_report(self,curr_test, single_NICtest_data,test_type='NIC') # still need NIC report format
-    #         elif ASTC_test == 1:
-    #             single_ASTCtest_data = pull_testplan_data(self,curr_test)
-    #             create_report(self,curr_test, single_ASTCtest_data, test_type='ASTC')
-    #         elif AIIC_test == 1:
-    #             single_AIICtest_data = pull_testplan_data(self,curr_test)
-    #             create_report(self,curr_test, single_AIICtest_data, test_type='AIIC')
-    #         else:
-    #             print('No test type selected, skipping test...')
-    #             # some sort of error checking needed here
-    #             continue
+    @classmethod
     def output_reports(self, instance):
         testplan_path = self.test_plan_path
         reportOutputfolder = self.report_output_folder_path
@@ -439,7 +348,7 @@ class FileLoaderApp(App):
             for test_type in ['NIC', 'ASTC', 'AIIC']:
                 if curr_test[test_type] == 1:
                     test_data = pull_testplan_data(self, curr_test)
-                    create_report(self, curr_test, test_data, test_type=test_type)
+                    create_report(self, curr_test, test_data, reportOutputfolder, test_type=test_type)
                     break
             else:
                 print('No test type selected, skipping test...')
@@ -461,8 +370,9 @@ class FileLoaderApp(App):
         # single test find 
         testplan_path = self.test_plan_path
         testplanfile = pd.read_excel(testplan_path) # 
-        rawReportpath = self.report_output_folder_path
-        reports =  [f for f in listdir(rawReportpath) if isfile(join(rawReportpath,f))]
+
+        # rawReportpath = self.report_output_folder_path
+        # reports =  [f for f in listdir(rawReportpath) if isfile(join(rawReportpath,f))]
 
         # find_test = '0.1.1'
         find_test = single_test_text_input_value
@@ -475,16 +385,18 @@ class FileLoaderApp(App):
         foundtest = testplanfile.iloc[index]
         # print the found test in the status box
         status_text_box.insert(tk.END, foundtest) # must come before mainloop
+
         report_string = '_'+foundtest+'_' 
         status_text_box.insert(tk.END, f"Report string: '{report_string}'")
-        status_text_box.insert(tk.END, f"Report list: '{reports}'")
+   
         curr_report_file = [x for x in reports if report_string in x]
         print('Current report file: ',curr_report_file)
         print(curr_report_file[0]) #print the name of the report file being used
+
         print('Current Test:', foundtest)
         
         # output reports function takes in the entire instance, we need to pass it the foundtest 
-        output_reports(self, instance)
+        FileLoaderApp.output_reports(self, instance)
 
         window.mainloop()
 
