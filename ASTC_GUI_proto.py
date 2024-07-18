@@ -57,8 +57,6 @@ def RAW_SLM_datapull(self, find_datafile, datatype):
     # just for 
     return srs_data
 
-
-#     return srs_data
  # creating a subfunction to return the dataframe from the testplan test list
  # pass it the current test number and the test list
 def pull_testplan_data(self,curr_test):
@@ -381,8 +379,6 @@ class FileLoaderApp(App):
 
         # Display a message in the status label
         self.status_label.text = 'Status: All test files loaded, ready to generate reports'
-
-
 
     # def output_reports(self, instance):
     #     testplan_path = self.test_plan_path

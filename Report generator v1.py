@@ -96,10 +96,9 @@ def calc_NR_val(srs_overalloct, rec_overalloct, bkgrnd_overalloct, rt_thirty, pa
     recieve_corr = list()
     recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
     print('rec vs background:',recieve_vsBkgrnd)
-    for i in range(len(recieve_vsBkgrnd)):
-        val = recieve_vsBkgrnd[i]
-        print('val:', recieve_vsBkgrnd[i])
-        print('count: ',i)
+    for i, val in enumerate(recieve_vsBkgrnd):
+        print('val:', val)
+        print('count: ', i)
         if val < 5:
             recieve_corr.append(rec_overalloct.iloc[i]-2)
         elif val < 10:
