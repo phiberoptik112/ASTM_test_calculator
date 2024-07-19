@@ -21,18 +21,18 @@ from os import listdir, walk
 from os.path import isfile, join
 import tkinter as tk
 from tkinter import *
-from config import *
 
+import matplotlib.pyplot as plt
 # Import Report generatorv1.py
 from Report_generatorv1 import create_report, calc_ASTC_val,calc_AIIC_val, RAW_SLM_datapull, sanitize_filepath,calc_NR_new,calc_ATL_val
 
-### # FUNCTIONS FOR PULLING EXCEL DATA ########
-import matplotlib.pyplot as plt
-
+from config import *
 # this is a new function combines RT and ASTC datapulls
 
  # creating a subfunction to return the dataframe from the testplan test list
  # pass it the current test number and the test list
+ 
+### # FUNCTIONS FOR PULLING EXCEL DATA ########
 def pull_testplan_data(self,curr_test):
     # AIIC_test = curr_test['AIIC']
     # NIC_test = curr_test['NIC'] 

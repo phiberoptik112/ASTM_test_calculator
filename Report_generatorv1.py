@@ -93,10 +93,6 @@ def calc_NR_new(srs_overalloct, rec_overalloct, bkgrnd_overalloct, rt_thirty, re
     # intermed = 30 / rt_thirty  # was i compensating for RT calcs?
    
     sabines = 0.049*(recieve_roomvol/rt_thirty)  # this produces accurate sabines values
-
-    # thisval = np.int32(recieve_roomvol * intermed)
-    # sabines = thisval / constant
-    # sabines = np.round(sabines*(0.921))        
     recieve_corr = list()
     recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
     print('rec vs background:',recieve_vsBkgrnd)
@@ -218,25 +214,29 @@ def calc_AIIC_val(Normalized_recieve_IIC):
         Contour_curve_result = IIC_contour - Normalized_recieve_IIC
         if AIIC_start <10: break
 
-# need to validate
+# validated against excel, working!
 def calc_ASTC_val(ATL_val):
     pos_diffs = list()
     diff_negative=0
     diff_positive=0 
-    ASTC_start = 20
+    ASTC_start = 16
     New_curve =list()
     new_sum = 0
     STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
-    while (diff_negative < 8 and new_sum < 32):
+    while (diff_negative <= 8 and new_sum <= 32):
         # print('starting loop')
         print('ASTC fit test value: ', ASTC_start)
         for vals in STCCurve:
             New_curve.append(vals+ASTC_start)
+        ATL_val = np.round(ATL_val,1)
         ASTC_curve = New_curve - ATL_val
-        # print('ASTC curve: ',ASTC_curve)
+        
+        ASTC_curve = np.round(ASTC_curve)
+        print('ASTC curve: ',ASTC_curve)
+        diff_negative = np.max(ASTC_curve)
 
-        diff_negative =  np.max(ASTC_curve - ATL_val)
         print('Max, single diff: ', diff_negative)
+
         for val in ASTC_curve:
             if val > 0:
                 pos_diffs.append(np.round(val))
@@ -253,7 +253,6 @@ def calc_ASTC_val(ATL_val):
         pos_diffs = []
         New_curve = []
         ASTC_start = ASTC_start + 1
-        
         
         if ASTC_start >80: break
 
@@ -339,12 +338,6 @@ def create_report(self,curr_test, single_test_dataframe, reportOutputfolder,test
     styles = getSampleStyleSheet()
     custom_title_style = styles['Heading1']
 
-
-    #     canvas.saveState()
-    #     canvas.setFont('Helvetica', 10)
-    #     canvas.drawCentredString(letter[0] / 2, letter[1] - top_margin - header_height / 2, "Field Impact Sound Transmission Test Report")
-    #     canvas.drawCentredString(letter[0] / 2, bottom_margin + footer_height / 2, f"Page {doc.page} of 4")
-    #     canvas.restoreState()
     # Define header elements
     def header_elements():
         elements = []
@@ -570,7 +563,6 @@ def create_report(self,curr_test, single_test_dataframe, reportOutputfolder,test
             }
         )
 
-
     elif test_type == 'ASTC':
         ## obtain SLM data from overall dataframe
         onethird_rec = format_SLMdata(single_test_dataframe['recive_data'])
@@ -643,6 +635,8 @@ def create_report(self,curr_test, single_test_dataframe, reportOutputfolder,test
        AIIC_plot_img = plot_curves(frequencies,IIC_yAxis, IIC_contour_final,Nrec_ANISPL,Ref_label, Field_IIC_label)
        plot_image = Image(AIIC_plot_img, 6*inch, 4*inch)
        main_elements.append(plot_image)
+       main_elements.append(Spacer(1, 10))
+       # create a text box with the AIIC single value result, contained in 
 
     elif test_type == 'ASTC':
         ASTCyAxis = 'Transmission Loss (dB)'
@@ -655,6 +649,7 @@ def create_report(self,curr_test, single_test_dataframe, reportOutputfolder,test
         NIC_plot_img = plot_curves(frequencies, ASTCyAxis, ASTC_contour_final,Nrec_ANISPL,Ref_label, Field_IIC_label)
         plot_img = Image(NIC_plot_img, 6*inch, 4*inch)
         main_elements.append(plot_img)
+
 
 
     # Output a file string for the PDF made up of test number and test type
