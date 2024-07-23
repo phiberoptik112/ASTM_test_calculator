@@ -134,8 +134,6 @@ def pull_testplan_data(self,curr_test):
             }
         return single_ASTCtest_data
         
-       
-
     if curr_test['NIC_test'] == 1:
         srs_data = RAW_SLM_datapull(self,curr_test['Source'],'-831_Data.')
         recive_data = RAW_SLM_datapull(self, curr_test['Recieve '],'-831_Data.')
@@ -388,10 +386,6 @@ class FileLoaderApp(App):
 
         report_string = '_'+foundtest+'_' 
         status_text_box.insert(tk.END, f"Report string: '{report_string}'")
-   
-        curr_report_file = [x for x in reports if report_string in x]
-        print('Current report file: ',curr_report_file)
-        print(curr_report_file[0]) #print the name of the report file being used
 
         print('Current Test:', foundtest)
         
