@@ -82,9 +82,10 @@ def RAW_SLM_datapull(self, find_datafile, datatype):
 
 def format_SLMdata(srs_data):
     srs_thirdoct = srs_data.iloc[7] # hardcoded to SLM export data format
-    srs_thirdoct = srs_thirdoct[14:30] # select only the frequency bands of interest
+    srs_thirdoct = srs_thirdoct[13:31] # select only the frequency bands of interest
     return srs_thirdoct
 
+## edit 7/24/24 - need to redo this, since the average tapper level is used for the IIC version, and needs to be specified for this function, as 
 def calc_NR_new(srs_overalloct, rec_overalloct, bkgrnd_overalloct, rt_thirty, recieve_roomvol, NIC_vollimit,testtype):
     NIC_vollimit = 150  # cu. ft.
     if recieve_roomvol > NIC_vollimit:
@@ -125,40 +126,110 @@ def calc_NR_new(srs_overalloct, rec_overalloct, bkgrnd_overalloct, rt_thirty, re
 
 ### DATA CALC FUNCTIONS ###
 
-# ATL calc, reworked and funtional - use Recieve room recording, not the tapper level for this calc. this does not take the tapper into account
-def calc_ATL_val(srs_overalloct,rec_overalloct,bkgrnd_overalloct,parition_area,recieve_roomvol,sabines):
+# ATL calc, reworked and funtional - use Recieve room recording, not the tapper level for this calc. this does not take the tapper into account and is just used for ASTC 
+# def calc_ATL_val(srs_overalloct,rec_overalloct,bkgrnd_overalloct,parition_area,recieve_roomvol,sabines):
+#     ASTC_vollimit = 883
+#     if recieve_roomvol > ASTC_vollimit:
+#         print('Using NIC calc, room volume too large')
+#     recieve_corr = list()
+#     bkgrnd_overalloct = pd.to_numeric(bkgrnd_overalloct, errors='coerce')
+#     bkgrnd_overalloct = np.array(bkgrnd_overalloct)
+#     rec_overalloct = pd.to_numeric(rec_overalloct, errors='coerce')
+#     rec_overalloct = np.array(rec_overalloct)
+    
+#     recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
+#     print('recieve vs background:',recieve_vsBkgrnd)
+#     recieve_vsBkgrnd = pd.to_numeric(recieve_vsBkgrnd, errors='coerce')
+#     recieve_vsBkgrnd = np.array(recieve_vsBkgrnd)
+
+#     for i, val in enumerate(recieve_vsBkgrnd):
+#         if val < 5:
+#             recieve_corr.append(rec_overalloct[i]-2)
+#         elif val < 10:
+#             recieve_corr.append(10*np.log10(10**(rec_overalloct[i]/10)-10**(bkgrnd_overalloct[i]/10)))
+#         else:
+#             recieve_corr.append(rec_overalloct[i])
+#     recieve_corr = np.round(recieve_corr,1)
+#     print('corrected recieve: ',recieve_corr)
+    
+#     sabines = pd.to_numeric(sabines, errors='coerce')
+#     #convert sabines to array
+#     sabines = np.array(sabines)
+#     print('sabines: ',sabines)
+#     srs_overalloct = pd.to_numeric(srs_overalloct, errors='coerce')
+#     srs_overalloct = np.array(srs_overalloct)
+#     print('srs_overalloct: ',srs_overalloct)
+#     ATL_val = srs_overalloct - recieve_corr+10*(np.log10(parition_area/sabines))
+#     return ATL_val
+
+### this code revised 7/24/24 - functional and produces accurate ATL values
+def calc_ATL_val(srs_overalloct,rec_overalloct,bkgrnd_overalloct,rt_thirty,parition_area,recieve_roomvol):
     ASTC_vollimit = 883
     if recieve_roomvol > ASTC_vollimit:
         print('Using NIC calc, room volume too large')
-    recieve_corr = list()
-    bkgrnd_overalloct = pd.to_numeric(bkgrnd_overalloct, errors='coerce')
-    bkgrnd_overalloct = np.array(bkgrnd_overalloct)
-    rec_overalloct = pd.to_numeric(rec_overalloct, errors='coerce')
-    rec_overalloct = np.array(rec_overalloct)
-    
-    recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
-    print('recieve vs background:',recieve_vsBkgrnd)
-    recieve_vsBkgrnd = pd.to_numeric(recieve_vsBkgrnd, errors='coerce')
-    recieve_vsBkgrnd = np.array(recieve_vsBkgrnd)
+    # constant = np.int32(20.047*np.sqrt(273.15+20))
+    # intermed = 30/rt_thirty ## why did i do this? not right....sabines calc is off
+    # thisval = np.int32(recieve_roomvol*intermed)
+    # sabines =thisval/constant
 
+    # RT value is right, why is this not working?
+    # print('recieve roomvol: ',recieve_roomvol)
+    if isinstance(rt_thirty, pd.DataFrame):
+        rt_thirty = rt_thirty.values
+    # print('rt_thirty: ',rt_thirty)
+    
+    sabines = 0.049*recieve_roomvol/rt_thirty  # this produces accurate sabines values
+
+    if isinstance(bkgrnd_overalloct, pd.DataFrame):
+        bkgrnd_overalloct = bkgrnd_overalloct.values
+    # print('bkgrnd_overalloct: ',bkgrnd_overalloct)
+    # sabines = np.int32(sabines) ## something not right with this calc
+    sabines = np.round(sabines)
+    # print('sabines: ',sabines)
+    
+    recieve_corr = list()
+    # print('recieve: ',rec_overalloct)
+    recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
+
+    if isinstance(recieve_vsBkgrnd, pd.DataFrame):
+        recieve_vsBkgrnd = recieve_vsBkgrnd.values
+
+    if isinstance(rec_overalloct, pd.DataFrame):
+        rec_overalloct = rec_overalloct.values
+    # print('recieve vs  background: ',recieve_vsBkgrnd)
+    # print('recieve roomvol: ',recieve_roomvol)
+    #### something wrong with this loop #### 
     for i, val in enumerate(recieve_vsBkgrnd):
         if val < 5:
+            # print('recieve vs background: ',val)
             recieve_corr.append(rec_overalloct[i]-2)
+            # print('less than 5, appending: ',recieve_corr[i])
         elif val < 10:
-            recieve_corr.append(10*np.log10(10**(rec_overalloct[i]/10)-10**(bkgrnd_overalloct[i]/10)))
+            # print('recieve vs background: ',val)
+            recieve_corr.append(10*np.log10((10**(rec_overalloct[i]/10))-(10**(bkgrnd_overalloct[i]/10))))
+            # print('less than 10, appending: ',recieve_corr[i])
         else:
+            # print('recieve vs background: ',val)
             recieve_corr.append(rec_overalloct[i])
-    recieve_corr = np.round(recieve_corr,1)
-    print('corrected recieve: ',recieve_corr)
+            # print('greater than 10, appending: ',recieve_corr[i])
+            
     
-    sabines = pd.to_numeric(sabines, errors='coerce')
-    #convert sabines to array
-    sabines = np.array(sabines)
-    print('sabines: ',sabines)
-    srs_overalloct = pd.to_numeric(srs_overalloct, errors='coerce')
-    srs_overalloct = np.array(srs_overalloct)
-    print('srs_overalloct: ',srs_overalloct)
-    ATL_val = srs_overalloct - recieve_corr+10*(np.log10(parition_area/sabines))
+    # print('recieve correction: ',recieve_corr)
+    if isinstance(srs_overalloct, pd.DataFrame):
+        recieve_corr = recieve_corr.values
+    if isinstance(srs_overalloct, pd.DataFrame):
+        srs_overalloct = srs_overalloct.values
+    if isinstance(sabines, pd.DataFrame):
+        sabines = sabines.values
+    # print('srs overalloct: ',srs_overalloct)
+    # print('recieve correction: ',recieve_corr)
+    # print('sabines: ',sabines)
+    ATL_val = []
+    for i, val in enumerate(srs_overalloct):
+        ATL_val.append(srs_overalloct[i]-recieve_corr[i]+10*(np.log10(parition_area/sabines.iloc[i])))
+    # ATL_val = srs_overalloct - recieve_corr+10*(np.log(parition_area/sabines)) 
+    ATL_val = np.round(ATL_val,1)
+    # print('ATL val: ',ATL_val)
     return ATL_val
 
 ## functional. need to verify with excel doc calcs
@@ -222,14 +293,16 @@ def calc_ASTC_val(ATL_val):
     ASTC_start = 16
     New_curve =list()
     new_sum = 0
+    ## Since ATL values only go from 125 to 4k, remove the end values from the curve
+    ATL_val_STC = ATL_val[1:17]
     STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
     while (diff_negative <= 8 and new_sum <= 32):
         # print('starting loop')
         print('ASTC fit test value: ', ASTC_start)
         for vals in STCCurve:
             New_curve.append(vals+ASTC_start)
-        ATL_val = np.round(ATL_val,1)
-        ASTC_curve = New_curve - ATL_val
+     
+        ASTC_curve = New_curve - ATL_val_STC
         
         ASTC_curve = np.round(ASTC_curve)
         print('ASTC curve: ',ASTC_curve)
@@ -249,7 +322,6 @@ def calc_ASTC_val(ATL_val):
         if new_sum > 32 or diff_negative > 8:
             print('Curve too high! ASTC fit: ', ASTC_start-1) 
             return ASTC_start-1
-            break
         pos_diffs = []
         New_curve = []
         ASTC_start = ASTC_start + 1
