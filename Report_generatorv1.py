@@ -80,46 +80,54 @@ def RAW_SLM_datapull(self, find_datafile, datatype):
         srs_data = pd.read_excel(slm_found[0],sheet_name='OBA') # data must be in OBA tab
     return srs_data
 
-def format_SLMdata(srs_data):
-    srs_thirdoct = srs_data.iloc[7] # hardcoded to SLM export data format
-    srs_thirdoct = srs_thirdoct[13:31] # select only the frequency bands of interest
-    return srs_thirdoct
-
-## edit 7/24/24 - need to redo this, since the average tapper level is used for the IIC version, and needs to be specified for this function, as 
-def calc_NR_new(srs_overalloct, rec_overalloct, bkgrnd_overalloct, rt_thirty, recieve_roomvol, NIC_vollimit,testtype):
+### NEW REWORK OF NR CALC ### # functional as of 7/25/24 ### 
+def calc_NR_new(srs_overalloct, rec_overalloct, bkgrnd_overalloct, sabines, recieve_roomvol, NIC_vollimit,testtype):
     NIC_vollimit = 150  # cu. ft.
     if recieve_roomvol > NIC_vollimit:
         print('Using NIC calc, room volume too large')
-    #constant = np.int32(20.047 * np.sqrt(273.15 + 20)) #  wut is this...
-    # intermed = 30 / rt_thirty  # was i compensating for RT calcs?
-   
-    sabines = 0.049*(recieve_roomvol/rt_thirty)  # this produces accurate sabines values
+    # sabines = 0.049*(recieve_roomvol/rt_thirty)  # this produces accurate sabines values
     recieve_corr = list()
+    rec_overalloct = pd.to_numeric(rec_overalloct)
+    bkgrnd_overalloct = pd.to_numeric(bkgrnd_overalloct)
+
     recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
+    # print('recieve: ',rec_overalloct)
+    # print('background: ',bkgrnd_overalloct)
+    recieve_vsBkgrnd = np.round(recieve_vsBkgrnd,1)
+    
     print('rec vs background:',recieve_vsBkgrnd)
     if testtype == 'AIIC':
         for i, val in enumerate(recieve_vsBkgrnd):
             if val < 5:
-                recieve_corr.append(rec_overalloct.iloc[i]-2)
+                recieve_corr.append(rec_overalloct[i]-2)
             else:
-                recieve_corr.append(10*np.log10(10**(rec_overalloct.iloc[i]/10)-10**(bkgrnd_overalloct.iloc[i]/10)))   
+                recieve_corr.append(10*np.log10(10**(rec_overalloct[i]/10)-10**(bkgrnd_overalloct[i]/10)))   
     elif testtype == 'ASTC':
         for i, val in enumerate(recieve_vsBkgrnd):
-            print('val:', val)
-            print('count: ', i)
+            # print('val:', val)
+            # print('count: ', i)
             if val < 5:
                 recieve_corr.append(rec_overalloct.iloc[i]-2)
             elif val < 10:
-                recieve_corr.append(10*np.log10(10**(rec_overalloct.iloc[i]/10)-10**(bkgrnd_overalloct.iloc[i]/10)))
+                recieve_corr.append(10*np.log10(10**(rec_overalloct[i]/10)-10**(bkgrnd_overalloct[i]/10)))
             else:
-                recieve_corr.append(rec_overalloct.iloc[i])
+                recieve_corr.append(rec_overalloct[i])
         # print('-=-=-=-=-')
         # print('recieve_corr: ',recieve_corr)
     recieve_corr = np.round(recieve_corr,1)
+    print('corrected recieve ISPL: ',recieve_corr)
     NR_val = srs_overalloct - recieve_corr
+
     # Normalized_recieve = recieve_corr / srs_overalloct
     sabines = pd.to_numeric(sabines, errors='coerce')
+    sabines = np.round(sabines)
+    if isinstance(sabines, pd.DataFrame):
+        sabines = sabines.values
+
+    Normalized_recieve = list()
     Normalized_recieve = recieve_corr-10*(np.log10(108/sabines))
+    Normalized_recieve = np.round(Normalized_recieve)
+    print('Normalized_recieve: ',Normalized_recieve)
     return NR_val, sabines,recieve_corr, Normalized_recieve
 
 # #### database has raw OBA datasheet, needs to be cleaned for plotting
