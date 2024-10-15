@@ -1,8 +1,9 @@
 import pandas as pd
 import numpy as np
 import logging
-import yaml
-import os import listdir, walk
+# import yaml
+import os 
+from os import listdir, walk
 from dataclasses import dataclass
 from typing import List, Tuple, Dict
 from enum import Enum
@@ -14,6 +15,9 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame, Paragraph, Table, TableStyle, Spacer, PageBreak, KeepInFrame, Image
 from reportlab.lib.units import inch
 
+## having gone through the PDF edit, this room properties will need to be revised 
+# im not even sure if moving to a class variable from a dataframe is best, 
+# i think it will work for now.  
 @dataclass
 class RoomProperties:
     site_name: str
@@ -54,6 +58,36 @@ class ReportData:
     room_properties: RoomProperties
     test_data: TestData
     test_type: TestType
+
+### SLM import - hardcoded - gives me the willies, but it works for now.
+### maybe change to something thats a better troubleshooting effort later ###
+##  ask GPT later about how best to do this, maybe a config file or something? 
+def format_SLMdata(srs_data):
+    ## verify that srs_data iloc[7] is correct- will have a label as 1/3 octave
+    srs_thirdoct = srs_data.iloc[7] # hardcoded to SLM export data format
+    srs_thirdoct = srs_thirdoct[13:31] # select only the frequency bands of interest
+    # verify step to check for SPL info? 
+    return srs_thirdoct
+
+def calculate_onethird_Logavg(average_pos):
+    if isinstance(average_pos, pd.DataFrame):
+        average_pos = average_pos.values
+    onethird_rec_Total = []
+    for i in range(len(average_pos)):
+        freqbin = average_pos[i]
+        total = 0
+        count = 0
+        for val in freqbin:
+            if not pd.isnull(val):
+                total += 10**(val/10)
+                count += 1
+        if count > 0:
+            average = total / count
+            onethird_rec_Total.append(10 * np.log10(average))
+        else:
+            onethird_rec_Total.append(np.nan)
+    onethird_rec_Total = np.round(onethird_rec_Total, 1)
+    return onethird_rec_Total
 
 def load_test_plan(file_path: Path, self) -> pd.DataFrame:
     # Load the test plan data from the Excel file
@@ -158,14 +192,33 @@ def load_test_plan(file_path: Path, self) -> pd.DataFrame:
         srs_data = RAW_SLM_datapull(self,find_source,'-831_Data.')
         recive_data = RAW_SLM_datapull(self,find_rec,'-831_Data.')
         bkgrnd_data = RAW_SLM_datapull(self,find_BNL,'-831_Data.')
-        rt = RAW_SLM_datapull(self,find_RT,'-RT_Data.')
+
         AIIC_pos1 = RAW_SLM_datapull(self,find_posOne,'-831_Data.')
         AIIC_pos2 = RAW_SLM_datapull(self,find_posTwo,'-831_Data.')
         AIIC_pos3 = RAW_SLM_datapull(self,find_posThree,'-831_Data.')
         AIIC_pos4 = RAW_SLM_datapull(self,find_posFour,'-831_Data.')
         AIIC_carpet = RAW_SLM_datapull(self,find_poscarpet,'-831_Data.')
         AIIC_source = RAW_SLM_datapull(self,find_Tapsrs,'-831_Data.')
-        
+
+        rt = RAW_SLM_datapull(self,find_RT,'-RT_Data.')
+        rt_thirty = rt['Unnamed: 10'][24:42]/1000 ## need to validate that this works
+        if isinstance(rt, pd.DataFrame):
+            rt_thirty = rt.values
+        rt_thirty = pd.to_numeric(rt_thirty, errors='coerce')
+        rt_thirty = np.round(rt_thirty,3)
+        ##### May need to put in the average of all the positions, log averaged together #####
+        # not sure where ive got it calculated in, it may be in my IIC function itself, 
+        # but it might be best to just average it here and then pass through the total log avg. 
+        average_pos = []
+        for i in range(1, 5):
+            pos_input = f'AIIC_pos{i}'
+            pos_data = format_SLMdata(single_AIICtest_data[pos_input]) # need to change to get the raw data 
+            average_pos.append(pos_data)
+
+        average_pos = pd.concat(average_pos, axis=1)
+        onethird_rec_Total = calculate_onethird_Logavg(average_pos)
+        print('tap total:', onethird_rec_Total)
+
         single_AIICtest_data = {
             'srs_data': pd.DataFrame(srs_data),
             'recive_data': pd.DataFrame(recive_data),
@@ -189,14 +242,21 @@ def load_test_plan(file_path: Path, self) -> pd.DataFrame:
         recive_data = RAW_SLM_datapull(self, curr_test['Recieve '],'-831_Data.')
         bkgrnd_data = RAW_SLM_datapull(self,curr_test['BNL'],'-831_Data.')
         rt = RAW_SLM_datapull(self,curr_test['RT'],'-RT_Data.')
+        ## formating the RT data further 
+        rt_thirty = rt['Summary']['Unnamed: 10'][24:42]/1000
+        if isinstance(rt, pd.DataFrame):
+            rt_thirty = rt.values
+        rt_thirty = pd.to_numeric(rt_thirty, errors='coerce')
+        rt_thirty = np.round(rt_thirty,3)
 
         single_ASTCtest_data = {
             'srs_data': pd.DataFrame(srs_data),
             'recive_data': pd.DataFrame(recive_data),
             'bkgrnd_data': pd.DataFrame(bkgrnd_data),
-            'rt': pd.DataFrame(rt),
+            'rt': pd.DataFrame(rt_thirty),
             'room_properties': pd.DataFrame(room_properties)
             }
+        
     else:
         single_ASTCtest_data = None
         # return single_ASTCtest_data
@@ -207,11 +267,16 @@ def load_test_plan(file_path: Path, self) -> pd.DataFrame:
         bkgrnd_data = RAW_SLM_datapull(self,curr_test['BNL'],'-831_Data.')
         rt = RAW_SLM_datapull(self,curr_test['RT'],'-RT_Data.')
 
+        if isinstance(rt, pd.DataFrame):
+            rt_thirty = rt.values
+        rt_thirty = pd.to_numeric(rt_thirty, errors='coerce')
+        rt_thirty = np.round(rt_thirty,3)
+
         single_NICtest_data = {
             'srs_data': pd.DataFrame(srs_data),
             'recive_data': pd.DataFrame(recive_data),
             'bkgrnd_data': pd.DataFrame(bkgrnd_data),
-            'rt': pd.DataFrame(rt),
+            'rt': pd.DataFrame(rt_thirty),
             'room_properties': pd.DataFrame(room_properties)
             }
         # return single_NICtest_data
@@ -229,12 +294,16 @@ def load_test_plan(file_path: Path, self) -> pd.DataFrame:
         recive_door_open = RAW_SLM_datapull(self, curr_test['Recieve_Door_Open '],'-831_Data.')
         recive_door_closed = RAW_SLM_datapull(self, curr_test['Recieve_Door_Closed '],'-831_Data.')
 
+        if isinstance(rt, pd.DataFrame): # converting RT data to numeric for calcs 
+            rt_thirty = rt.values
+        rt_thirty = pd.to_numeric(rt_thirty, errors='coerce')
+        rt_thirty = np.round(rt_thirty,3)
 
         single_DTCtest_data = {
             'srs_data': pd.DataFrame(srs_data),
             'recive_data': pd.DataFrame(recive_data),
             'bkgrnd_data': pd.DataFrame(bkgrnd_data),
-            'rt': pd.DataFrame(rt),
+            'rt': pd.DataFrame(rt_thirty),
             'srs_door_open': pd.DataFrame(srs_door_open),
             'srs_door_closed': pd.DataFrame(srs_door_closed),
             'recive_door_open': pd.DataFrame(recive_door_open),
@@ -275,9 +344,6 @@ def RAW_SLM_datapull(self, find_datafile, datatype):
         srs_data = pd.read_excel(slm_found[0], sheet_name='OBA')
     elif datatype == '-RT_Data.': ## may change to -RT60Pink. for RT60 data
         srs_data = pd.read_excel(slm_found[0], sheet_name='Summary')  # data must be in Summary tab for RT meas.
-    # srs_data = pd.read_excel(slm_found[0], sheet_name='OBA')  # data must be in OBA tab
-    # potentially need a write to excel here...similar to previous function
-        srs_data = pd.read_excel(slm_found[0],sheet_name='OBA') # data must be in OBA tab
     return srs_data
 
 ### NEW REWORK OF NR CALC ### # functional as of 7/25/24 ### 
@@ -300,13 +366,13 @@ def calc_nr_new(srs_overalloct: pd.Series, rec_overalloct: pd.Series,
     recieve_vsBkgrnd = np.round(recieve_vsBkgrnd,1)
     
     print('rec vs background:',recieve_vsBkgrnd)
-    if testtype == 'AIIC':
+    if test_type == 'AIIC':
         for i, val in enumerate(recieve_vsBkgrnd):
             if val < 5:
                 recieve_corr.append(rec_overalloct[i]-2)
             else:
                 recieve_corr.append(10*np.log10(10**(rec_overalloct[i]/10)-10**(bkgrnd_overalloct[i]/10)))   
-    elif testtype == 'ASTC':
+    elif test_type == 'ASTC':
         for i, val in enumerate(recieve_vsBkgrnd):
             # print('val:', val)
             # print('count: ', i)
@@ -347,7 +413,7 @@ def calc_atl_val(srs_overalloct: pd.Series, rec_overalloct: pd.Series,
     # thisval = np.int32(recieve_roomvol*intermed)
     # sabines =thisval/constant
 
-    # RT value is right, why is this not working?
+    # RT value is right, why is this not working? - RT value MUST NOT BE ROUNDED TO 2 DECIMALS
     # print('recieve roomvol: ',recieve_roomvol)
     if isinstance(rt_thirty, pd.DataFrame):
         rt_thirty = rt_thirty.values
@@ -407,7 +473,7 @@ def calc_atl_val(srs_overalloct: pd.Series, rec_overalloct: pd.Series,
     # print('ATL val: ',ATL_val)
     return ATL_val
 
-def calc_aiic_val(normalized_receive_iic: pd.Series) -> Tuple[float, pd.Series]:
+def calc_aiic_val(Normalized_recieve_IIC: pd.Series) -> Tuple[float, pd.Series]:
     pos_diffs = list()
     diff_negative_min = 0
     AIIC_start = 94
