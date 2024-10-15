@@ -8,7 +8,6 @@ from openpyxl import load_workbook
 from openpyxl import Workbook
 from openpyxl import cell
 from openpyxl.utils import get_column_letter
-import xlsxwriter
 import time
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -18,6 +17,7 @@ import os
 
 # config file with constants
 from config import *
+from data_processor import *
 
 def sanitize_filepath(filepath):
     ##"""Sanitize a file path by replacing forward slashes with backslashes."""
@@ -51,84 +51,6 @@ def create_tables(data, col_width=None, row_heights=None, style=None):
         ])
     table.setStyle(style)
     return table
-
-
-# this raw datapaths method relies on only 2 paths being passed from the GUI - will we need more paths? seems like testing is always limited to 2 meters...
-def RAW_SLM_datapull(self, find_datafile, datatype):
-    # pass datatype as '-831_Data.' or '-RT_Data.' to pull the correct data
-    raw_testpaths = {
-        'D': self.slm_data_d_path,
-        'E': self.slm_data_e_path,
-        # 'A': self.slm_data_a_path
-    }
-    datafiles = {}
-    for key, path in raw_testpaths.items():
-        datafiles[key] = [f for f in listdir(path) if isfile(join(path, f))]
-
-    if find_datafile[0] in datafiles:
-        datafile_num = datatype + find_datafile[1:] + '.xlsx'
-        slm_found = [x for x in datafiles[find_datafile[0]] if datafile_num in x]
-        slm_found[0] = raw_testpaths[find_datafile[0]] + slm_found[0]  # If this line errors, the test file is mislabeled or doesn't exist 
-
-    print(slm_found[0])
-    if datatype == '-831_Data.':
-        srs_data = pd.read_excel(slm_found[0], sheet_name='OBA')
-    elif datatype == '-RT_Data.': ## may change to -RT60Pink. for RT60 data
-        srs_data = pd.read_excel(slm_found[0], sheet_name='Summary')  # data must be in Summary tab for RT meas.
-    # srs_data = pd.read_excel(slm_found[0], sheet_name='OBA')  # data must be in OBA tab
-    # potentially need a write to excel here...similar to previous function
-        srs_data = pd.read_excel(slm_found[0],sheet_name='OBA') # data must be in OBA tab
-    return srs_data
-
-### NEW REWORK OF NR CALC ### # functional as of 7/25/24 ### 
-def calc_NR_new(srs_overalloct, rec_overalloct, bkgrnd_overalloct, sabines, recieve_roomvol, NIC_vollimit,testtype):
-    NIC_vollimit = 150  # cu. ft.
-    if recieve_roomvol > NIC_vollimit:
-        print('Using NIC calc, room volume too large')
-    # sabines = 0.049*(recieve_roomvol/rt_thirty)  # this produces accurate sabines values
-    recieve_corr = list()
-    rec_overalloct = pd.to_numeric(rec_overalloct)
-    bkgrnd_overalloct = pd.to_numeric(bkgrnd_overalloct)
-
-    recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
-    # print('recieve: ',rec_overalloct)
-    # print('background: ',bkgrnd_overalloct)
-    recieve_vsBkgrnd = np.round(recieve_vsBkgrnd,1)
-    
-    print('rec vs background:',recieve_vsBkgrnd)
-    if testtype == 'AIIC':
-        for i, val in enumerate(recieve_vsBkgrnd):
-            if val < 5:
-                recieve_corr.append(rec_overalloct[i]-2)
-            else:
-                recieve_corr.append(10*np.log10(10**(rec_overalloct[i]/10)-10**(bkgrnd_overalloct[i]/10)))   
-    elif testtype == 'ASTC':
-        for i, val in enumerate(recieve_vsBkgrnd):
-            # print('val:', val)
-            # print('count: ', i)
-            if val < 5:
-                recieve_corr.append(rec_overalloct.iloc[i]-2)
-            elif val < 10:
-                recieve_corr.append(10*np.log10(10**(rec_overalloct[i]/10)-10**(bkgrnd_overalloct[i]/10)))
-            else:
-                recieve_corr.append(rec_overalloct[i])
-        # print('-=-=-=-=-')
-        # print('recieve_corr: ',recieve_corr)
-    recieve_corr = np.round(recieve_corr,1)
-    print('corrected recieve ISPL: ',recieve_corr)
-    NR_val = srs_overalloct - recieve_corr
-
-    # Normalized_recieve = recieve_corr / srs_overalloct
-    sabines = pd.to_numeric(sabines, errors='coerce')
-    sabines = np.round(sabines)
-    if isinstance(sabines, pd.DataFrame):
-        sabines = sabines.values
-
-    Normalized_recieve = list()
-    Normalized_recieve = recieve_corr-10*(np.log10(108/sabines))
-    Normalized_recieve = np.round(Normalized_recieve)
-    print('Normalized_recieve: ',Normalized_recieve)
-    return NR_val, sabines,recieve_corr, Normalized_recieve
 
 # #### database has raw OBA datasheet, needs to be cleaned for plotting
 
@@ -171,216 +93,176 @@ def calc_NR_new(srs_overalloct, rec_overalloct, bkgrnd_overalloct, sabines, reci
 #     return ATL_val
 
 ### this code revised 7/24/24 - functional and produces accurate ATL values
-def calc_ATL_val(srs_overalloct,rec_overalloct,bkgrnd_overalloct,rt_thirty,parition_area,recieve_roomvol):
-    ASTC_vollimit = 883
-    if recieve_roomvol > ASTC_vollimit:
-        print('Using NIC calc, room volume too large')
-    # constant = np.int32(20.047*np.sqrt(273.15+20))
-    # intermed = 30/rt_thirty ## why did i do this? not right....sabines calc is off
-    # thisval = np.int32(recieve_roomvol*intermed)
-    # sabines =thisval/constant
+#  moving to data_processor.py
 
-    # RT value is right, why is this not working?
-    # print('recieve roomvol: ',recieve_roomvol)
-    if isinstance(rt_thirty, pd.DataFrame):
-        rt_thirty = rt_thirty.values
-    # print('rt_thirty: ',rt_thirty)
+# def calc_ATL_val(srs_overalloct,rec_overalloct,bkgrnd_overalloct,rt_thirty,parition_area,recieve_roomvol):
+#     ASTC_vollimit = 883
+#     if recieve_roomvol > ASTC_vollimit:
+#         print('Using NIC calc, room volume too large')
+#     # constant = np.int32(20.047*np.sqrt(273.15+20))
+#     # intermed = 30/rt_thirty ## why did i do this? not right....sabines calc is off
+#     # thisval = np.int32(recieve_roomvol*intermed)
+#     # sabines =thisval/constant
+
+#     # RT value is right, why is this not working?
+#     # print('recieve roomvol: ',recieve_roomvol)
+#     if isinstance(rt_thirty, pd.DataFrame):
+#         rt_thirty = rt_thirty.values
+#     # print('rt_thirty: ',rt_thirty)
     
-    sabines = 0.049*recieve_roomvol/rt_thirty  # this produces accurate sabines values
+#     sabines = 0.049*recieve_roomvol/rt_thirty  # this produces accurate sabines values
 
-    if isinstance(bkgrnd_overalloct, pd.DataFrame):
-        bkgrnd_overalloct = bkgrnd_overalloct.values
-    # print('bkgrnd_overalloct: ',bkgrnd_overalloct)
-    # sabines = np.int32(sabines) ## something not right with this calc
-    sabines = np.round(sabines)
-    # print('sabines: ',sabines)
+#     if isinstance(bkgrnd_overalloct, pd.DataFrame):
+#         bkgrnd_overalloct = bkgrnd_overalloct.values
+#     # print('bkgrnd_overalloct: ',bkgrnd_overalloct)
+#     # sabines = np.int32(sabines) ## something not right with this calc
+#     sabines = np.round(sabines)
+#     # print('sabines: ',sabines)
     
-    recieve_corr = list()
-    # print('recieve: ',rec_overalloct)
-    recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
+#     recieve_corr = list()
+#     # print('recieve: ',rec_overalloct)
+#     recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
 
-    if isinstance(recieve_vsBkgrnd, pd.DataFrame):
-        recieve_vsBkgrnd = recieve_vsBkgrnd.values
+#     if isinstance(recieve_vsBkgrnd, pd.DataFrame):
+#         recieve_vsBkgrnd = recieve_vsBkgrnd.values
 
-    if isinstance(rec_overalloct, pd.DataFrame):
-        rec_overalloct = rec_overalloct.values
-    # print('recieve vs  background: ',recieve_vsBkgrnd)
-    # print('recieve roomvol: ',recieve_roomvol)
-    #### something wrong with this loop #### 
-    for i, val in enumerate(recieve_vsBkgrnd):
-        if val < 5:
-            # print('recieve vs background: ',val)
-            recieve_corr.append(rec_overalloct[i]-2)
-            # print('less than 5, appending: ',recieve_corr[i])
-        elif val < 10:
-            # print('recieve vs background: ',val)
-            recieve_corr.append(10*np.log10((10**(rec_overalloct[i]/10))-(10**(bkgrnd_overalloct[i]/10))))
-            # print('less than 10, appending: ',recieve_corr[i])
-        else:
-            # print('recieve vs background: ',val)
-            recieve_corr.append(rec_overalloct[i])
-            # print('greater than 10, appending: ',recieve_corr[i])
+#     if isinstance(rec_overalloct, pd.DataFrame):
+#         rec_overalloct = rec_overalloct.values
+#     # print('recieve vs  background: ',recieve_vsBkgrnd)
+#     # print('recieve roomvol: ',recieve_roomvol)
+#     #### something wrong with this loop #### 
+#     for i, val in enumerate(recieve_vsBkgrnd):
+#         if val < 5:
+#             # print('recieve vs background: ',val)
+#             recieve_corr.append(rec_overalloct[i]-2)
+#             # print('less than 5, appending: ',recieve_corr[i])
+#         elif val < 10:
+#             # print('recieve vs background: ',val)
+#             recieve_corr.append(10*np.log10((10**(rec_overalloct[i]/10))-(10**(bkgrnd_overalloct[i]/10))))
+#             # print('less than 10, appending: ',recieve_corr[i])
+#         else:
+#             # print('recieve vs background: ',val)
+#             recieve_corr.append(rec_overalloct[i])
+#             # print('greater than 10, appending: ',recieve_corr[i])
             
     
-    # print('recieve correction: ',recieve_corr)
-    if isinstance(srs_overalloct, pd.DataFrame):
-        recieve_corr = recieve_corr.values
-    if isinstance(srs_overalloct, pd.DataFrame):
-        srs_overalloct = srs_overalloct.values
-    if isinstance(sabines, pd.DataFrame):
-        sabines = sabines.values
-    # print('srs overalloct: ',srs_overalloct)
-    # print('recieve correction: ',recieve_corr)
-    # print('sabines: ',sabines)
-    ATL_val = []
-    for i, val in enumerate(srs_overalloct):
-        ATL_val.append(srs_overalloct[i]-recieve_corr[i]+10*(np.log10(parition_area/sabines.iloc[i])))
-    # ATL_val = srs_overalloct - recieve_corr+10*(np.log(parition_area/sabines)) 
-    ATL_val = np.round(ATL_val,1)
-    # print('ATL val: ',ATL_val)
-    return ATL_val
+#     # print('recieve correction: ',recieve_corr)
+#     if isinstance(srs_overalloct, pd.DataFrame):
+#         recieve_corr = recieve_corr.values
+#     if isinstance(srs_overalloct, pd.DataFrame):
+#         srs_overalloct = srs_overalloct.values
+#     if isinstance(sabines, pd.DataFrame):
+#         sabines = sabines.values
+#     # print('srs overalloct: ',srs_overalloct)
+#     # print('recieve correction: ',recieve_corr)
+#     # print('sabines: ',sabines)
+#     ATL_val = []
+#     for i, val in enumerate(srs_overalloct):
+#         ATL_val.append(srs_overalloct[i]-recieve_corr[i]+10*(np.log10(parition_area/sabines.iloc[i])))
+#     # ATL_val = srs_overalloct - recieve_corr+10*(np.log(parition_area/sabines)) 
+#     ATL_val = np.round(ATL_val,1)
+#     # print('ATL val: ',ATL_val)
+#     return ATL_val
 
 ## functional. need to verify with excel doc calcs
-def calc_AIIC_val(Normalized_recieve_IIC):
-    pos_diffs = list()
-    AIIC_start = 94
-    AIIC_contour_val = 16
-    IIC_contour = list()
-    new_sum = 0
-    diff_negative_max = 0
-    IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
-    # initial application of the IIC curve to the first AIIC start value 
-    for vals in IIC_curve:
-        IIC_contour.append(vals+AIIC_start)
-    Contour_curve_result = IIC_contour - Normalized_recieve_IIC
-    print('Normalized recieve ANISPL: ', Normalized_recieve_IIC)
+# # moving to data_processor.py
+# def calc_AIIC_val(Normalized_recieve_IIC):
+#     pos_diffs = list()
+#     AIIC_start = 94
+#     AIIC_contour_val = 16
+#     IIC_contour = list()
+#     new_sum = 0
+#     diff_negative_max = 0
+#     IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
+#     # initial application of the IIC curve to the first AIIC start value 
+#     for vals in IIC_curve:
+#         IIC_contour.append(vals+AIIC_start)
+#     Contour_curve_result = IIC_contour - Normalized_recieve_IIC
+#     print('Normalized recieve ANISPL: ', Normalized_recieve_IIC)
 
-    while (diff_negative_max < 8 and new_sum < 32):
-        print('Inside loop, current AIIC contour: ', AIIC_contour_val)
-        print('Contour curve (IIC curve minus ANISPL): ',Contour_curve_result)
+#     while (diff_negative_max < 8 and new_sum < 32):
+#         print('Inside loop, current AIIC contour: ', AIIC_contour_val)
+#         print('Contour curve (IIC curve minus ANISPL): ',Contour_curve_result)
         
-        diff_negative =  Normalized_recieve_IIC-IIC_contour
-        print('diff negative: ', diff_negative)
+#         diff_negative =  Normalized_recieve_IIC-IIC_contour
+#         print('diff negative: ', diff_negative)
 
-        diff_negative_max =  np.max(diff_negative)
-        diff_negative = pd.to_numeric(diff_negative, errors='coerce')
-        diff_negative = np.array(diff_negative)
+#         diff_negative_max =  np.max(diff_negative)
+#         diff_negative = pd.to_numeric(diff_negative, errors='coerce')
+#         diff_negative = np.array(diff_negative)
 
-        print('Max, single diff: ', diff_negative_max)
-        for val in diff_negative:
-            if val > 0:
-                pos_diffs.append(np.round(val))
-            else:
-                pos_diffs.append(0)
-        print('positive diffs: ',pos_diffs)
-        new_sum = np.sum(pos_diffs)
-        print('Sum Positive diffs: ', new_sum)
-        print('Evaluating sums and differences vs 32, 8: ', new_sum, diff_negative_max)
-        if new_sum > 32 or diff_negative_max > 8:
-            print('Difference condition met! AIIC value: ', AIIC_contour_val) # 
-            print('AIIC result curve: ', Contour_curve_result)
-            return AIIC_contour_val, Contour_curve_result
-        # condition not met, resetting arrays
-        pos_diffs = []
-        IIC_contour = []
-        print('difference condition not met, subtracting 1 from AIIC start and recalculating the IIC contour')
-        AIIC_start = AIIC_start - 1
-        AIIC_contour_val = AIIC_contour_val + 1
-        print('AIIC start: ', AIIC_start)
-        print('AIIC contour value: ', AIIC_contour_val)
-        for vals in IIC_curve:
-            IIC_contour.append(vals+AIIC_start)
-        Contour_curve_result = IIC_contour - Normalized_recieve_IIC
-        if AIIC_start <10: break
+#         print('Max, single diff: ', diff_negative_max)
+#         for val in diff_negative:
+#             if val > 0:
+#                 pos_diffs.append(np.round(val))
+#             else:
+#                 pos_diffs.append(0)
+#         print('positive diffs: ',pos_diffs)
+#         new_sum = np.sum(pos_diffs)
+#         print('Sum Positive diffs: ', new_sum)
+#         print('Evaluating sums and differences vs 32, 8: ', new_sum, diff_negative_max)
+#         if new_sum > 32 or diff_negative_max > 8:
+#             print('Difference condition met! AIIC value: ', AIIC_contour_val) # 
+#             print('AIIC result curve: ', Contour_curve_result)
+#             return AIIC_contour_val, Contour_curve_result
+#         # condition not met, resetting arrays
+#         pos_diffs = []
+#         IIC_contour = []
+#         print('difference condition not met, subtracting 1 from AIIC start and recalculating the IIC contour')
+#         AIIC_start = AIIC_start - 1
+#         AIIC_contour_val = AIIC_contour_val + 1
+#         print('AIIC start: ', AIIC_start)
+#         print('AIIC contour value: ', AIIC_contour_val)
+#         for vals in IIC_curve:
+#             IIC_contour.append(vals+AIIC_start)
+#         Contour_curve_result = IIC_contour - Normalized_recieve_IIC
+#         if AIIC_start <10: break
 
-# validated against excel, working!
-def calc_ASTC_val(ATL_val):
-    pos_diffs = list()
-    diff_negative=0
-    diff_positive=0 
-    ASTC_start = 16
-    New_curve =list()
-    new_sum = 0
-    ## Since ATL values only go from 125 to 4k, remove the end values from the curve
-    ATL_val_STC = ATL_val[1:17]
-    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
-    while (diff_negative <= 8 and new_sum <= 32):
-        # print('starting loop')
-        print('ASTC fit test value: ', ASTC_start)
-        for vals in STCCurve:
-            New_curve.append(vals+ASTC_start)
-     
-        ASTC_curve = New_curve - ATL_val_STC
-        
-        ASTC_curve = np.round(ASTC_curve)
-        print('ASTC curve: ',ASTC_curve)
-        diff_negative = np.max(ASTC_curve)
 
-        print('Max, single diff: ', diff_negative)
-
-        for val in ASTC_curve:
-            if val > 0:
-                pos_diffs.append(np.round(val))
-            else:
-                pos_diffs.append(0)
-        # print(pos_diffs)
-        new_sum = np.sum(pos_diffs)
-        print('Sum Positive diffs: ', new_sum)
-        
-        if new_sum > 32 or diff_negative > 8:
-            print('Curve too high! ASTC fit: ', ASTC_start-1) 
-            return ASTC_start-1
-        pos_diffs = []
-        New_curve = []
-        ASTC_start = ASTC_start + 1
-        
-        if ASTC_start >80: break
-
-# need to validate
-def plot_curves(frequencies,Y_label,Ref_curve, Field_curve,Ref_label, Field_label):
-    # pass labels for both curves, depending on AIIC or ASTC 
-    # AIIC will be Nrec_ANISPL, ASTC will be ATL_val
-    plt.figure(figsize=(10, 6))
-    plt.plot(frequencies, Ref_curve, label=Ref_label, color='red')
-    plt.plot(frequencies, Field_curve, label=Field_label, color='black', marker='s', linestyle='--')
-    plt.xlabel('Frequency')
-    plt.ylabel(Y_label)
-    plt.grid(True)
-    plt.tick_params(axis='x', rotation=45)
-    plt.xticks(frequencies)
-    plt.xscale('log')
-    plt.gca().get_xaxis().set_major_formatter(plt.ScalarFormatter())  # Format x-ticks as scalars
-    plt.gca().xaxis.set_major_locator(ticker.FixedLocator(frequencies))  # Force all x-ticks to display
-    # plt.title('Reference vs Measured')
-    plt.legend()
-    # plt.show()
-    fig = plt.get_figure()
-    fig.savefig('plot.png')
-    plot_fig = Image('plot.png')
-    return plot_fig
 # need to write a big overall wrapper function here that will go through the testplan, depending on what test type, pull the data from each excel file, write the data to the database variables for that test and then use those database variables to plot the data in the report.
 # for each testplan entry, first write the room properties database: 
 # Organize the variables into a dictionary
 
+#     recieve_vsBkgrnd = np.round(recieve_vsBkgrnd,1)
+    
+#     print('rec vs background:',recieve_vsBkgrnd)
+#     if testtype == 'AIIC':
+#         for i, val in enumerate(recieve_vsBkgrnd):
+#             if val < 5:
+#                 recieve_corr.append(rec_overalloct[i]-2)
+#             else:
+#                 recieve_corr.append(10*np.log10(10**(rec_overalloct[i]/10)-10**(bkgrnd_overalloct[i]/10)))   
+#     elif testtype == 'ASTC':
+#         for i, val in enumerate(recieve_vsBkgrnd):
+#             # print('val:', val)
+#             # print('count: ', i)
+#             if val < 5:
+#                 recieve_corr.append(rec_overalloct.iloc[i]-2)
+#             elif val < 10:
+#                 recieve_corr.append(10*np.log10(10**(rec_overalloct[i]/10)-10**(bkgrnd_overalloct[i]/10)))
+#             else:
+#                 recieve_corr.append(rec_overalloct[i])
+#         # print('-=-=-=-=-')
+#         # print('recieve_corr: ',recieve_cor
 ###################################
 ####_+#_+_+_#+_#+_#+_####_######################################
 ## do i put the GUI here YES - ASTC GUI proto.py works - just need to add in the reportlab formatting and get going.
 # wrap the following into a funciton - take in the testplan entry, and return the reportlab formatted pdf output path
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame, Paragraph, Table, TableStyle, Spacer,PageBreak, KeepInFrame, Image
+from reportlab.pdfgen import canvas
 
-def create_report(self,curr_test, single_test_dataframe, reportOutputfolder,test_type):
+from reportlab.lib.units import inch
+
+# def create_report(self,curr_test, single_test_dataframe, reportOutputfolder,test_type):
         # all the code below
     # Kaulu by gentry testing ## EXAMPLE DATA CREATE LOOP FOR EACH TESTPLAN ENTRY
 
 ##### _+_+#__#+_#+_+_+_####################### REPORT GENERATION CODE ##############################
-    import matplotlib.pyplot as plt
-    import matplotlib.ticker as ticker
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import letter
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame, Paragraph, Table, TableStyle, Spacer,PageBreak, KeepInFrame, Image
-    from reportlab.pdfgen import canvas
-
-    from reportlab.lib.units import inch
 
     ######## =--=-=-=--= 
     ### custom margins
@@ -396,7 +278,7 @@ def create_report(self,curr_test, single_test_dataframe, reportOutputfolder,test
     # doc = BaseDocTemplate("report_with_header.pdf", pagesize=letter)
 
     #### -=-=--=-= 
-
+def header_elements(self, single_test_dataframe, test_type):
     # Document Setup 
     # document name and page size
     #  Example ouptut file name: '24-006 AIIC Test Report_1.1.1.pdf'
@@ -419,67 +301,67 @@ def create_report(self,curr_test, single_test_dataframe, reportOutputfolder,test
     custom_title_style = styles['Heading1']
 
     # Define header elements
-    def header_elements():
-        elements = []
-        if test_type == 'AIIC':
-            elements.append(Paragraph("<b>Field Impact Sound Transmission Test Report</b>", custom_title_style))
-            elements.append(Paragraph("<b>Apparent Impact Insulation Class (AIIC)</b>", custom_title_style))
-        elif test_type == 'ASTC':
-            elements.append(Paragraph("<b>Field Sound Transmission Test Report</b>", custom_title_style))
-            elements.append(Paragraph("<b>Apparent Sound Transmission Class (ASTC)</b>", custom_title_style))
-        elif test_type == 'NIC':
-            elements.append(Paragraph("<b>Field Sound Transmission Test Report</b>", custom_title_style))
-            elements.append(Paragraph("<b>Noise Isolation Class (NIC)</b>", custom_title_style))
-        
-        # elements.append(Paragraph("<b>Field Impact Sound Transmission Test Report</b>", custom_title_style))
-        # elements.append(Paragraph("<b>Apparent Impact Insulation Class (AIIC)</b>", custom_title_style))
-        elements.append(Spacer(1, 10))
-        leftside_data = [
-            ["Report Date:", single_test_dataframe['room_properties']['Report_Date'][0]],
-            ['Test Date:', single_test_dataframe['room_properties']['Test_Date'][0]],
-            ['DLAA Test No', single_test_dataframe['room_properties']['Test_Label'][0]]
-        ]
-        rightside_data = [
-            ["Source Room:", single_test_dataframe['room_properties']['Source_Room'][0]],
-            ["Receiver Room:", single_test_dataframe['room_properties']['Receiving_Room'][0]],
-            ["Test Assembly:", single_test_dataframe['room_properties']['tested_assembly'][0]]
-        ]
 
-        table_left = Table(leftside_data)
-        table_right = Table(rightside_data)
-        table_left.setStyle(TableStyle([('GRID', (0, 0), (-1, -1), 1, colors.white)]))
-        table_right.setStyle(TableStyle([('GRID', (0, 0), (-1, -1), 1, colors.white)]))
+    elements = []
+    if test_type == 'AIIC':
+        elements.append(Paragraph("<b>Field Impact Sound Transmission Test Report</b>", custom_title_style))
+        elements.append(Paragraph("<b>Apparent Impact Insulation Class (AIIC)</b>", custom_title_style))
+    elif test_type == 'ASTC':
+        elements.append(Paragraph("<b>Field Sound Transmission Test Report</b>", custom_title_style))
+        elements.append(Paragraph("<b>Apparent Sound Transmission Class (ASTC)</b>", custom_title_style))
+    elif test_type == 'NIC':
+        elements.append(Paragraph("<b>Field Sound Transmission Test Report</b>", custom_title_style))
+        elements.append(Paragraph("<b>Noise Isolation Class (NIC)</b>", custom_title_style))
+    
+    # elements.append(Paragraph("<b>Field Impact Sound Transmission Test Report</b>", custom_title_style))
+    # elements.append(Paragraph("<b>Apparent Impact Insulation Class (AIIC)</b>", custom_title_style))
+    elements.append(Spacer(1, 10))
+    leftside_data = [
+        ["Report Date:", single_test_dataframe['room_properties']['Report_Date'][0]],
+        ['Test Date:', single_test_dataframe['room_properties']['Test_Date'][0]],
+        ['DLAA Test No', single_test_dataframe['room_properties']['Test_Label'][0]]
+    ]
+    rightside_data = [
+        ["Source Room:", single_test_dataframe['room_properties']['Source_Room'][0]],
+        ["Receiver Room:", single_test_dataframe['room_properties']['Receiving_Room'][0]],
+        ["Test Assembly:", single_test_dataframe['room_properties']['tested_assembly'][0]]
+    ]
 
-        table_combined_lr = Table([[table_left, table_right]], colWidths=[doc.width / 2.0] * 2)
-        elements.append(KeepInFrame(maxWidth=doc.width, maxHeight=header_height, content=[table_combined_lr], hAlign='LEFT'))
-        elements.append(Spacer(1, 10))
-        elements.append(Paragraph('Test site: ' + single_test_dataframe['room_properties']['Site_Name'][0], styles['Normal']))
-        elements.append(Spacer(1, 5))
-        elements.append(Paragraph('Client: ' + single_test_dataframe['room_properties']['Client_Name'][0], styles['Normal']))
-        return elements
+    table_left = Table(leftside_data)
+    table_right = Table(rightside_data)
+    table_left.setStyle(TableStyle([('GRID', (0, 0), (-1, -1), 1, colors.white)]))
+    table_right.setStyle(TableStyle([('GRID', (0, 0), (-1, -1), 1, colors.white)]))
 
-    # Define a function to draw the header and footer
-    def header_footer(canvas, doc):
-        canvas.saveState()
+    table_combined_lr = Table([[table_left, table_right]], colWidths=[doc.width / 2.0] * 2)
+    elements.append(KeepInFrame(maxWidth=doc.width, maxHeight=header_height, content=[table_combined_lr], hAlign='LEFT'))
+    elements.append(Spacer(1, 10))
+    elements.append(Paragraph('Test site: ' + single_test_dataframe['room_properties']['Site_Name'][0], styles['Normal']))
+    elements.append(Spacer(1, 5))
+    elements.append(Paragraph('Client: ' + single_test_dataframe['room_properties']['Client_Name'][0], styles['Normal']))
+    return elements
 
-        # Build the header
-        header_frame._leftPadding = header_frame._rightPadding = 0
-        header_story = header_elements()
-        header_frame.addFromList(header_story, canvas)
+# Define a function to draw the header and footer
+def header_footer(canvas, doc):
+    canvas.saveState()
 
-        # Footer
-        canvas.setFont('Helvetica', 10)
-        footer_text = f"Page {doc.page}"
-        canvas.drawCentredString(letter[0] / 2, bottom_margin + footer_height / 2, footer_text)
+    # Build the header
+    header_frame._leftPadding = header_frame._rightPadding = 0
+    header_story = header_elements()
+    header_frame.addFromList(header_story, canvas)
 
-        canvas.restoreState()
+    # Footer
+    canvas.setFont('Helvetica', 10)
+    footer_text = f"Page {doc.page}"
+    canvas.drawCentredString(letter[0] / 2, bottom_margin + footer_height / 2, footer_text)
+
+    canvas.restoreState()
 
     # Create a page template with header and footer
-    page_template = PageTemplate(id='Standard', frames=[main_frame, header_frame, footer_frame], onPage=header_footer)
-    doc.addPageTemplates([page_template])
-    # Main document content (Add your main document elements here)
-    main_elements = []
-
+    # page_template = PageTemplate(id='Standard', frames=[main_frame, header_frame, footer_frame], onPage=header_footer)
+    # doc.addPageTemplates([page_template])
+    # # Main document content (Add your main document elements here)
+    # main_elements = []
+def create_standards_section(test_type, single_test_dataframe, main_elements):
     ## -=-==-= Heading 'STANDARDS'  # -=-=-=-=-=--=-=-=-=-=--=-=-
     styleHeading = ParagraphStyle('heading', parent=styles['Normal'], spaceAfter=10)
     main_elements.append(Spacer(1, 10))  # Adds some space 
@@ -523,6 +405,9 @@ def create_report(self,curr_test, single_test_dataframe, reportOutputfolder,test
     main_elements.append(standards_table)
     ## these elements are in the single test dataframe, room_properties
     ### 
+    return main_elements,styleHeading
+
+def create_test_environment_section(test_type,single_test_dataframe, main_elements):
     # Heading 'TEST ENVIRONMENT'
     main_elements.append(Paragraph("<u>TEST ENVIRONMENT:</u>", styleHeading))
     main_elements.append(Paragraph('The source room was '+single_test_dataframe['room_properties']['Source_Room'][0]+'. The space was'+single_test_dataframe['room_properties']['source_room_finish'][0]+'. The floor was '+single_test_dataframe['room_properties']['srs_floor'][0]+'. The ceiling was '+single_test_dataframe['room_properties']['srs_ceiling'][0]+". The walls were"+single_test_dataframe['room_properties']['srs_walls'][0]+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+single_test_dataframe['room_properties']['source_room_vol'][0]+"cu. ft."))
@@ -536,6 +421,8 @@ def create_report(self,curr_test, single_test_dataframe, reportOutputfolder,test
     main_elements.append(Paragraph("<u>TEST ASSEMBLY:</u>", styleHeading))
     main_elements.append(Spacer(1, 10))  # Adds some space 
     main_elements.append(Paragraph("The tested assembly was the"+single_test_dataframe['room_properties']['Test_Assembly_Type'][0]+"The assembly was not field verified, and was based on information provided by the client and drawings for the project. The client advised that no slab treatment or self-leveling was applied. Results may vary if slab treatment or self-leveling or any adhesive is used in other installations."))
+    
+    
     # ##### END OF FIRST PAGE TEXT  - ########
         
     main_elements.append(PageBreak())
@@ -593,11 +480,12 @@ def create_report(self,curr_test, single_test_dataframe, reportOutputfolder,test
     main_elements.append(test_instrumentation_table)
     #### END OF SECOND PAGE TXT -=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-
     main_elements.append(PageBreak())
+
+def create_calc_table_section(self, single_test_dataframe, test_type):
     main_elements.append(Paragraph("<u>STATEMENT OF TEST RESULTS:</u>", styleHeading))
     #### Main calculation table section --- also split into AIIC, ASTC, NIC report results. 
     # function returning a database table to display frequency, level, OBA of source, reciever, RT60, NR, ATL, Exceptions
     ######### CALCS FOR PDF TABLES AND PLOTS WILL GO IN THIS SCRIPT ###########
-    # freqThirdoct = single_test_dataframe['srs_data'].iloc[6]
     # frequencies = freqThirdoct[14:30]
     frequencies =[125,160,200,250,315,400,500,630,800,1000,1250,1600,2000,2500,3150,4000]
     # freqThirdoct.iloc[6]
@@ -705,38 +593,57 @@ def create_report(self,curr_test, single_test_dataframe, reportOutputfolder,test
     elif test_type == 'NIC':
         main_elements.append(Paragraph("The Noise Isolation Class (NIC) was calculated. The NIC rating is based on Noise Reduction (NR), and includes the effects of noise flanking. The NIC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_data[0][0]))
     main_elements.append(Paragraph("The results stated in this report represent only the specific construction and acoustical conditions present at the time of the test. Measurements performed in accordance with this test method on nominally identical constructions and acoustical conditions may produce different results."))
-
+def create_plot_page_section(test_type, main_elements, frequencies, IIC_contour_final, ASTC_contour_final, Nrec_ANISPL, Ref_label, Field_IIC_label):
     main_elements.append(PageBreak())
     ####### 3rd page - ASTC/NIC reference contour plot
 
     # need proper formatting for this plot.
     if test_type == 'AIIC':
-       IIC_yAxis = 'Sound Pressure Level (dB)'
-       AIIC_plot_img = plot_curves(frequencies,IIC_yAxis, IIC_contour_final,Nrec_ANISPL,Ref_label, Field_IIC_label)
-       plot_image = Image(AIIC_plot_img, 6*inch, 4*inch)
-       main_elements.append(plot_image)
-       main_elements.append(Spacer(1, 10))
-       # create a text box with the AIIC single value result, contained in 
+        IIC_yAxis = 'Sound Pressure Level (dB)'
+        AIIC_plot_img = plot_curves(frequencies,IIC_yAxis, IIC_contour_final,Nrec_ANISPL,Ref_label, Field_IIC_label)
+        plot_image = Image(AIIC_plot_img, 6*inch, 4*inch)
+        main_elements.append(plot_image)
+        main_elements.append(Spacer(1, 10))
+    # create a text box with the AIIC single value result, contained in 
 
     elif test_type == 'ASTC':
         ASTCyAxis = 'Transmission Loss (dB)'
         ASTC_plot_img = plot_curves(frequencies, ASTCyAxis, ASTC_contour_final,Nrec_ANISPL,Ref_label, Field_IIC_label)
         plot_img = Image(ASTC_plot_img, 6*inch, 4*inch)
         main_elements.append(plot_img)
+        main_elements.append(Spacer(1, 10))
+
 
     elif test_type == 'NIC':
         ASTCyAxis = 'Transmission Loss (dB)'
         NIC_plot_img = plot_curves(frequencies, ASTCyAxis, ASTC_contour_final,Nrec_ANISPL,Ref_label, Field_IIC_label)
         plot_img = Image(NIC_plot_img, 6*inch, 4*inch)
         main_elements.append(plot_img)
+        main_elements.append(Spacer(1, 10))
 
 
+        return main_elements
 
-    # Output a file string for the PDF made up of test number and test type
-    output_file = f"{reportOutputfolder}/Report_{curr_test}_{test_type}.pdf"
+#  not sure if this function will go here, but it will be the main function that is called to create the report. 
+## still need to sync up with the changes that may come from working through how best to iterate through each test and all its reports
 
-    # Build the document
-    doc.build(main_elements)
+# def create_report(test_data: TestData, report_output_folder: str, test_type: str):
+#     page_template = PageTemplate(id='Standard', frames=[main_frame, header_frame, footer_frame], onPage=header_footer)
+#     doc.addPageTemplates([page_template])
+#     main_elements = []
 
-    # Save the document as a PDF
-    doc.save(output_file)
+#     doc = BaseDocTemplate(...)
+#     elements = []
+#     elements.extend(create_header(test_type, test_data))
+#     elements.extend(create_standards_section(test_type))
+#     elements.extend(create_test_environment_section(test_data))
+#     # ... other sections ...
+#     # doc.build(elements)
+#         # Output a file string for the PDF made up of test number and test type
+#     output_file = f"{reportOutputfolder}/Report_{curr_test}_{test_type}.pdf"
+
+#         # Build the document
+#     doc.build(main_elements)
+
+#         # Save the document as a PDF
+#     doc.save(output_file)
