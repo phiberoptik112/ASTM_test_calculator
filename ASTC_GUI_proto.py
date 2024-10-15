@@ -16,7 +16,6 @@ from openpyxl import load_workbook
 from openpyxl import Workbook
 from openpyxl import cell
 from openpyxl.utils import get_column_letter
-import xlsxwriter
 from os import listdir, walk
 from os.path import isfile, join
 import tkinter as tk
@@ -24,135 +23,170 @@ from tkinter import *
 
 import matplotlib.pyplot as plt
 # Import Report generatorv1.py
-from Report_generatorv1 import create_report, calc_ASTC_val,calc_AIIC_val, RAW_SLM_datapull, sanitize_filepath,calc_NR_new,calc_ATL_val
+# from Report_generatorv1 import create_report,calc_AIIC_val, RAW_SLM_datpull, sanitize_filepath,
 
 from config import *
+from data_processor import *
 # this is a new function combines RT and ASTC datapulls
 
  # creating a subfunction to return the dataframe from the testplan test list
  # pass it the current test number and the test list
  
 ### # FUNCTIONS FOR PULLING EXCEL DATA ########
-def pull_testplan_data(self,curr_test):
-    # AIIC_test = curr_test['AIIC']
-    # NIC_test = curr_test['NIC'] 
-    # ASTC_test = curr_test['ASTC']
+## moving this to data_processor.py
 
-    if int(curr_test['source room vol']) >= 5300 or int(curr_test['receive room vol']) >= 5300:
-        NICreporting_Note = 'The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver and/or source room was greater than the maximum allowed per E336-16, Paragraph 9.4.1.2.'
-    elif int(curr_test['source room vol']) <= 833 or int(curr_test['receive room vol']) <= 833:
-        NICreporting_Note = 'The receiver and/or source room has a volume less than the minimum volume requirement of 25 m3 (883 cu. ft.).'
-    else:
-        NICreporting_Note = '---'
+# def pull_testplan_data(self,curr_test):
+#     #pulling data from the test plan
+#     if int(curr_test['source room vol']) >= 5300 or int(curr_test['receive room vol']) >= 5300:
+#         NICreporting_Note = 'The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver and/or source room was greater than the maximum allowed per E336-16, Paragraph 9.4.1.2.'
+#     elif int(curr_test['source room vol']) <= 833 or int(curr_test['receive room vol']) <= 833:
+#         NICreporting_Note = 'The receiver and/or source room has a volume less than the minimum volume requirement of 25 m3 (883 cu. ft.).'
+#     else:
+#         NICreporting_Note = '---'
 
-    room_properties = pd.DataFrame(
-        {
-            "Site Name": curr_test['Site_Name'],
-            "Client Name": curr_test['Client_Name'],
-            "Source Room Name": curr_test['Source_Room'],
-            "Recieve Room Name": curr_test['Receiving_Room'],
-            "Testdate": curr_test['Test_Date'],
-            "ReportDate": curr_test['Report_Date'],
-            "Project Name": curr_test['Project_Name'],
-            "Test number": curr_test['Test_Label'],
-            "Source Vol" : curr_test['source_room_vol'],
-            "Recieve Vol": curr_test['receive_room_vol'],
-            "Partition area": curr_test['partition_area'],
-            "Partition dim.": curr_test['partition_dim'],
-            "Source room Finish" : curr_test['source_room_finish'],
-            "Recieve room Finish": curr_test['receive_room_finish'],
-            "Srs Floor Descrip.": curr_test['srs_floor'],
-            "Srs Ceiling Descrip.": curr_test['srs_ceiling'],
-            "Srs Walls Descrip.": curr_test['srs_Walls'],
-            "Rec Floor Descrip.": curr_test['rec_floor'],
-            "Rec Ceiling Descrip.": curr_test['rec_ceiling'],
-            "Rec Walls Descrip.": curr_test['rec_Wall'],          
-            "Tested Assembly": curr_test['tested_assembly'],
-            "Expected Performance": curr_test['expected_performance'],
-            "Annex 2 used?": curr_test['Annex_2_used?'],
-            "Test assem. type": curr_test['Test_assembly_Type'],
-            "AIIC_test": curr_test['AIIC_test'],
-            "NIC_test": curr_test['NIC_test'],
-            "ASTC_test": curr_test['ASTC_test'],
-            "NIC reporting Note": NICreporting_Note
-        },
-        index=[0]
-        )
+#     room_properties = pd.DataFrame(
+#         {
+#             "Site Name": curr_test['Site_Name'],
+#             "Client Name": curr_test['Client_Name'],
+#             "Source Room Name": curr_test['Source_Room'],
+#             "Recieve Room Name": curr_test['Receiving_Room'],
+#             "Testdate": curr_test['Test_Date'],
+#             "ReportDate": curr_test['Report_Date'],
+#             "Project Name": curr_test['Project_Name'],
+#             "Test number": curr_test['Test_Label'],
+#             "Source Vol" : curr_test['source_room_vol'],
+#             "Recieve Vol": curr_test['receive_room_vol'],
+#             "Partition area": curr_test['partition_area'],
+#             "Partition dim.": curr_test['partition_dim'],
+#             "Source room Finish" : curr_test['source_room_finish'],
+#             "Recieve room Finish": curr_test['receive_room_finish'],
+#             "Srs Floor Descrip.": curr_test['srs_floor'],
+#             "Srs Ceiling Descrip.": curr_test['srs_ceiling'],
+#             "Srs Walls Descrip.": curr_test['srs_Walls'],
+#             "Rec Floor Descrip.": curr_test['rec_floor'],
+#             "Rec Ceiling Descrip.": curr_test['rec_ceiling'],
+#             "Rec Walls Descrip.": curr_test['rec_Wall'],          
+#             "Tested Assembly": curr_test['tested_assembly'],
+#             "Expected Performance": curr_test['expected_performance'],
+#             "Annex 2 used?": curr_test['Annex_2_used?'],
+#             "Test assem. type": curr_test['Test_assembly_Type'],
+#             "AIIC_test": curr_test['AIIC_test'],
+#             "NIC_test": curr_test['NIC_test'],
+#             "ASTC_test": curr_test['ASTC_test'],
+#             "DTC_test": curr_test['DTC_test'],
+#             "NIC reporting Note": NICreporting_Note
+#         },
+#         index=[0]
+#         )
     
-    
-    if curr_test['AIIC_test'] == 1:
-        print("AIIC testing enabled, copying data...")
-### IIC variables  #### When extending to IIC data
-        find_source = curr_test['Source']
-        find_rec = curr_test['Recieve '] #trailing whitespace? be sure to verify this is consistent in the excel file
-        find_BNL = curr_test['BNL']
-        find_RT = curr_test['RT']
-        find_posOne = curr_test['Position1']
-        find_posTwo = curr_test['Position2']
-        find_posThree = curr_test['Position3']
-        find_posFour = curr_test['Position4']
-        find_poscarpet = curr_test['Carpet']
-        find_Tapsrs = curr_test['SourceTap']
-        srs_data = RAW_SLM_datapull(self,find_source,'-831_Data.')
-        recive_data = RAW_SLM_datapull(self,find_rec,'-831_Data.')
-        bkgrnd_data = RAW_SLM_datapull(self,find_BNL,'-831_Data.')
-        rt = RAW_SLM_datapull(self,find_RT,'-RT_Data.')
-        AIIC_pos1 = RAW_SLM_datapull(self,find_posOne,'-831_Data.')
-        AIIC_pos2 = RAW_SLM_datapull(self,find_posTwo,'-831_Data.')
-        AIIC_pos3 = RAW_SLM_datapull(self,find_posThree,'-831_Data.')
-        AIIC_pos4 = RAW_SLM_datapull(self,find_posFour,'-831_Data.')
-        AIIC_carpet = RAW_SLM_datapull(self,find_poscarpet,'-831_Data.')
-        AIIC_source = RAW_SLM_datapull(self,find_Tapsrs,'-831_Data.')
+#     ### 
+#     if curr_test['AIIC_test'] == 1:
+#         print("AIIC testing enabled, copying data...")
+# ### IIC variables  #### When extending to IIC data
+#         find_source = curr_test['Source']
+#         find_rec = curr_test['Recieve '] #trailing whitespace? be sure to verify this is consistent in the excel file
+#         find_BNL = curr_test['BNL']
+#         find_RT = curr_test['RT']
+#         find_posOne = curr_test['Position1']
+#         find_posTwo = curr_test['Position2']
+#         find_posThree = curr_test['Position3']
+#         find_posFour = curr_test['Position4']
+#         find_poscarpet = curr_test['Carpet']
+#         find_Tapsrs = curr_test['SourceTap']
+#         srs_data = RAW_SLM_datapull(self,find_source,'-831_Data.')
+#         recive_data = RAW_SLM_datapull(self,find_rec,'-831_Data.')
+#         bkgrnd_data = RAW_SLM_datapull(self,find_BNL,'-831_Data.')
+#         rt = RAW_SLM_datapull(self,find_RT,'-RT_Data.')
+#         AIIC_pos1 = RAW_SLM_datapull(self,find_posOne,'-831_Data.')
+#         AIIC_pos2 = RAW_SLM_datapull(self,find_posTwo,'-831_Data.')
+#         AIIC_pos3 = RAW_SLM_datapull(self,find_posThree,'-831_Data.')
+#         AIIC_pos4 = RAW_SLM_datapull(self,find_posFour,'-831_Data.')
+#         AIIC_carpet = RAW_SLM_datapull(self,find_poscarpet,'-831_Data.')
+#         AIIC_source = RAW_SLM_datapull(self,find_Tapsrs,'-831_Data.')
         
-        single_AIICtest_data = {
-            'srs_data': pd.DataFrame(srs_data),
-            'recive_data': pd.DataFrame(recive_data),
-            'bkgrnd_data': pd.DataFrame(bkgrnd_data),
-            'rt': pd.DataFrame(rt),
-            'AIIC_pos1': pd.DataFrame(AIIC_pos1),
-            'AIIC_pos2': pd.DataFrame(AIIC_pos2),
-            'AIIC_pos3': pd.DataFrame(AIIC_pos3),
-            'AIIC_pos4': pd.DataFrame(AIIC_pos4),
-            'AIIC_source': pd.DataFrame(AIIC_source),
-            'AIIC_carpet': pd.DataFrame(AIIC_carpet),
-            'room_properties': pd.DataFrame(room_properties)
-        }
-        return single_AIICtest_data
+#         single_AIICtest_data = {
+#             'srs_data': pd.DataFrame(srs_data),
+#             'recive_data': pd.DataFrame(recive_data),
+#             'bkgrnd_data': pd.DataFrame(bkgrnd_data),
+#             'rt': pd.DataFrame(rt),
+#             'AIIC_pos1': pd.DataFrame(AIIC_pos1),
+#             'AIIC_pos2': pd.DataFrame(AIIC_pos2),
+#             'AIIC_pos3': pd.DataFrame(AIIC_pos3),
+#             'AIIC_pos4': pd.DataFrame(AIIC_pos4),
+#             'AIIC_source': pd.DataFrame(AIIC_source),
+#             'AIIC_carpet': pd.DataFrame(AIIC_carpet),
+#             'room_properties': pd.DataFrame(room_properties)
+#         }
+#     else:
+#         single_AIICtest_data = None
+#         # return single_AIICtest_data
     
-    if curr_test['ASTC_test'] == 1:
-        srs_data = RAW_SLM_datapull(self,curr_test['Source'],'-831_Data.')
-        recive_data = RAW_SLM_datapull(self, curr_test['Recieve '],'-831_Data.')
-        bkgrnd_data = RAW_SLM_datapull(self,curr_test['BNL'],'-831_Data.')
-        rt = RAW_SLM_datapull(self,curr_test['RT'],'-RT_Data.')
+#     if curr_test['ASTC_test'] == 1:
+#         srs_data = RAW_SLM_datapull(self,curr_test['Source'],'-831_Data.')
+#         recive_data = RAW_SLM_datapull(self, curr_test['Recieve '],'-831_Data.')
+#         bkgrnd_data = RAW_SLM_datapull(self,curr_test['BNL'],'-831_Data.')
+#         rt = RAW_SLM_datapull(self,curr_test['RT'],'-RT_Data.')
 
-        single_ASTCtest_data = {
-            'srs_data': pd.DataFrame(srs_data),
-            'recive_data': pd.DataFrame(recive_data),
-            'bkgrnd_data': pd.DataFrame(bkgrnd_data),
-            'rt': pd.DataFrame(rt),
-            'room_properties': pd.DataFrame(room_properties)
-            }
-        return single_ASTCtest_data
+#         single_ASTCtest_data = {
+#             'srs_data': pd.DataFrame(srs_data),
+#             'recive_data': pd.DataFrame(recive_data),
+#             'bkgrnd_data': pd.DataFrame(bkgrnd_data),
+#             'rt': pd.DataFrame(rt),
+#             'room_properties': pd.DataFrame(room_properties)
+#             }
+#     else:
+#         single_ASTCtest_data = None
+#         # return single_ASTCtest_data
         
-    if curr_test['NIC_test'] == 1:
-        srs_data = RAW_SLM_datapull(self,curr_test['Source'],'-831_Data.')
-        recive_data = RAW_SLM_datapull(self, curr_test['Recieve '],'-831_Data.')
-        bkgrnd_data = RAW_SLM_datapull(self,curr_test['BNL'],'-831_Data.')
-        rt = RAW_SLM_datapull(self,curr_test['RT'],'-RT_Data.')
+#     if curr_test['NIC_test'] == 1:
+#         srs_data = RAW_SLM_datapull(self,curr_test['Source'],'-831_Data.')
+#         recive_data = RAW_SLM_datapull(self, curr_test['Recieve '],'-831_Data.')
+#         bkgrnd_data = RAW_SLM_datapull(self,curr_test['BNL'],'-831_Data.')
+#         rt = RAW_SLM_datapull(self,curr_test['RT'],'-RT_Data.')
 
-        single_NICtest_data = {
-            'srs_data': pd.DataFrame(srs_data),
-            'recive_data': pd.DataFrame(recive_data),
-            'bkgrnd_data': pd.DataFrame(bkgrnd_data),
-            'rt': pd.DataFrame(rt),
-            'room_properties': pd.DataFrame(room_properties)
-            }
-        return single_NICtest_data
+#         single_NICtest_data = {
+#             'srs_data': pd.DataFrame(srs_data),
+#             'recive_data': pd.DataFrame(recive_data),
+#             'bkgrnd_data': pd.DataFrame(bkgrnd_data),
+#             'rt': pd.DataFrame(rt),
+#             'room_properties': pd.DataFrame(room_properties)
+#             }
+#         # return single_NICtest_data
+#     else:
+#         single_NICtest_data = None
+    
+#     if curr_test['DTC_test'] == 1:
+
+#         srs_data = RAW_SLM_datapull(self,curr_test['Source'],'-831_Data.')
+#         recive_data = RAW_SLM_datapull(self, curr_test['Recieve '],'-831_Data.')
+#         bkgrnd_data = RAW_SLM_datapull(self,curr_test['BNL'],'-831_Data.')
+#         rt = RAW_SLM_datapull(self,curr_test['RT'],'-RT_Data.')
+#         srs_door_open = RAW_SLM_datapull(self,curr_test['Source_Door_Open'],'-831_Data.')
+#         srs_door_closed = RAW_SLM_datapull(self,curr_test['Source_Door_Closed'],'-831_Data.')
+#         recive_door_open = RAW_SLM_datapull(self, curr_test['Recieve_Door_Open '],'-831_Data.')
+#         recive_door_closed = RAW_SLM_datapull(self, curr_test['Recieve_Door_Closed '],'-831_Data.')
+
+
+#         single_DTCtest_data = {
+#             'srs_data': pd.DataFrame(srs_data),
+#             'recive_data': pd.DataFrame(recive_data),
+#             'bkgrnd_data': pd.DataFrame(bkgrnd_data),
+#             'rt': pd.DataFrame(rt),
+#             'srs_door_open': pd.DataFrame(srs_door_open),
+#             'srs_door_closed': pd.DataFrame(srs_door_closed),
+#             'recive_door_open': pd.DataFrame(recive_door_open),
+#             'recive_door_closed': pd.DataFrame(recive_door_closed),
+#             'room_properties': pd.DataFrame(room_properties)
+#             }
+#     else:
+#         single_DTCtest_data = None
+#         # return single_DTCtest_data
+#     return room_properties, single_NICtest_data, single_DTCtest_data, single_ASTCtest_data, single_AIICtest_data
     
 
     
 ################ ## # # ###############
-    # End of function section #
+    # GUI Interface - kivy #
 #######################################
 
 #### THIS LIBRARY IMPORT NEEDS TO REMAIN HERE- Otherwise kivy errors result. 
@@ -242,12 +276,18 @@ class FileLoaderApp(App):
         layout.add_widget(calculate_single_test_button)
 
         # Output Reports Button
-        output_button = Button(text='Output Reports', on_press=self.output_reports)
+        output_button = Button(text='Output All Reports', on_press=self.output_all_reports)
         layout.add_widget(output_button)
 
         # Status Text Box
         self.status_label = Label(text='Status: Ready')
         layout.add_widget(self.status_label)
+
+        # Debug check box for testing
+        self.debug_check_box = CheckBox(active=True)
+        self.debug_label = Label(text='Debug')
+        layout.add_widget(self.debug_check_box)
+        layout.add_widget(self.debug_label)
 
         return layout
 
@@ -320,36 +360,80 @@ class FileLoaderApp(App):
 
         self.D_datafiles = [f for f in listdir(rawDtestpath) if isfile(join(rawDtestpath,f))]
         self.E_datafiles = [f for f in listdir(rawEtestpath) if isfile(join(rawEtestpath,f))]
-        self.test_list = pd.read_excel(testplan_path)
+        # self.test_plan = pd.read_excel(testplan_path)
+        # self.room_properties, self.test_types = load_test_plan(testplan_path)
         testnums = self.test_list['Test Label'] ## Determines the labels and number of excel files copied
         project_name =  self.test_list['Project Name'] # need to access a cell within template the project name to copy to final reports
         project_name = project_name.iloc[1]
-
+        ### debug print outs here for the datafiles ### 
+        print(self.D_datafiles)
+        print(self.E_datafiles)
         # Display a message in the status label
         self.status_label.text = 'Status: All test files loaded, ready to generate reports'
+        # open a popup window to display the test list
+        self.show_test_list_popup(self.test_list)
+        #
 
     @classmethod
-    def output_reports(self, instance):
+    def output_all_reports(self, instance):
+        # access the text from the load_data function
+        print('Arguments received by output_reports:', instance, self.test_plan_path, self.report_template_path, self.slm_data_d_path, self.slm_data_e_path, self.report_output_folder_path)
+
         testplan_path = self.test_plan_path
         reportOutputfolder = self.report_output_folder_path
 
         test_list = pd.read_excel(testplan_path)
         self.status_label.text = ('Test list:', test_list)
         testnums = test_list['Test Label']
+        # pull the debug checkbox from the GUI and set it equal to debug
+        debug = 1 if self.debug_check_box.active else 0
+
+        if debug == 1:  
+            print('Debug mode enabled')
+            print('Test list:', test_list)
+            print('Test numbers:', testnums)
+            print('Test plan path:', testplan_path)
+            print('Report output folder:', reportOutputfolder)
         
+        # this will iterate through all the tests in the test plan and generate the reports
         for i in range(len(testnums)):
             curr_test = test_list.iloc[i]
-            print('Current Test:', curr_test)
-            self.status_label.text = 'Status: Reporting test: ' + curr_test['Test Label']
 
+            if debug == 1:
+                print('Current Test:', curr_test)
+            self.status_label.text = 'Status: Reporting test: ' + curr_test['Test Label']
+            
             # Determine the test type and generate the report
-            for test_type in ['NIC', 'ASTC', 'AIIC']:
-                if curr_test[test_type] == 1:
-                    test_data = pull_testplan_data(self, curr_test)
-                    create_report(self, curr_test, test_data, reportOutputfolder, test_type=test_type)
-                    break
+            # loop through the test types and generate the report for the first one that is enabled
+            self.room_properties, self.test_types, self.test_data = load_test_plan(testplan_path)
+
+            selected_test_type = next((test_type for test_type in TestType if curr_test[test_type.value] == 1), None)
+
+
+            # for all our test types, if the test type is enabled, generate the report
+            for test_type in TestType:
+                if curr_test[test_type.value] == 1:
+                    self.status_label.text = f'Status: Generating report for {test_type.value} test...'
+                    # write a loop entry here to make a debug function where i can see/edit the data
+                    if debug == 1:
+                        ## open a popup window to display the room properties, test types, and test data
+                        self.show_test_properties_popup(self.room_properties, self.test_types, self.test_data)
+                        # pause the program until the user closes the popup
+                        self.popup.wait_window()
+                        ## create a debug popup window to edit the room properties, test types, and test data
+                        self.edit_test_properties_popup(self.room_properties, self.test_types, self.test_data)
+                    room_properties, test_types, test_data = load_test_plan(self, curr_test, test_type.value)
+                    # test data for report debugging goes here before printing to PDF
+                    ## maybe write a log file generator here
+                    # write a function here to print a report number and potentially interuupt or restart the test load. 
+                    # print(test_data)
+
+                    create_report(self, curr_test, test_data, reportOutputfolder, test_type=selected_test_type.value)
+                    # print the test number label and test type]
+                    print(f'Test number: {curr_test["Test Label"]}, Test type: {selected_test_type.value}')
             else:
                 print('No test type selected, skipping test...')
+                
         
 
     def calculate_single_test(self, instance):
@@ -398,7 +482,8 @@ class FileLoaderApp(App):
         print('Single Test:', single_test_text_input_value)
         # Display a message in the status label
         self.status_label.text = f'Status: Calculating Single Test {single_test_text_input_value}...'
-        
+        room_properties, test_types, test_data = load_test_plan(testplan_path)
+        create_report(self, foundtest, test_data, reportOutputfolder, test_type=selected_test_type.value)
         self.status_label.text = f'Status: Single Test {single_test_text_input_value} Calculated'
 
 ## this report display window should appear after the reports are generated, after the output_reports function has run. do i need to pass it more info? TBD.
