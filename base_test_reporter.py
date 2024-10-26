@@ -1,3 +1,13 @@
+from reportlab.lib.units import inch
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.platypus import Paragraph, Spacer, Table, TableStyle, KeepInFrame, PageBreak
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate
+
+from createreport_debug import getSampleStyleSheet
+from config import *
+
 class BaseTestReport:
     def __init__(self, curr_test, single_test_dataframe, reportOutputfolder):
         self.curr_test = curr_test
@@ -116,7 +126,15 @@ class BaseTestReport:
         raise NotImplementedError
 
     def get_test_instrumentation(self):
-        raise NotImplementedError
+        common_equipment = [
+            ['Sound Level Meter','Larson Davis','831','4328','10/24/2022','4/4/2024'],
+            ['Microphone Pre-Amp','Larson Davis','PRM831','046469','10/24/2022','4/4/2024'],
+            ['Microphone','Larson Davis','377B20','168830','10/20/2022','4/4/2024'],
+            ['Calibrator','Larson Davis','CAL200','5955','10/26/2022','N/A'],
+            ['Amplified Loudspeaker','QSC','K10','GAA530909','N/A','N/A'],
+            ['Noise Generator','NTi Audio','MR-PRO','0162','N/A','N/A']
+        ]
+        return common_equipment
 
     def create_results_table(self):
         raise NotImplementedError
@@ -135,14 +153,36 @@ class AIICTestReport(BaseTestReport):
         return [
             ['ASTM E1007-14', 'Standard Test Method for Field Measurement of Tapping Machine Impact Sound Transmission Through Floor-Ceiling Assemblies and Associated Support Structure'],
             ['ASTM E413-16', 'Standard Classification for Rating Sound Insulation'],
-            # ... other AIIC-specific standards
+            ['ASTM E2235-04(2012)', 'Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods'],
+            ['ASTM E989-06(2012)', 'Standard Classification for Determination of Impact Insulation Class (IIC)']
         ]
+    def get_test_instrumentation(self):
+        equipment = super().get_test_instrumentation()
+        # Add AIIC-specific equipment
+        aiic_equipment = [
+            ["Tapping Machine:", "Norsonics", "CAL200", "2775671", "9/19/2022", "N/A"],
+        ]
+        return equipment + aiic_equipment
 
     # Implement other methods specific to AIIC
 
 class ASTCTestReport(BaseTestReport):
     # Implement ASTC-specific methods
-    pass
+    def get_standards_data(self):
+        return [
+            ['ASTM E336-20', 'Standard Test Method for Measurement of Airborne Sound Attenuation between Rooms in Buildings'],
+            ['ASTM E413-16', 'Standard Classification for Rating Sound Insulation'],
+            ['ASTM E2235-04(2012)', 'Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods']
+        ]
+    def get_test_instrumentation(self):
+        equipment = super().get_test_instrumentation()
+        # Add ASTC-specific equipment
+        astc_equipment = [
+            ["Amplified Loudspeaker", "QSC", "K10", "GAA530909", "N/A", "N/A"],
+            ["Noise Generator", "NTi Audio", "MR-PRO", "0162", "N/A", "N/A"],
+        ]
+        return equipment + astc_equipment
+
 
 class NICTestReport(BaseTestReport):
     def get_doc_name(self):
@@ -152,6 +192,7 @@ class NICTestReport(BaseTestReport):
         return [
             ['ASTM E336-20', 'Standard Test Method for Measurement of Airborne Sound Attenuation between Rooms in Buildings'],
             ['ASTM E413-16', 'Standard Classification for Rating Sound Insulation'],
+            ['ASTM E2235-04(2012)', 'Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods']
         ]
 
     # Implement other methods as needed
@@ -171,6 +212,7 @@ class NICTestReport(BaseTestReport):
         return "Noise Isolation Class (NIC) Test Report"
 
 class DTCTestReport(BaseTestReport):
+    pass
     # Implement DTC-specific methods
 
 
@@ -217,5 +259,37 @@ def create_first_page(report, styles):
 
     return main_elements
 
+def create_second_page(report, styleHeading):
+    main_elements = []
+    
+    # Test Procedure
+    main_elements.append(Paragraph("<u>TEST PROCEDURE:</u>", styleHeading))
+    main_elements.append(Paragraph('Determination of space-average sound pressure levels was performed via the manually scanned microphones techique, described in ' + standards_data[0][0] + ', Paragraph 11.4.3.3.'+ "The source room was selected in accordance with ASTM E336-11 Paragraph 9.2.5, which states that 'If a corridor must be used as one of the spaces for measurement of ATL or FTL, it shall be used as the source space.'"))
+    main_elements.append(Spacer(1,10))
+    main_elements.append(Paragraph("Flanking transmission was not evaluated."))
+    main_elements.append(Paragraph("To evaluate room absorption, 1 microphone was used to measure 4 decays at 4 locations around the receiving room for a total of 16 measurements, per"+standards_data[2][0]))
+    
+    # Test Instrumentation
+    main_elements.append(Paragraph("<u>TEST INSTRUMENTATION:</u>", styleHeading))
+    
+    test_instrumentation_table = report.get_test_instrumentation()
+
+    
+    test_instrumentation_table = Table(test_instrumentation_table, hAlign='LEFT')
+    test_instrumentation_table.setStyle(TableStyle([
+        ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
+        ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN',(0,0), (-1,-1),'LEFT')
+    ]))
+    
+    main_elements.append(test_instrumentation_table)
+    main_elements.append(PageBreak())
+    
+    return main_elements
 # Similarly update create_second_page and create_third_page
 
