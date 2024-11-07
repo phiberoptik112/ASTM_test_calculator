@@ -284,6 +284,8 @@ def load_test_plan(file_path: Path, self) -> pd.DataFrame:
         single_NICtest_data = None
     
     if curr_test['DTC_test'] == 1:
+        print("DTC testing enabled, copying data...")
+        ## move this into a calc_DTC_data function
 
         srs_data = RAW_SLM_datapull(self,curr_test['Source'],'-831_Data.')
         recive_data = RAW_SLM_datapull(self, curr_test['Recieve '],'-831_Data.')
@@ -604,21 +606,21 @@ def plot_curves(frequencies: List[float], y_label: str, ref_curve: pd.Series,
     plot_fig = Image('plot.png')
     return fig
 
-def create_report(test_data: TestData, report_output_folder: Path, test_type: TestType) -> Path:
-    # Implement the report creation logic using ReportLab
-    # This is a placeholder implementation
-    doc_name = f"{test_data.room_properties.project_name} {test_type.value} Test Report_{test_data.room_properties.test_label}.pdf"
-    output_path = report_output_folder / doc_name
+# def create_report(test_data: TestData, report_output_folder: Path, test_type: TestType) -> Path:
+#     # Implement the report creation logic using ReportLab
+#     # This is a placeholder implementation
+#     doc_name = f"{test_data.room_properties.project_name} {test_type.value} Test Report_{test_data.room_properties.test_label}.pdf"
+#     output_path = report_output_folder / doc_name
     
-    doc = BaseDocTemplate(str(output_path), pagesize=letter,
-                          leftMargin=0.75*inch, rightMargin=0.75*inch,
-                          topMargin=0.25*inch, bottomMargin=inch)
+#     doc = BaseDocTemplate(str(output_path), pagesize=letter,
+#                           leftMargin=0.75*inch, rightMargin=0.75*inch,
+#                           topMargin=0.25*inch, bottomMargin=inch)
     
-    # Create the report content here
-    # ...
+#     # Create the report content here
+#     # ...
 
-    doc.build([])  # Build the document with the content
-    return output_path
+#     doc.build([])  # Build the document with the content
+#     return output_path
 
 def process_single_test(test_plan_entry: pd.Series, slm_data_paths: Dict[str, Path], 
                         output_folder: Path) -> Path:
@@ -640,22 +642,22 @@ def process_single_test(test_plan_entry: pd.Series, slm_data_paths: Dict[str, Pa
 ## this function below is a generated function, not sure if im going to include it or just use the GUI interface to iterate through all the tests by default. 
 # i guess it makes the single test function much more clean, since i can just troublshoot that single test process if i want to do the entire thing...
 ## ok try to work this in. add it to the list. 
-def process_all_tests(test_plan_path: Path, slm_data_folder: Path, output_folder: Path) -> List[Path]:
-    test_plan = load_test_plan(test_plan_path)
-    report_paths = []
+# def process_all_tests(test_plan_path: Path, slm_data_folder: Path, output_folder: Path) -> List[Path]:
+#     test_plan = load_test_plan(test_plan_path)
+#     report_paths = []
     
-    for _, test_entry in test_plan.iterrows():
-        slm_data_paths = {
-            'source': slm_data_folder / f"{test_entry['SourceFile']}.xlsx",
-            'receive': slm_data_folder / f"{test_entry['ReceiveFile']}.xlsx",
-            'background': slm_data_folder / f"{test_entry['BackgroundFile']}.xlsx",
-            'rt': slm_data_folder / f"{test_entry['RTFile']}.xlsx",
-        }
+#     for _, test_entry in test_plan.iterrows():
+#         slm_data_paths = {
+#             'source': slm_data_folder / f"{test_entry['SourceFile']}.xlsx",
+#             'receive': slm_data_folder / f"{test_entry['ReceiveFile']}.xlsx",
+#             'background': slm_data_folder / f"{test_entry['BackgroundFile']}.xlsx",
+#             'rt': slm_data_folder / f"{test_entry['RTFile']}.xlsx",
+#         }
         
-        report_path = process_single_test(test_entry, slm_data_paths, output_folder)
-        report_paths.append(report_path)
+#         report_path = process_single_test(test_entry, slm_data_paths, output_folder)
+#         report_paths.append(report_path)
     
-    return report_paths
+#     return report_paths
 
 # Constants (you might want to move these to a separate config file)
 FREQUENCIES = [125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
@@ -666,3 +668,5 @@ def sanitize_filepath(filepath: str) -> str:
     filepath = filepath.replace('T:', '//DLA-04/Shared/')
     filepath = filepath.replace('\\', '/')
     return filepath
+
+def calculate_ASTM_results(test_data: TestData, test_type: TestType):

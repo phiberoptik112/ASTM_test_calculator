@@ -16,6 +16,16 @@ standards_text = (("ASTC Test Procedure ASTM E336-16",	"Standard Test Method for
 ("IIC Calculation	ASTM E989-06(2012)",	"Standard Classification for Determination of Impact Insulation Class (IIC)"),
 ("RT60 Test Procedure	ASTM E2235-04(2012)",	"Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods"))
 
+test_instrumentation_table = [["Equipment Type","Manufacturer","Model Number","Serial Number",Paragraph("Last NIST Traceable Calibration"),Paragraph("Last Local Calibration")],
+["Tapping Machine:","Norsonics","CAL200","2775671","9/19/2022","N/A"],
+["Sound Level Meter","Larson Davis","831","4328","10/24/2022","4/4/2024"],
+["Microphone Pre-Amp","Larson Davis","PRM831","046469","10/24/2022","4/4/2024"],
+["Microphone","Larson Davis","377B20","168830","10/20/2022","4/4/2024"],
+["Calibrator","Larson Davis","CAL200","5955","10/26/2022","N/A"],
+["Amplified Loudspeaker","QSC","K10","GAA530909","N/A","N/A"],
+["Noise Generator","NTi Audio","MR-PRO","0162","N/A","N/A"]
+]
+
 test_procedure_pg = 'Determination of space-average sound pressure levels was performed via the manually scanned microphones techique, described in ' + standards_text[0][0] + ', Paragraph 11.4.3.3.'+ 'The source room was selected in accordance with ASTM E336-11 Paragraph 9.2.5, which states that "If a corridor must be used as one of the spaces for measurement of ATL or FTL, it shall be used as the source space."'
 # code:
 # =CONCATENATE("The test was performaned in general accordance with ",AIIC or ASTC or NIC,". Determination of Space-Average Levels performed via the manually scanned microphones techique, described in ",'SLM Data'!C59,", Paragraph 11.4.2.2.")
@@ -207,3 +217,4 @@ main_content_height = letter[1] - top_margin - bottom_margin - header_height - f
 
 # ## STATEMENT OF TEST RESULTS 
 # statement_test_results_text =' STATEMENT OF TEST RESULTS: '
+

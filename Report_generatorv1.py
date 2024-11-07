@@ -303,15 +303,15 @@ def header_elements(self, single_test_dataframe, test_type):
     # Define header elements
 
     elements = []
-    if test_type == 'AIIC':
-        elements.append(Paragraph("<b>Field Impact Sound Transmission Test Report</b>", custom_title_style))
-        elements.append(Paragraph("<b>Apparent Impact Insulation Class (AIIC)</b>", custom_title_style))
-    elif test_type == 'ASTC':
-        elements.append(Paragraph("<b>Field Sound Transmission Test Report</b>", custom_title_style))
-        elements.append(Paragraph("<b>Apparent Sound Transmission Class (ASTC)</b>", custom_title_style))
-    elif test_type == 'NIC':
-        elements.append(Paragraph("<b>Field Sound Transmission Test Report</b>", custom_title_style))
-        elements.append(Paragraph("<b>Noise Isolation Class (NIC)</b>", custom_title_style))
+    # if test_type == 'AIIC':
+    elements.append(Paragraph("<b>Field Impact Sound Transmission Test Report</b>", custom_title_style))
+    elements.append(Paragraph("<b>Apparent Impact Insulation Class (AIIC)</b>", custom_title_style))
+    # elif test_type == 'ASTC':
+    #     elements.append(Paragraph("<b>Field Sound Transmission Test Report</b>", custom_title_style))
+    #     elements.append(Paragraph("<b>Apparent Sound Transmission Class (ASTC)</b>", custom_title_style))
+    # elif test_type == 'NIC':
+    #     elements.append(Paragraph("<b>Field Sound Transmission Test Report</b>", custom_title_style))
+    #     elements.append(Paragraph("<b>Noise Isolation Class (NIC)</b>", custom_title_style))
     
     # elements.append(Paragraph("<b>Field Impact Sound Transmission Test Report</b>", custom_title_style))
     # elements.append(Paragraph("<b>Apparent Impact Insulation Class (AIIC)</b>", custom_title_style))
@@ -647,3 +647,67 @@ def create_plot_page_section(test_type, main_elements, frequencies, IIC_contour_
 
 #         # Save the document as a PDF
 #     doc.save(output_file)
+
+def create_AIIC_report(self, single_test_dataframe, test_data: TestData, report_output_folder: str, test_type: str):
+    def header_elements(self, single_test_dataframe, test_type):
+        # Document Setup 
+        # document name and page size
+        #  Example ouptut file name: '24-006 AIIC Test Report_1.1.1.pdf'
+        #  format: project_name + test_type + test_num + '.pdf'
+        # doc_name = f"{single_test_dataframe['room_properties']['Project_Name'][0]} {test_type} Test Report_{single_test_dataframe['room_properties']['Test_Label'][0]}.pdf"
+        doc_name = f"{single_test_dataframe['room_properties']['Project_Name'][0]} {test_type} Test Report_{single_test_dataframe['room_properties']['Test_Label'][0]}.pdf"
+
+        
+        doc = BaseDocTemplate(doc_name, pagesize=letter,
+                            leftMargin=left_margin, rightMargin=right_margin,
+                            topMargin=top_margin, bottomMargin=bottom_margin)
+
+        # Define Frames for the header, main content, and footer
+        header_frame = Frame(left_margin, letter[1] - top_margin - header_height, letter[0] - 2 * left_margin, header_height, id='header')
+        main_frame = Frame(left_margin, bottom_margin + footer_height, letter[0] - 2 * left_margin, letter[1] - top_margin - header_height - footer_height - bottom_margin, id='main')
+        footer_frame = Frame(left_margin, bottom_margin, letter[0] - 2 * left_margin, footer_height, id='footer')
+
+        # Create styles
+        styles = getSampleStyleSheet()
+        custom_title_style = styles['Heading1']
+
+        # Define header elements
+        elements = []
+
+        elements.append(Paragraph("<b>Field Impact Sound Transmission Test Report</b>", custom_title_style))
+        elements.append(Paragraph("<b>Apparent Impact Insulation Class (AIIC)</b>", custom_title_style))
+        elements.append(Spacer(1, 10))
+        leftside_data = [
+        ["Report Date:", single_test_dataframe['room_properties']['Report_Date'][0]],
+        ['Test Date:', single_test_dataframe['room_properties']['Test_Date'][0]],
+        ['DLAA Test No', single_test_dataframe['room_properties']['Test_Label'][0]]
+        ]
+        rightside_data = [
+        ["Source Room:", single_test_dataframe['room_properties']['Source_Room'][0]],
+        ["Receiver Room:", single_test_dataframe['room_properties']['Receiving_Room'][0]],
+        ["Test Assembly:", single_test_dataframe['room_properties']['tested_assembly'][0]]
+        ]
+
+        table_left = Table(leftside_data)
+        table_right = Table(rightside_data)
+        table_left.setStyle(TableStyle([('GRID', (0, 0), (-1, -1), 1, colors.white)]))
+        table_right.setStyle(TableStyle([('GRID', (0, 0), (-1, -1), 1, colors.white)]))
+
+        table_combined_lr = Table([[table_left, table_right]], colWidths=[doc.width / 2.0] * 2)
+        elements.append(KeepInFrame(maxWidth=doc.width, maxHeight=header_height, content=[table_combined_lr], hAlign='LEFT'))
+        elements.append(Spacer(1, 10))
+        elements.append(Paragraph('Test site: ' + single_test_dataframe['room_properties']['Site_Name'][0], styles['Normal']))
+        elements.append(Spacer(1, 5))
+        elements.append(Paragraph('Client: ' + single_test_dataframe['room_properties']['Client_Name'][0], styles['Normal']))
+        return elements
+        pass
+
+def create_ASTC_report(test_data: TestData, report_output_folder: str, test_type: str):
+    pass
+
+def create_NIC_report(test_data: TestData, report_output_folder: str, test_type: str):
+    pass
+
+def create_DTC_report(test_data: TestData, report_output_folder: str, test_type: str):
+    pass
+
