@@ -1,11 +1,11 @@
 from reportlab.lib.units import inch
-from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, Spacer, Table, TableStyle, KeepInFrame, PageBreak
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate
 
-from createreport_debug import getSampleStyleSheet
+
 from config import *
 
 class BaseTestReport:
@@ -163,6 +163,9 @@ class AIICTestReport(BaseTestReport):
             ["Tapping Machine:", "Norsonics", "CAL200", "2775671", "9/19/2022", "N/A"],
         ]
         return equipment + aiic_equipment
+    
+    def get_statement_of_conformace(self):
+        return "Testing was conducted in accordance with ASTM E1007-14, ASTM E413-16, ASTM E2235-04(2012), and ASTM E989-06(2012), with exceptions noted below. All requrements for measuring abd reporting Absorption Normalized Impact Sound Pressure Level (ANISPL) and Apparent Impact Insulation Class (AIIC) were met."
 
     # Implement other methods specific to AIIC
 
@@ -182,6 +185,8 @@ class ASTCTestReport(BaseTestReport):
             ["Noise Generator", "NTi Audio", "MR-PRO", "0162", "N/A", "N/A"],
         ]
         return equipment + astc_equipment
+    def get_statement_of_conformace(self):
+        return "Testing was conducted in accordance with ASTM E336-20, ASTM E413-16, and ASTM E2235-04(2012), with exceptions noted below. All requrements for measuring abd reporting Airborne Sound Attenuation between Rooms in Buildings (ATL) and Apparent Sound Transmission Class (ASTC) were met."
 
 
 class NICTestReport(BaseTestReport):
@@ -229,26 +234,22 @@ def create_report(curr_test, single_test_dataframe, reportOutputfolder, test_typ
     else:
         raise ValueError(f"Unsupported test type: {test_type}")
 
-    # Document setup
-    doc = BaseDocTemplate(f"{reportOutputfolder}/{report.get_doc_name()}", pagesize=letter,
-                          leftMargin=left_margin, rightMargin=right_margin,
-                          topMargin=top_margin, bottomMargin=bottom_margin)
-
-    # ... (rest of the document setup code)
+    # Setup document using the report's setup method
+    doc = report.setup_document()
 
     # Generate content
     main_elements = []
-    main_elements.extend(create_first_page(report, styles))
-    main_elements.extend(create_second_page(report, styles))
-    main_elements.extend(create_third_page(report, styles))
+    main_elements.extend(create_first_page(report))
+    main_elements.extend(create_second_page(report))
+    main_elements.extend(create_third_page(report))
 
     # Build and save document
     doc.build(main_elements)
     print(f"Report saved as: {report.get_doc_name()}")
 
-def create_first_page(report, styles):
+def create_first_page(report):
     main_elements = []
-    styleHeading = ParagraphStyle('heading', parent=styles['Normal'], spaceAfter=10)
+    styleHeading = ParagraphStyle('heading', parent=report.styles['Normal'], spaceAfter=10)
     
     main_elements.append(Paragraph('<u>STANDARDS:</u>', styleHeading))
     standards_table = Table(report.get_standards_data(), hAlign='LEFT')
@@ -256,21 +257,24 @@ def create_first_page(report, styles):
     main_elements.append(standards_table)
 
     # ... (add other elements using report methods)
+    # statement of conformance
+    main_elements.append(Paragraph("<u>STATEMENT OF CONFORMANCE:</u>", styleHeading))
+    main_elements.append(Paragraph("The test results are in conformance with the standards cited in this report."))
 
     return main_elements
 
-def create_second_page(report, styleHeading):
+def create_second_page(report): 
     main_elements = []
     
     # Test Procedure
-    main_elements.append(Paragraph("<u>TEST PROCEDURE:</u>", styleHeading))
+    main_elements.append(Paragraph("<u>TEST PROCEDURE:</u>", report.custom_title_style))
     main_elements.append(Paragraph('Determination of space-average sound pressure levels was performed via the manually scanned microphones techique, described in ' + standards_data[0][0] + ', Paragraph 11.4.3.3.'+ "The source room was selected in accordance with ASTM E336-11 Paragraph 9.2.5, which states that 'If a corridor must be used as one of the spaces for measurement of ATL or FTL, it shall be used as the source space.'"))
     main_elements.append(Spacer(1,10))
     main_elements.append(Paragraph("Flanking transmission was not evaluated."))
     main_elements.append(Paragraph("To evaluate room absorption, 1 microphone was used to measure 4 decays at 4 locations around the receiving room for a total of 16 measurements, per"+standards_data[2][0]))
     
     # Test Instrumentation
-    main_elements.append(Paragraph("<u>TEST INSTRUMENTATION:</u>", styleHeading))
+    main_elements.append(Paragraph("<u>TEST INSTRUMENTATION:</u>", report.custom_title_style))
     
     test_instrumentation_table = report.get_test_instrumentation()
 
@@ -292,4 +296,6 @@ def create_second_page(report, styleHeading):
     
     return main_elements
 # Similarly update create_second_page and create_third_page
-
+def create_third_page(report):
+    main_elements = []
+    return main_elements
