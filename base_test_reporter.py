@@ -265,8 +265,35 @@ class ASTCTestReport(BaseTestReport):
         return equipment + astc_equipment
     def get_statement_of_conformace(self):
         return "Testing was conducted in accordance with ASTM E336-20, ASTM E413-16, and ASTM E2235-04(2012), with exceptions noted below. All requrements for measuring abd reporting Airborne Sound Attenuation between Rooms in Buildings (ATL) and Apparent Sound Transmission Class (ASTC) were met."
-
-
+    def get_test_results(self, single_test_dataframe):
+        ## obtain SLM data from overall dataframe
+        onethird_rec = format_SLMdata(single_test_dataframe['recive_data'])
+        onethird_srs = format_SLMdata(single_test_dataframe['srs_data'])
+        onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
+        rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
+        # Calculation of ATL
+        ATL_val,corrected_STC_recieve = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,single_test_dataframe['room_properties']['partition_area'][0],single_test_dataframe['room_properties']['receive_room_vol'][0],sabines)
+        # Calculation of NR
+        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,single_test_dataframe['room_properties']['receive_room_vol'][0],NIC_vollimit=883,testtype='ASTC')
+        # creating reference curve for ASTC graph
+        STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
+        ASTC_contour_final = list()
+        for vals in STCCurve:
+            ASTC_contour_final.append(vals+(ATL_val))
+        
+        Test_result_table = pd.DataFrame(
+            {
+                "Frequency": frequencies,
+                "L1, Average Source Room Level (dB)": onethird_srs,
+                "L2, Average Corrected Receiver Room Level (dB)":corrected_STC_recieve,
+                "Average Receiver Background Level (dB)": onethird_bkgrd,
+                "Average RT60 (Seconds)": rt_thirty,
+                "Noise Reduction, NR (dB)": calc_NR,
+                "Apparent Transmission Loss, ATL (dB)": ATL_val,
+                "Exceptions": ASTC_Exceptions
+            }
+        )
+        return Test_result_table
 class NICTestReport(BaseTestReport):
     def get_doc_name(self):
         return f"{self.single_test_dataframe['room_properties']['Project_Name'][0]} NIC Test Report_{self.single_test_dataframe['room_properties']['Test_Label'][0]}.pdf"
@@ -285,8 +312,33 @@ class NICTestReport(BaseTestReport):
     def get_test_instrumentation(self):
         pass
 
-    def create_results_table(self):
-        pass
+    def get_test_results(self, single_test_dataframe):
+        ## obtain SLM data from overall dataframe
+        onethird_rec = format_SLMdata(single_test_dataframe['recive_data'])
+        onethird_srs = format_SLMdata(single_test_dataframe['srs_data'])
+        onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
+        rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
+        # Calculation of ATL
+        ATL_val,corrected_STC_recieve = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,single_test_dataframe['room_properties']['partition_area'][0],single_test_dataframe['room_properties']['receive_room_vol'][0],sabines)
+        # Calculation of NR
+        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,single_test_dataframe['room_properties']['receive_room_vol'][0],NIC_vollimit=883,testtype='ASTC')
+        # creating reference curve for ASTC graph
+        STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
+        ASTC_contour_final = list()
+        for vals in STCCurve:
+            ASTC_contour_final.append(vals+(ATL_val))
+        
+        Test_result_table = pd.DataFrame(
+            {
+                "Frequency": frequencies,
+                "Source OBA": onethird_srs,
+                "Reciever OBA": onethird_rec,
+                "Background OBA": onethird_bkgrd,
+                "NR": rt['NR'],
+                "Exceptions": NIC_exceptions
+            }
+        )
+        return Test_result_table
 
     def create_plot(self):
         pass
