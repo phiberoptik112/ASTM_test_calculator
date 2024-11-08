@@ -361,11 +361,10 @@ class FileLoaderApp(App):
 
         self.D_datafiles = [f for f in listdir(rawDtestpath) if isfile(join(rawDtestpath,f))]
         self.E_datafiles = [f for f in listdir(rawEtestpath) if isfile(join(rawEtestpath,f))]
-        # self.test_plan = pd.read_excel(testplan_path)
         # self.room_properties, self.test_types = load_test_plan(testplan_path)
-        testnums = self.test_list['Test Label'] ## Determines the labels and number of excel files copied
-        project_name =  self.test_list['Project Name'] # need to access a cell within template the project name to copy to final reports
-        project_name = project_name.iloc[1]
+
+        ### each line of the testplan loaded from testplan_path is a test that may require up to 4 test reports to be generated.
+        # pass 
         ### debug print outs here for the datafiles ### 
         print(self.D_datafiles)
         print(self.E_datafiles)
@@ -499,6 +498,53 @@ class FileLoaderApp(App):
         room_properties, test_types, test_data = load_test_plan(testplan_path)
         create_report(self, foundtest, test_data, reportOutputfolder, test_type=selected_test_type.value)
         self.status_label.text = f'Status: Single Test {single_test_text_input_value} Calculated'
+    def excel_import(self):
+        # import the excel file from the testplan_path
+        self.test_plan = pd.read_excel(self.test_plan_path)
+        testnums = self.test_list['Test Label'] ## Determines the labels and number of excel files copied
+        project_name =  self.test_list['Project Name'] # need to access a cell within template the project name to copy to final reports
+        project_name = project_name.iloc[1]
+        # Initialize list to store ReportData objects
+        report_data_list = []
+
+        # Iterate through each test in testnums
+        for idx, test_row in testnums.iterrows():
+            # Load test plan data for this row
+            room_properties, test_types, test_data = load_test_plan(self.test_plan_path, self)
+            
+            # Check which test types are enabled for this test
+            for test_type in TestType:
+                if test_types[test_type]:
+                    # Create ReportData object for this test type
+                    report_data = ReportData(
+                        room_properties=room_properties,
+                        test_data=test_data,
+                        test_type=test_type
+                    )
+                    report_data_list.append(report_data)
+                    
+                    # Create popup window for this report data
+                    report_window = tk.Toplevel()
+                    report_window.title(f"Test {test_row['Test Label']} - {test_type.value}")
+                    report_window.geometry("600x400")
+                    
+                    # Create text widget to display report data
+                    text_widget = tk.Text(report_window, height=20, width=70)
+                    text_widget.pack(padx=10, pady=10)
+                    
+                    # Insert report data details
+                    text_widget.insert(tk.END, f"Test Label: {test_row['Test Label']}\n")
+                    text_widget.insert(tk.END, f"Test Type: {test_type.value}\n\n")
+                    text_widget.insert(tk.END, f"Room Properties:\n")
+                    text_widget.insert(tk.END, f"Site Name: {room_properties.site_name}\n")
+                    text_widget.insert(tk.END, f"Source Room: {room_properties.source_room}\n")
+                    text_widget.insert(tk.END, f"Receive Room: {room_properties.receive_room}\n")
+                    text_widget.insert(tk.END, f"Test Date: {room_properties.test_date}\n")
+                    
+                    # Make text widget read-only
+                    text_widget.configure(state='disabled')
+
+        print(f"Generated {len(report_data_list)} report data windows")
 
 ## this report display window should appear after the reports are generated, after the output_reports function has run. do i need to pass it more info? TBD.
 def display_report_window(report_paths, testplan, test_results):

@@ -314,6 +314,7 @@ class NICTestReport(BaseTestReport):
 
     def get_test_results(self, single_test_dataframe):
         ## obtain SLM data from overall dataframe
+        ## need to convert all of this to use the dataclasses and the data_processor.py functions 
         onethird_rec = format_SLMdata(single_test_dataframe['recive_data'])
         onethird_srs = format_SLMdata(single_test_dataframe['srs_data'])
         onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
