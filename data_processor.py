@@ -606,22 +606,6 @@ def plot_curves(frequencies: List[float], y_label: str, ref_curve: pd.Series,
     plot_fig = Image('plot.png')
     return fig
 
-# def create_report(test_data: TestData, report_output_folder: Path, test_type: TestType) -> Path:
-#     # Implement the report creation logic using ReportLab
-#     # This is a placeholder implementation
-#     doc_name = f"{test_data.room_properties.project_name} {test_type.value} Test Report_{test_data.room_properties.test_label}.pdf"
-#     output_path = report_output_folder / doc_name
-    
-#     doc = BaseDocTemplate(str(output_path), pagesize=letter,
-#                           leftMargin=0.75*inch, rightMargin=0.75*inch,
-#                           topMargin=0.25*inch, bottomMargin=inch)
-    
-#     # Create the report content here
-#     # ...
-
-#     doc.build([])  # Build the document with the content
-#     return output_path
-
 def process_single_test(test_plan_entry: pd.Series, slm_data_paths: Dict[str, Path], 
                         output_folder: Path) -> Path:
     room_props = RoomProperties(**test_plan_entry.to_dict())

@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 
 from config import *
 from data_processor import *
+from base_test_reporter import *
 # this is a new function combines RT and ASTC datapulls
 
  # creating a subfunction to return the dataframe from the testplan test list

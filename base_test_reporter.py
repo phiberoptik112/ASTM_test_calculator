@@ -221,7 +221,7 @@ class DTCTestReport(BaseTestReport):
     # Implement DTC-specific methods
 
 
-def create_report(curr_test, single_test_dataframe, reportOutputfolder, test_type):
+def create_report(self, curr_test, single_test_dataframe, reportOutputfolder, test_type):
     # Create the appropriate test report object based on test_type
     if test_type == 'AIIC':
         report = AIICTestReport(curr_test, single_test_dataframe, reportOutputfolder)
@@ -242,6 +242,7 @@ def create_report(curr_test, single_test_dataframe, reportOutputfolder, test_typ
     main_elements.extend(create_first_page(report))
     main_elements.extend(create_second_page(report))
     main_elements.extend(create_third_page(report))
+    main_elements.extend(create_fourth_page(report))
 
     # Build and save document
     doc.build(main_elements)
@@ -249,8 +250,8 @@ def create_report(curr_test, single_test_dataframe, reportOutputfolder, test_typ
 
 def create_first_page(report):
     main_elements = []
+    ### STANDARDS ###
     styleHeading = ParagraphStyle('heading', parent=report.styles['Normal'], spaceAfter=10)
-    
     main_elements.append(Paragraph('<u>STANDARDS:</u>', styleHeading))
     standards_table = Table(report.get_standards_data(), hAlign='LEFT')
     # ... (set table style)
@@ -273,7 +274,7 @@ def create_second_page(report):
     main_elements.append(Paragraph("Flanking transmission was not evaluated."))
     main_elements.append(Paragraph("To evaluate room absorption, 1 microphone was used to measure 4 decays at 4 locations around the receiving room for a total of 16 measurements, per"+standards_data[2][0]))
     
-    # Test Instrumentation
+    # Test Instrumentation and Calibration
     main_elements.append(Paragraph("<u>TEST INSTRUMENTATION:</u>", report.custom_title_style))
     
     test_instrumentation_table = report.get_test_instrumentation()
@@ -295,7 +296,11 @@ def create_second_page(report):
     main_elements.append(PageBreak())
     
     return main_elements
-# Similarly update create_second_page and create_third_page
+
 def create_third_page(report):
+    main_elements = []
+    return main_elements
+
+def create_fourth_page(report):
     main_elements = []
     return main_elements
