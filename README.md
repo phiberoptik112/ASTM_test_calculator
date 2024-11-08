@@ -16,6 +16,6 @@ Run report lab with ():
 
 `pip install pandas matplotlib openpyxl IPython reportlab`
 
-`python report_generatorv1.py` and you should see
+`python report_generatorv1.py` and you should see a GUI pop up window
 
 

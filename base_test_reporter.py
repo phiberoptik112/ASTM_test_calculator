@@ -7,6 +7,7 @@ from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate
 
 
 from config import *
+from data_processor import *
 
 class BaseTestReport:
     def __init__(self, curr_test, single_test_dataframe, reportOutputfolder):
@@ -136,8 +137,21 @@ class BaseTestReport:
         ]
         return common_equipment
 
-    def create_results_table(self):
-        raise NotImplementedError
+    def create_results_table(self, Test_result_table, styleHeading):
+        main_elements = []
+        main_elements.append(Paragraph("<u>STATEMENT OF TEST RESULTS:</u>", styleHeading))
+        Test_result_table = Table(Test_result_table, hAlign='LEFT') ## hardcoded, change to table variable for selected test
+        Test_result_table.setStyle(TableStyle([
+            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
+            ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ALIGN',(0,0), (-1,-1),'LEFT')
+        ]))
+        return Test_result_table, main_elements
 
     def create_plot(self):
         raise NotImplementedError
@@ -156,6 +170,28 @@ class AIICTestReport(BaseTestReport):
             ['ASTM E2235-04(2012)', 'Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods'],
             ['ASTM E989-06(2012)', 'Standard Classification for Determination of Impact Insulation Class (IIC)']
         ]
+    def get_statement_of_conformace(self):
+        return "Testing was conducted in accordance with ASTM E1007-14, ASTM E413-16, ASTM E2235-04(2012), and ASTM E989-06(2012), with exceptions noted below. All requrements for measuring abd reporting Absorption Normalized Impact Sound Pressure Level (ANISPL) and Apparent Impact Insulation Class (AIIC) were met."
+    
+    def get_test_environment(self,styleHeading,):
+        main_elements = []
+        main_elements.append(Paragraph("<u>TEST ENVIRONMENT:</u>", styleHeading))
+        main_elements.append(Paragraph('The source room was '+self.single_test_dataframe['room_properties']['Source_Room'][0]+'. The space was'+self.single_test_dataframe['room_properties']['source_room_finish'][0]+'. The floor was '+self.single_test_dataframe['room_properties']['srs_floor'][0]+'. The ceiling was '+self.single_test_dataframe['room_properties']['srs_ceiling'][0]+". The walls were"+self.single_test_dataframe['room_properties']['srs_walls'][0]+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+self.single_test_dataframe['room_properties']['source_room_vol'][0]+"cu. ft."))
+        main_elements.append(Spacer(1, 10))  # Adds some space 
+        ### Recieve room paragraph
+        main_elements.append(Paragraph('The receiver room was '+single_test_dataframe['room_properties']['Receiving_Room'][0]+'. The space was'+single_test_dataframe['room_properties']['receiver_room_finish'][0]+'. The floor was '+single_test_dataframe['room_properties']['rec_floor'][0]+'. The ceiling was '+single_test_dataframe['room_properties']['rec_ceiling'][0]+". The walls were"+single_test_dataframe['room_properties']['rec_Wall'][0]+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+single_test_dataframe['room_properties']['receive_room_vol'][0]+"cu. ft."))
+        main_elements.append(Spacer(1, 10))  # Adds some space 
+        main_elements.append(Paragraph('The test assembly measured approximately '+single_test_dataframe['room_properties']['partition_dim'][0]+", and had an area of approximately "+single_test_dataframe['room_properties']['partition_area'][0]+"sq. ft."))
+        main_elements.append(Spacer(1, 10))  # Adds some space 
+        # Heading 'TEST ENVIRONMENT'
+        main_elements.append(Paragraph("<u>TEST ASSEMBLY:</u>", styleHeading))
+        main_elements.append(Spacer(1, 10))  # Adds some space 
+        main_elements.append(Paragraph("The tested assembly was the"+single_test_dataframe['room_properties']['Test_Assembly_Type'][0]+"The assembly was not field verified, and was based on information provided by the client and drawings for the project. The client advised that no slab treatment or self-leveling was applied. Results may vary if slab treatment or self-leveling or any adhesive is used in other installations."))
+        return main_elements
+    
+    # ##### END OF FIRST PAGE TEXT  - ########
+        
+    main_elements.append(PageBreak())
     def get_test_instrumentation(self):
         equipment = super().get_test_instrumentation()
         # Add AIIC-specific equipment
@@ -164,8 +200,50 @@ class AIICTestReport(BaseTestReport):
         ]
         return equipment + aiic_equipment
     
-    def get_statement_of_conformace(self):
-        return "Testing was conducted in accordance with ASTM E1007-14, ASTM E413-16, ASTM E2235-04(2012), and ASTM E989-06(2012), with exceptions noted below. All requrements for measuring abd reporting Absorption Normalized Impact Sound Pressure Level (ANISPL) and Apparent Impact Insulation Class (AIIC) were met."
+    def get_test_results(self, single_test_dataframe):
+                #dataframe for AIIC is in single_test_dataframe
+        onethird_srs = format_SLMdata(single_test_dataframe['AIIC_source']) 
+        average_pos = []
+        # get average of 4 tapper positions for recieve total OBA
+        for i in range(1, 5):
+            pos_input = f'AIIC_pos{i}'
+            pos_data = format_SLMdata(single_test_dataframe[pos_input])
+            average_pos.append(pos_data)
+
+        onethird_rec_Total = sum(average_pos) / len(average_pos)
+        # this needs to be an average of the 4 tapper positions, stored in a dataframe of the average of the 4 dataframes octave band results. 
+
+
+        onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
+        rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
+
+        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_new(onethird_srs, onethird_rec_Total, onethird_bkgrd, rt_thirty,single_test_dataframe['room_properties']['receive_room_vol'][0],NIC_vollimit=883,testtype='AIIC')
+        
+        # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,rt_thirty,room_properties['Partition area'][0],room_properties['Recieve Vol'][0])
+        AIIC_contour_val, Contour_curve_result = calc_AIIC_val(Nrec_ANISPL)
+
+        IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
+        IIC_contour_final = list()
+        # initial application of the IIC curve to the first AIIC start value 
+        for vals in IIC_curve:
+            IIC_contour_final.append(vals+(110-AIIC_contour_val))
+        # print(IIC_contour_final)
+        #### Contour_final is the AIIC contour that needs to be plotted vs the ANISPL curve- we have everything to plot the graphs and the results table  #####
+        Ref_label = f'AIIC {AIIC_contour_val} Contour'
+        Field_IIC_label = 'Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)'
+        frequencies =[125,160,200,250,315,400,500,630,800,1000,1250,1600,2000,2500,3150,4000]
+        Test_result_table = pd.DataFrame(
+            {
+                "Frequency": frequencies,
+                "Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)	": Nrec_ANISPL,
+                "Average Receiver Background Level": onethird_bkgrd,
+                "Average RT60 (Seconds)": rt_thirty,
+                "Exceptions noted to ASTM E1007-14": AIIC_Exceptions
+            }
+        )
+        main_elements.append(Paragraph("The Apparent Impact Insulation Class (AIIC) was calculated. The AIIC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_data[0][0]))
+
+        return Test_result_table
 
     # Implement other methods specific to AIIC
 
@@ -260,8 +338,9 @@ def create_first_page(report):
     # ... (add other elements using report methods)
     # statement of conformance
     main_elements.append(Paragraph("<u>STATEMENT OF CONFORMANCE:</u>", styleHeading))
-    main_elements.append(Paragraph("The test results are in conformance with the standards cited in this report."))
+    main_elements.append(Paragraph(report.get_statement_of_conformace()))
 
+    main_elements.append(Paragraph(report.get_test_environment()))
     return main_elements
 
 def create_second_page(report): 
