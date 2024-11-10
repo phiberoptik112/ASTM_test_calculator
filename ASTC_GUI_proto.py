@@ -364,10 +364,12 @@ class FileLoaderApp(App):
         # self.room_properties, self.test_types = load_test_plan(testplan_path)
 
         ### each line of the testplan loaded from testplan_path is a test that may require up to 4 test reports to be generated.
-        # pass 
+        
         ### debug print outs here for the datafiles ### 
         print(self.D_datafiles)
         print(self.E_datafiles)
+
+        self.excel_import()
         # Display a message in the status label
         self.status_label.text = 'Status: All test files loaded, ready to generate reports'
         # open a popup window to display the test list
@@ -421,21 +423,21 @@ class FileLoaderApp(App):
                         self.popup.wait_window()
                         ## create a debug popup window to edit the room properties, test types, and test data
                         self.edit_test_properties_popup(self.room_properties, self.test_types, self.test_data)
-                    room_properties, test_types, test_data = load_test_plan(self, curr_test, test_type.value)
+                    report_data = load_test_plan(curr_test, test_type.value)
                     # test data for report debugging goes here before printing to PDF
                     ####### function below for calculating the results from the loaded test plan 
                     if test_type == TestType.DTC:
-                        DTC_report_data =self.calc_DTC_data(self, curr_test, test_data) # does it need to have self?
+                        DTC_report_data =self.calc_DTC_data(self, report_data) # does it need to have self?
                         # now pass the report data to the create_report function
                         create_report(self, curr_test, DTC_report_data, reportOutputfolder, test_type=selected_test_type.value)
                     elif test_type == TestType.NIC:
-                        NIC_report_data = self.calc_NIC_data(self, curr_test, test_data)
+                        NIC_report_data = self.calc_NIC_data(self, report_data)
                         create_report(self, curr_test, NIC_report_data, reportOutputfolder, test_type=selected_test_type.value)
                     elif test_type == TestType.AIIC:
-                        AIIC_report_data = self.calc_AIIC_data(self, curr_test, test_data)
+                        AIIC_report_data = self.calc_AIIC_data(self, report_data)
                         create_report(self, curr_test, AIIC_report_data, reportOutputfolder, test_type=selected_test_type.value)
                     elif test_type == TestType.ASTC:
-                        ASTC_report_data = self.calc_ASTC_data(self, curr_test, test_data)
+                        ASTC_report_data = self.calc_ASTC_data(self, report_data)
                         create_report(self, curr_test, ASTC_report_data, reportOutputfolder, test_type=selected_test_type.value)
                     ## maybe write a log file generator here
                     # write a function here to print a report number and potentially interuupt or restart the test load. 

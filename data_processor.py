@@ -18,129 +18,6 @@ from reportlab.lib.units import inch
 ## having gone through the PDF edit, this room properties will need to be revised 
 # im not even sure if moving to a class variable from a dataframe is best, 
 # i think it will work for now.  
-@dataclass
-class RoomProperties:
-    site_name: str
-    client_name: str
-    source_room: str
-    receive_room: str
-    test_date: str
-    report_date: str
-    project_name: str
-    test_label: str
-    source_vol: float
-    receive_vol: float
-    partition_area: float
-    partition_dim: str
-    source_room_finish: str
-    receive_room_finish: str
-    tested_assembly: str
-    expected_performance: str
-    annex_2_used: bool
-    test_assembly_type: str
-
-# each test data class has all the differnet test types in it
-@dataclass
-class TestData:
-    single_ASTCtest_data: pd.DataFrame
-    single_AIICtest_data: pd.DataFrame
-    single_NICtest_data: pd.DataFrame
-    single_DTCtest_data: pd.DataFrame
-    room_properties: RoomProperties
-
-class TestType(Enum):
-    AIIC = "AIIC"
-    ASTC = "ASTC"
-    NIC = "NIC"
-    DTC = "DTC"
-@dataclass
-class ReportData:
-    room_properties: RoomProperties
-    test_data: TestData
-    test_type: TestType
-
-### SLM import - hardcoded - gives me the willies, but it works for now.
-### maybe change to something thats a better troubleshooting effort later ###
-##  ask GPT later about how best to do this, maybe a config file or something? 
-def format_SLMdata(srs_data):
-    ## verify that srs_data iloc[7] is correct- will have a label as 1/3 octave
-    srs_thirdoct = srs_data.iloc[7] # hardcoded to SLM export data format
-    srs_thirdoct = srs_thirdoct[13:31] # select only the frequency bands of interest
-    # verify step to check for SPL info? 
-    return srs_thirdoct
-
-def calculate_onethird_Logavg(average_pos):
-    if isinstance(average_pos, pd.DataFrame):
-        average_pos = average_pos.values
-    onethird_rec_Total = []
-    for i in range(len(average_pos)):
-        freqbin = average_pos[i]
-        total = 0
-        count = 0
-        for val in freqbin:
-            if not pd.isnull(val):
-                total += 10**(val/10)
-                count += 1
-        if count > 0:
-            average = total / count
-            onethird_rec_Total.append(10 * np.log10(average))
-        else:
-            onethird_rec_Total.append(np.nan)
-    onethird_rec_Total = np.round(onethird_rec_Total, 1)
-    return onethird_rec_Total
-
-def load_test_plan(file_path: Path, self) -> pd.DataFrame:
-    # Load the test plan data from the Excel file
-    curr_test = pd.read_excel(file_path) # need to verify that this import works 
-    # do i need to run the format_slm_data function here?
-
-
-    if int(curr_test['source room vol']) >= 5300 or int(curr_test['receive room vol']) >= 5300:
-        NICreporting_Note = 'The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver and/or source room was greater than the maximum allowed per E336-16, Paragraph 9.4.1.2.'
-    elif int(curr_test['source room vol']) <= 833 or int(curr_test['receive room vol']) <= 833:
-        NICreporting_Note = 'The receiver and/or source room has a volume less than the minimum volume requirement of 25 m3 (883 cu. ft.).'
-    else:
-        NICreporting_Note = '---'
-    
-    # load a test properties dataframe
-    # rewrite to the TestType enum
-    test_types = {
-        TestType.AIIC: curr_test['AIIC_test'],
-        TestType.NIC: curr_test['NIC_test'],
-        TestType.ASTC: curr_test['ASTC_test'],
-        TestType.DTC: curr_test['DTC_test']
-        }
-    # test_properties = pd.DataFrame(
-    #     {
-    #         "AIIC_test": curr_test['AIIC_test'],
-    #         "NIC_test": curr_test['NIC_test'],
-    #         "ASTC_test": curr_test['ASTC_test'],
-    #         "DTC_test": curr_test['DTC_test']
-    #     },
-    #     index=[0]
-    # )
-    room_properties = RoomProperties(
-        site_name=curr_test['Site_Name'],
-        client_name=curr_test['Client_Name'],
-        source_room=curr_test['Source_Room'],
-        receive_room=curr_test['Receiving_Room'],
-        test_date=curr_test['Test_Date'],
-        report_date=curr_test['Report_Date'],
-        project_name=curr_test['Project_Name'],
-        test_label=curr_test['Test_Label'],
-        source_vol=curr_test['source room vol'],
-        receive_vol=curr_test['receive room vol'],
-        partition_area=curr_test['partition area'],
-        partition_dim=curr_test['partition dim.'],
-        source_room_finish=curr_test['source room finish'],
-        receive_room_finish=curr_test['receive room finish'],
-        srs_floor=curr_test['srs floor descrip.'],
-        srs_ceiling=curr_test['srs ceiling descrip.'],
-        srs_walls=curr_test['srs walls descrip.'],
-        rec_floor=curr_test['rec floor descrip.'],
-        rec_ceiling=curr_test['rec ceiling descrip.'],
-        rec_wall=curr_test['rec walls descrip.'],   
-    )
     # room_properties = pd.DataFrame(
     #     {
     #         "Site Name": curr_test['Site_Name'],
@@ -176,6 +53,141 @@ def load_test_plan(file_path: Path, self) -> pd.DataFrame:
     #     index=[0]
     # )
         ### 
+@dataclass
+class RoomProperties:
+    site_name: str
+    client_name: str
+    source_room: str
+    receive_room: str
+    test_date: str
+    report_date: str
+    project_name: str
+    test_label: str
+    source_vol: float
+    receive_vol: float
+    partition_area: float
+    partition_dim: str
+    source_room_finish: str
+    receive_room_finish: str
+    tested_assembly: str
+    expected_performance: str
+    annex_2_used: bool
+    test_assembly_type: str
+
+# each test data class has all the differnet test types in it
+@dataclass
+class TestData:
+    single_ASTCtest_data: pd.DataFrame
+    single_AIICtest_data: pd.DataFrame
+    single_NICtest_data: pd.DataFrame
+    single_DTCtest_data: pd.DataFrame
+    # room_properties: RoomProperties  ## removing this to ReportData class
+
+class TestType(Enum):
+    AIIC = "AIIC"
+    ASTC = "ASTC"
+    NIC = "NIC"
+    DTC = "DTC"
+@dataclass
+class ReportData:
+    room_properties: RoomProperties
+    test_data: TestData
+    test_type: TestType
+#####
+# class TestData:
+#     def __init__(self, room_properties: RoomProperties, ...):
+#         self.room_properties = room_properties
+#         # other initializations...
+
+# class ReportData:
+#     def __init__(self, test_data: TestData, ...):
+#         self.test_data = test_data  # Contains room_properties via test_data
+#         # other initializations...
+        
+#     def get_room_properties(self) -> RoomProperties:
+#         return self.test_data.room_properties
+### SLM import - hardcoded - gives me the willies, but it works for now.
+### maybe change to something thats a better troubleshooting effort later ###
+##  ask GPT later about how best to do this, maybe a config file or something? 
+def format_SLMdata(srs_data):
+    ## verify that srs_data iloc[7] is correct- will have a label as 1/3 octave
+    srs_thirdoct = srs_data.iloc[7] # hardcoded to SLM export data format
+    srs_thirdoct = srs_thirdoct[13:31] # select only the frequency bands of interest
+    # verify step to check for SPL info? 
+    return srs_thirdoct
+
+def calculate_onethird_Logavg(average_pos):
+    if isinstance(average_pos, pd.DataFrame):
+        average_pos = average_pos.values
+    onethird_rec_Total = []
+    for i in range(len(average_pos)):
+        freqbin = average_pos[i]
+        total = 0
+        count = 0
+        for val in freqbin:
+            if not pd.isnull(val):
+                total += 10**(val/10)
+                count += 1
+        if count > 0:
+            average = total / count
+            onethird_rec_Total.append(10 * np.log10(average))
+        else:
+            onethird_rec_Total.append(np.nan)
+    onethird_rec_Total = np.round(onethird_rec_Total, 1)
+    return onethird_rec_Total
+
+def load_test_plan(curr_test: pd.DataFrame) -> pd.DataFrame:
+    # Load the test plan data from the Excel file
+
+    # do i need to run the format_slm_data function here?
+
+    if int(curr_test['source room vol']) >= 5300 or int(curr_test['receive room vol']) >= 5300:
+        NICreporting_Note = 'The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver and/or source room was greater than the maximum allowed per E336-16, Paragraph 9.4.1.2.'
+    elif int(curr_test['source room vol']) <= 833 or int(curr_test['receive room vol']) <= 833:
+        NICreporting_Note = 'The receiver and/or source room has a volume less than the minimum volume requirement of 25 m3 (883 cu. ft.).'
+    else:
+        NICreporting_Note = '---'
+    
+    # load a test properties dataframe
+    # rewrite to the TestType enum
+    test_types = {
+        TestType.AIIC: bool(curr_test['AIIC_test'].iloc[0]),  # Convert to boolean
+        TestType.NIC: bool(curr_test['NIC_test'].iloc[0]),
+        TestType.ASTC: bool(curr_test['ASTC_test'].iloc[0]),
+        TestType.DTC: bool(curr_test['DTC_test'].iloc[0])
+    }
+    # test_properties = pd.DataFrame(
+    #     {
+    #         "AIIC_test": curr_test['AIIC_test'],
+    #         "NIC_test": curr_test['NIC_test'],
+    #         "ASTC_test": curr_test['ASTC_test'],
+    #         "DTC_test": curr_test['DTC_test']
+    #     },
+    #     index=[0]
+    # )
+    room_properties = RoomProperties(
+        site_name=curr_test['Site_Name'],
+        client_name=curr_test['Client_Name'],
+        source_room=curr_test['Source_Room'],
+        receive_room=curr_test['Receiving_Room'],
+        test_date=curr_test['Test_Date'],
+        report_date=curr_test['Report_Date'],
+        project_name=curr_test['Project_Name'],
+        test_label=curr_test['Test_Label'],
+        source_vol=curr_test['source room vol'],
+        receive_vol=curr_test['receive room vol'],
+        partition_area=curr_test['partition area'],
+        partition_dim=curr_test['partition dim.'],
+        source_room_finish=curr_test['source room finish'],
+        receive_room_finish=curr_test['receive room finish'],
+        srs_floor=curr_test['srs floor descrip.'],
+        srs_ceiling=curr_test['srs ceiling descrip.'],
+        srs_walls=curr_test['srs walls descrip.'],
+        rec_floor=curr_test['rec floor descrip.'],
+        rec_ceiling=curr_test['rec ceiling descrip.'],
+        rec_wall=curr_test['rec walls descrip.'],   
+    )
+
     if curr_test['AIIC_test'] == 1:
         print("AIIC testing enabled, copying data...")
 ### IIC variables  #### When extending to IIC data
@@ -230,7 +242,6 @@ def load_test_plan(file_path: Path, self) -> pd.DataFrame:
             'AIIC_pos4': pd.DataFrame(AIIC_pos4),
             'AIIC_source': pd.DataFrame(AIIC_source),
             'AIIC_carpet': pd.DataFrame(AIIC_carpet),
-            'room_properties': pd.DataFrame(room_properties)
         }
 
     else:
@@ -254,7 +265,6 @@ def load_test_plan(file_path: Path, self) -> pd.DataFrame:
             'recive_data': pd.DataFrame(recive_data),
             'bkgrnd_data': pd.DataFrame(bkgrnd_data),
             'rt': pd.DataFrame(rt_thirty),
-            'room_properties': pd.DataFrame(room_properties)
             }
         
     else:
@@ -277,7 +287,6 @@ def load_test_plan(file_path: Path, self) -> pd.DataFrame:
             'recive_data': pd.DataFrame(recive_data),
             'bkgrnd_data': pd.DataFrame(bkgrnd_data),
             'rt': pd.DataFrame(rt_thirty),
-            'room_properties': pd.DataFrame(room_properties)
             }
         # return single_NICtest_data
     else:
@@ -310,7 +319,6 @@ def load_test_plan(file_path: Path, self) -> pd.DataFrame:
             'srs_door_closed': pd.DataFrame(srs_door_closed),
             'recive_door_open': pd.DataFrame(recive_door_open),
             'recive_door_closed': pd.DataFrame(recive_door_closed),
-            'room_properties': pd.DataFrame(room_properties)
             }
     else:
         single_DTCtest_data = None
@@ -323,7 +331,12 @@ def load_test_plan(file_path: Path, self) -> pd.DataFrame:
         single_NICtest_data=single_NICtest_data,
         single_DTCtest_data=single_DTCtest_data
     )
-    return room_properties, test_types, test_data
+    # Create ReportData object with collected data structures
+    report_data = ReportData(
+        test_data=test_data,
+        test_type=test_types
+    )
+    return report_data
 
 def RAW_SLM_datapull(self, find_datafile, datatype):
     # pass datatype as '-831_Data.' or '-RT_Data.' to pull the correct data
