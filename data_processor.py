@@ -5,7 +5,7 @@ import logging
 import os 
 from os import listdir, walk
 from dataclasses import dataclass
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 from enum import Enum
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -14,6 +14,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame, Paragraph, Table, TableStyle, Spacer, PageBreak, KeepInFrame, Image
 from reportlab.lib.units import inch
+
 
 ## having gone through the PDF edit, this room properties will need to be revised 
 # im not even sure if moving to a class variable from a dataframe is best, 
@@ -102,6 +103,17 @@ class AIICTestData(TestData):
         self.pos4 = test_data['AIIC_pos4']
         self.source = test_data['AIIC_source']
         self.carpet = test_data['AIIC_carpet']
+class DTCtestData(TestData):
+    def __init__(self, room_properties: RoomProperties, test_data: dict):
+        super().__init__(room_properties)
+        self.srs_data = test_data['srs_data']
+        self.recive_data = test_data['recive_data']
+        self.bkgrnd_data = test_data['bkgrnd_data']
+        self.rt = test_data['rt']
+        self.srs_door_open = test_data['srs_door_open']
+        self.srs_door_closed = test_data['srs_door_closed']
+        self.recive_door_open = test_data['recive_door_open']
+        self.recive_door_closed = test_data['recive_door_closed']
 
 class ASTCTestData(TestData):
     def __init__(self, room_properties: RoomProperties, test_data: dict):
@@ -110,7 +122,7 @@ class ASTCTestData(TestData):
         self.recive_data = test_data['recive_data']
         self.bkgrnd_data = test_data['bkgrnd_data']
         self.rt = test_data['rt']
-        
+
 class NICTestData(TestData):
     def __init__(self, room_properties: RoomProperties, test_data: dict):
         super().__init__(room_properties)
@@ -137,6 +149,49 @@ class ReportData:
         self.room_properties = room_properties
         self.test_data = test_data
         self.test_type = test_type
+    test_type: TestType
+    test_data: Union[AIICTestData, ASTCTestData, NICTestData, DTCtestData]
+
+    def __post_init__(self):
+        if not isinstance(self.test_data, TestData):
+            raise ValueError("test_data must be an instance of TestData")
+        test_data_types = {
+            TestType.AIIC: AIICTestData,
+            TestType.ASTC: ASTCTestData,
+            TestType.NIC: NICTestData,
+            TestType.DTC: DTCtestData
+        }
+        expected_test_data_type = test_data_types[self.test_type]
+        if not isinstance(self.test_data, expected_test_data_type):
+            raise ValueError(f"test_data must be an instance of {expected_test_data_type.__name__}")
+        
+    @property
+    def room_properties(self) -> RoomProperties:
+        return self.test_data.room_properties
+    
+    def generate_report(self):
+        if self.test_type == TestType.AIIC:
+            return self._generate_aiic_report()
+        elif self.test_type == TestType.ASTC:
+            return self._generate_astc_report()
+        elif self.test_type == TestType.NIC:
+            return self._generate_nic_report()
+        elif self.test_type == TestType.DTC:
+            return self._generate_dtc_report()
+        else:
+            raise ValueError(f"Unsupported test type: {self.test_type}")
+        
+    def _generate_aiic_report(self):
+        pass
+    
+    def _generate_astc_report(self):
+        pass
+    
+    def _generate_nic_report(self):
+        pass
+    
+    def _generate_dtc_report(self):
+        pass
 #####
 # class TestData:
 #     def __init__(self, room_properties: RoomProperties, ...):
