@@ -55,44 +55,88 @@ from reportlab.lib.units import inch
         ### 
 @dataclass
 class RoomProperties:
-    site_name: str
-    client_name: str
-    source_room: str
-    receive_room: str
-    test_date: str
-    report_date: str
-    project_name: str
-    test_label: str
-    source_vol: float
-    receive_vol: float
-    partition_area: float
-    partition_dim: str
-    source_room_finish: str
-    receive_room_finish: str
-    tested_assembly: str
-    expected_performance: str
-    annex_2_used: bool
-    test_assembly_type: str
+    def __init__(self, site_name: str, client_name: str, source_room: str, receive_room: str, test_date: str, report_date: str, project_name: str, test_label: str, source_vol: float, receive_vol: float, partition_area: float, partition_dim: str, source_room_finish: str, receive_room_finish: str, tested_assembly: str, expected_performance: str, annex_2_used: bool, test_assembly_type: str):
+        self.site_name = site_name
+        self.client_name = client_name
+        self.source_room = source_room
+        self.receive_room = receive_room
+        self.test_date = test_date
+        self.report_date = report_date
+        self.project_name = project_name
+        self.test_label = test_label
+        self.source_vol = source_vol
+        self.receive_vol = receive_vol
+        self.partition_area = partition_area
+        self.partition_dim = partition_dim
+        self.source_room_finish = source_room_finish
+        self.receive_room_finish = receive_room_finish
+        self.tested_assembly = tested_assembly
+        self.expected_performance = expected_performance
+        self.annex_2_used = annex_2_used
+        self.test_assembly_type = test_assembly_type
 
 # each test data class has all the differnet test types in it
 @dataclass
 class TestData:
-    single_ASTCtest_data: pd.DataFrame
-    single_AIICtest_data: pd.DataFrame
-    single_NICtest_data: pd.DataFrame
-    single_DTCtest_data: pd.DataFrame
-    # room_properties: RoomProperties  ## removing this to ReportData class
+    def __init__(self, room_properties: RoomProperties):
+        self.room_properties = room_properties
+    
+    def get_basic_data(self):
+        return {
+            'srs_data': self.srs_data,
+            'recive_data': self.recive_data,
+            'bkgrnd_data': self.bkgrnd_data,
+            'rt': self.rt
+        }
+
+class AIICTestData(TestData):
+    def __init__(self, room_properties: RoomProperties, test_data: dict):
+        super().__init__(room_properties)
+        self.srs_data = test_data['srs_data']
+        self.recive_data = test_data['recive_data']
+        self.bkgrnd_data = test_data['bkgrnd_data']
+        self.rt = test_data['rt']
+        self.pos1 = test_data['AIIC_pos1']
+        self.pos2 = test_data['AIIC_pos2']
+        self.pos3 = test_data['AIIC_pos3']
+        self.pos4 = test_data['AIIC_pos4']
+        self.source = test_data['AIIC_source']
+        self.carpet = test_data['AIIC_carpet']
+
+class ASTCTestData(TestData):
+    def __init__(self, room_properties: RoomProperties, test_data: dict):
+        super().__init__(room_properties)
+        self.srs_data = test_data['srs_data']
+        self.recive_data = test_data['recive_data']
+        self.bkgrnd_data = test_data['bkgrnd_data']
+        self.rt = test_data['rt']
+        
+class NICTestData(TestData):
+    def __init__(self, room_properties: RoomProperties, test_data: dict):
+        super().__init__(room_properties)
+        self.srs_data = test_data['srs_data']
+        self.recive_data = test_data['recive_data']
+        self.bkgrnd_data = test_data['bkgrnd_data']
+        self.rt = test_data['rt']
+
+
 
 class TestType(Enum):
-    AIIC = "AIIC"
-    ASTC = "ASTC"
-    NIC = "NIC"
-    DTC = "DTC"
+    def __init__(self, aiic: bool, astc: bool, nic: bool, dtc: bool):
+        self.aiic = aiic
+        self.astc = astc
+        self.nic = nic
+        self.dtc = dtc  
+    # AIIC = "AIIC"
+    # ASTC = "ASTC"
+    # NIC = "NIC"
+    # DTC = "DTC"
 @dataclass
 class ReportData:
-    room_properties: RoomProperties
-    test_data: TestData
-    test_type: TestType
+    def __init__(self, room_properties: RoomProperties, test_data: TestData, test_type: TestType):
+        self.room_properties = room_properties
+        self.test_data = test_data
+        self.test_type = test_type
 #####
 # class TestData:
 #     def __init__(self, room_properties: RoomProperties, ...):
@@ -666,4 +710,5 @@ def sanitize_filepath(filepath: str) -> str:
     filepath = filepath.replace('\\', '/')
     return filepath
 
-def calculate_ASTM_results(test_data: TestData, test_type: TestType):
+# def calculate_ASTM_results(test_data: TestData, test_type: TestType):
+
