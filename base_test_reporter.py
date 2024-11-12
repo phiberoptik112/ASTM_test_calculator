@@ -187,11 +187,11 @@ class AIICTestReport(BaseTestReport):
         main_elements.append(Paragraph("<u>TEST ASSEMBLY:</u>", styleHeading))
         main_elements.append(Spacer(1, 10))  # Adds some space 
         main_elements.append(Paragraph("The tested assembly was the"+single_test_dataframe['room_properties']['Test_Assembly_Type'][0]+"The assembly was not field verified, and was based on information provided by the client and drawings for the project. The client advised that no slab treatment or self-leveling was applied. Results may vary if slab treatment or self-leveling or any adhesive is used in other installations."))
+        main_elements.append(PageBreak())
+        # ##### END OF FIRST PAGE TEXT  - ########
         return main_elements
     
-    # ##### END OF FIRST PAGE TEXT  - ########
-        
-    main_elements.append(PageBreak())
+
     def get_test_instrumentation(self):
         equipment = super().get_test_instrumentation()
         # Add AIIC-specific equipment
