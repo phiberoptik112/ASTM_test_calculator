@@ -193,18 +193,16 @@ class ReportData:
     def _generate_dtc_report(self):
         pass
 #####
-# class TestData:
-#     def __init__(self, room_properties: RoomProperties, ...):
-#         self.room_properties = room_properties
-#         # other initializations...
+## Usage example:
+# aiic_report = ReportData(
+#     test_type=TestType.AIIC,
+#     test_data=aiic_test  # AIICTestData instance
+# )
 
-# class ReportData:
-#     def __init__(self, test_data: TestData, ...):
-#         self.test_data = test_data  # Contains room_properties via test_data
-#         # other initializations...
-        
-#     def get_room_properties(self) -> RoomProperties:
-#         return self.test_data.room_properties
+# astc_report = ReportData(
+#     test_type=TestType.ASTC,
+#     test_data=astc_test  # ASTCTestData instance
+# )
 ### SLM import - hardcoded - gives me the willies, but it works for now.
 ### maybe change to something thats a better troubleshooting effort later ###
 ##  ask GPT later about how best to do this, maybe a config file or something? 
