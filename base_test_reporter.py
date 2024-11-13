@@ -431,6 +431,19 @@ def create_second_page(report):
 
 def create_third_page(report):
     main_elements = []
+    main_elements.append(Paragraph("<u>STATEMENT OF TEST RESULTS:</u>", styleHeading))
+    Test_result_table = Table(Test_result_table, hAlign='LEFT') ## hardcoded, change to table variable for selected test
+    Test_result_table.setStyle(TableStyle([
+        ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
+        ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN',(0,0), (-1,-1),'LEFT')
+    ]))
+    main_elements.append(Test_result_table)
     return main_elements
 
 def create_fourth_page(report):
