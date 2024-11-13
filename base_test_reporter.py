@@ -294,6 +294,14 @@ class ASTCTestReport(BaseTestReport):
             }
         )
         return Test_result_table
+    def get_results_plot(self):
+        plot_title = 'ASTC Reference Contour'
+        plt.plot(ATL_curve, freqbands)
+        plt.xlabel('Apparent Transmission Loss (dB)')
+        plt.ylabel('Frequency (Hz)')
+        plt.title('ASTC Reference Contour')
+        plt.grid()
+
 class NICTestReport(BaseTestReport):
     def get_doc_name(self):
         return f"{self.single_test_dataframe['room_properties']['Project_Name'][0]} NIC Test Report_{self.single_test_dataframe['room_properties']['Test_Label'][0]}.pdf"
@@ -431,8 +439,46 @@ def create_second_page(report):
 
 def create_third_page(report):
     main_elements = []
+    main_elements.append(Paragraph("<u>STATEMENT OF TEST RESULTS:</u>", report.custom_title_style))
+    Test_result_table = report.get_test_results()
+    Test_result_table = Table(Test_result_table, hAlign='LEFT') ## hardcoded, change to table variable for selected test
+    Test_result_table.setStyle(TableStyle([
+        ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
+        ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN',(0,0), (-1,-1),'LEFT')
+    ]))
+    main_elements.append(Test_result_table)
     return main_elements
 
 def create_fourth_page(report):
     main_elements = []
+    if test_type == 'AIIC':
+        plot_title = 'AIIC Reference Contour'
+        plt.plot(ATL_curve, freqbands)
+        plt.xlabel('Apparent Transmission Loss (dB)')
+        plt.ylabel('Frequency (Hz)')
+        plt.title('AIIC Reference Contour')
+        plt.grid()
+        plt.show()
+    elif test_type == 'ASTC':
+        plot_title = 'ASTC Reference Contour'
+        plt.plot(ATL_curve, freqbands)
+        plt.xlabel('Apparent Transmission Loss (dB)')
+        plt.ylabel('Frequency (Hz)')
+        plt.title('ASTC Reference Contour')
+        plt.grid()
+        plt.show()
+    elif test_type == 'NIC':
+        plot_title = 'NIC Reference Contour'
+        plt.plot(ATL_curve, freqbands)
+        plt.xlabel('Apparent Transmission Loss (dB)')
+        plt.ylabel('Frequency (Hz)')
+        plt.title('NIC Reference Contour')
+        plt.grid()
+        plt.show()
     return main_elements

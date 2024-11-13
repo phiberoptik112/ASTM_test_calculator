@@ -136,7 +136,8 @@ test_instrumentation = pd.DataFrame(
 
 ## STATEMENT OF TEST RESULTS 
 statement_test_results_text =' STATEMENT OF TEST RESULTS: '
-
+FREQUENCIES = [125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
+NIC_VOLLIMIT = 883  # cu. ft.
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 

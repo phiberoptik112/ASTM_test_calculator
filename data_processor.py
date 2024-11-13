@@ -56,25 +56,29 @@ from reportlab.lib.units import inch
         ### 
 @dataclass
 class RoomProperties:
-    def __init__(self, site_name: str, client_name: str, source_room: str, receive_room: str, test_date: str, report_date: str, project_name: str, test_label: str, source_vol: float, receive_vol: float, partition_area: float, partition_dim: str, source_room_finish: str, receive_room_finish: str, tested_assembly: str, expected_performance: str, annex_2_used: bool, test_assembly_type: str):
-        self.site_name = site_name
-        self.client_name = client_name
-        self.source_room = source_room
-        self.receive_room = receive_room
-        self.test_date = test_date
-        self.report_date = report_date
-        self.project_name = project_name
-        self.test_label = test_label
-        self.source_vol = source_vol
-        self.receive_vol = receive_vol
-        self.partition_area = partition_area
-        self.partition_dim = partition_dim
-        self.source_room_finish = source_room_finish
-        self.receive_room_finish = receive_room_finish
-        self.tested_assembly = tested_assembly
-        self.expected_performance = expected_performance
-        self.annex_2_used = annex_2_used
-        self.test_assembly_type = test_assembly_type
+    site_name: str
+    client_name: str
+    source_room: str
+    receive_room: str
+    test_date: str
+    report_date: str
+    project_name: str
+    test_label: str
+    source_vol: float
+    receive_vol: float
+    partition_area: float
+    partition_dim: str
+    source_room_finish: str
+    receive_room_finish: str
+    tested_assembly: str
+    expected_performance: str
+    annex_2_used: bool
+    test_assembly_type: str
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'RoomProperties':
+        """Create RoomProperties from dictionary"""
+        return cls(**data)
 
 # each test data class has all the differnet test types in it
 @dataclass
@@ -103,6 +107,7 @@ class AIICTestData(TestData):
         self.pos4 = test_data['AIIC_pos4']
         self.source = test_data['AIIC_source']
         self.carpet = test_data['AIIC_carpet']
+        
 class DTCtestData(TestData):
     def __init__(self, room_properties: RoomProperties, test_data: dict):
         super().__init__(room_properties)
@@ -193,18 +198,16 @@ class ReportData:
     def _generate_dtc_report(self):
         pass
 #####
-# class TestData:
-#     def __init__(self, room_properties: RoomProperties, ...):
-#         self.room_properties = room_properties
-#         # other initializations...
+## Usage example:
+# aiic_report = ReportData(
+#     test_type=TestType.AIIC,
+#     test_data=aiic_test  # AIICTestData instance
+# )
 
-# class ReportData:
-#     def __init__(self, test_data: TestData, ...):
-#         self.test_data = test_data  # Contains room_properties via test_data
-#         # other initializations...
-        
-#     def get_room_properties(self) -> RoomProperties:
-#         return self.test_data.room_properties
+# astc_report = ReportData(
+#     test_type=TestType.ASTC,
+#     test_data=astc_test  # ASTCTestData instance
+# )
 ### SLM import - hardcoded - gives me the willies, but it works for now.
 ### maybe change to something thats a better troubleshooting effort later ###
 ##  ask GPT later about how best to do this, maybe a config file or something? 
@@ -289,153 +292,55 @@ def load_test_plan(curr_test: pd.DataFrame) -> pd.DataFrame:
 
     if curr_test['AIIC_test'] == 1:
         print("AIIC testing enabled, copying data...")
-### IIC variables  #### When extending to IIC data
-        find_source = curr_test['Source']
-        find_rec = curr_test['Recieve '] #trailing whitespace? be sure to verify this is consistent in the excel file
-        find_BNL = curr_test['BNL']
-        find_RT = curr_test['RT']
-        find_posOne = curr_test['Position1']
-        find_posTwo = curr_test['Position2']
-        find_posThree = curr_test['Position3']
-        find_posFour = curr_test['Position4']
-        find_poscarpet = curr_test['Carpet']
-        find_Tapsrs = curr_test['SourceTap']
-        srs_data = RAW_SLM_datapull(self,find_source,'-831_Data.')
-        recive_data = RAW_SLM_datapull(self,find_rec,'-831_Data.')
-        bkgrnd_data = RAW_SLM_datapull(self,find_BNL,'-831_Data.')
-
-        AIIC_pos1 = RAW_SLM_datapull(self,find_posOne,'-831_Data.')
-        AIIC_pos2 = RAW_SLM_datapull(self,find_posTwo,'-831_Data.')
-        AIIC_pos3 = RAW_SLM_datapull(self,find_posThree,'-831_Data.')
-        AIIC_pos4 = RAW_SLM_datapull(self,find_posFour,'-831_Data.')
-        AIIC_carpet = RAW_SLM_datapull(self,find_poscarpet,'-831_Data.')
-        AIIC_source = RAW_SLM_datapull(self,find_Tapsrs,'-831_Data.')
-
-        rt = RAW_SLM_datapull(self,find_RT,'-RT_Data.')
-        rt_thirty = rt['Unnamed: 10'][24:42]/1000 ## need to validate that this works
-        if isinstance(rt, pd.DataFrame):
-            rt_thirty = rt.values
-        rt_thirty = pd.to_numeric(rt_thirty, errors='coerce')
-        rt_thirty = np.round(rt_thirty,3)
-        ##### May need to put in the average of all the positions, log averaged together #####
-        # not sure where ive got it calculated in, it may be in my IIC function itself, 
-        # but it might be best to just average it here and then pass through the total log avg. 
-        average_pos = []
-        for i in range(1, 5):
-            pos_input = f'AIIC_pos{i}'
-            pos_data = format_SLMdata(single_AIICtest_data[pos_input]) # need to change to get the raw data 
-            average_pos.append(pos_data)
-
-        average_pos = pd.concat(average_pos, axis=1)
-        onethird_rec_Total = calculate_onethird_Logavg(average_pos)
-        print('tap total:', onethird_rec_Total)
-
-        single_AIICtest_data = {
-            'srs_data': pd.DataFrame(srs_data),
-            'recive_data': pd.DataFrame(recive_data),
-            'bkgrnd_data': pd.DataFrame(bkgrnd_data),
-            'rt': pd.DataFrame(rt),
-            'AIIC_pos1': pd.DataFrame(AIIC_pos1),
-            'AIIC_pos2': pd.DataFrame(AIIC_pos2),
-            'AIIC_pos3': pd.DataFrame(AIIC_pos3),
-            'AIIC_pos4': pd.DataFrame(AIIC_pos4),
-            'AIIC_source': pd.DataFrame(AIIC_source),
-            'AIIC_carpet': pd.DataFrame(AIIC_carpet),
+        
+        # Collect raw data
+        raw_data = {
+            'source': RAW_SLM_datapull(self, curr_test['Source'], '-831_Data.'),
+            'receive': RAW_SLM_datapull(self, curr_test['Recieve '], '-831_Data.'),
+            'bnl': RAW_SLM_datapull(self, curr_test['BNL'], '-831_Data.'),
+            'rt': RAW_SLM_datapull(self, curr_test['RT'], '-RT_Data.'),
+            'pos1': RAW_SLM_datapull(self, curr_test['Position1'], '-831_Data.'),
+            'pos2': RAW_SLM_datapull(self, curr_test['Position2'], '-831_Data.'),
+            'pos3': RAW_SLM_datapull(self, curr_test['Position3'], '-831_Data.'),
+            'pos4': RAW_SLM_datapull(self, curr_test['Position4'], '-831_Data.'),
+            'carpet': RAW_SLM_datapull(self, curr_test['Carpet'], '-831_Data.'),
+            'source_tap': RAW_SLM_datapull(self, curr_test['SourceTap'], '-831_Data.')
         }
 
-    else:
-        single_AIICtest_data = None
-        # return single_AIICtest_data
-    
-    if curr_test['ASTC_test'] == 1:
-        srs_data = RAW_SLM_datapull(self,curr_test['Source'],'-831_Data.')
-        recive_data = RAW_SLM_datapull(self, curr_test['Recieve '],'-831_Data.')
-        bkgrnd_data = RAW_SLM_datapull(self,curr_test['BNL'],'-831_Data.')
-        rt = RAW_SLM_datapull(self,curr_test['RT'],'-RT_Data.')
-        ## formating the RT data further 
-        rt_thirty = rt['Summary']['Unnamed: 10'][24:42]/1000
-        if isinstance(rt, pd.DataFrame):
-            rt_thirty = rt.values
+        # Process RT data
+        rt_thirty = raw_data['rt']['Unnamed: 10'][24:42]/1000
         rt_thirty = pd.to_numeric(rt_thirty, errors='coerce')
-        rt_thirty = np.round(rt_thirty,3)
+        rt_thirty = np.round(rt_thirty, 3)
 
-        single_ASTCtest_data = {
-            'srs_data': pd.DataFrame(srs_data),
-            'recive_data': pd.DataFrame(recive_data),
-            'bkgrnd_data': pd.DataFrame(bkgrnd_data),
-            'rt': pd.DataFrame(rt_thirty),
-            }
+        # Process position data
+        average_pos = []
+        for i in range(1, 5):
+            pos_data = format_SLMdata(raw_data[f'pos{i}'])
+            average_pos.append(pos_data)
         
-    else:
-        single_ASTCtest_data = None
-        # return single_ASTCtest_data
-        
-    if curr_test['NIC_test'] == 1:
-        srs_data = RAW_SLM_datapull(self,curr_test['Source'],'-831_Data.')
-        recive_data = RAW_SLM_datapull(self, curr_test['Recieve '],'-831_Data.')
-        bkgrnd_data = RAW_SLM_datapull(self,curr_test['BNL'],'-831_Data.')
-        rt = RAW_SLM_datapull(self,curr_test['RT'],'-RT_Data.')
+        average_pos = pd.concat(average_pos, axis=1)
+        onethird_rec_Total = calculate_onethird_Logavg(average_pos)
 
-        if isinstance(rt, pd.DataFrame):
-            rt_thirty = rt.values
-        rt_thirty = pd.to_numeric(rt_thirty, errors='coerce')
-        rt_thirty = np.round(rt_thirty,3)
-
-        single_NICtest_data = {
-            'srs_data': pd.DataFrame(srs_data),
-            'recive_data': pd.DataFrame(recive_data),
-            'bkgrnd_data': pd.DataFrame(bkgrnd_data),
-            'rt': pd.DataFrame(rt_thirty),
+        # Create AIICTestData instance
+        aiic_test = AIICTestData(
+            room_properties=room_properties,
+            test_data={
+                'srs_data': pd.DataFrame(raw_data['source']),
+                'recive_data': pd.DataFrame(raw_data['receive']),
+                'bkgrnd_data': pd.DataFrame(raw_data['bnl']),
+                'rt': pd.DataFrame(rt_thirty),
+                'AIIC_pos1': pd.DataFrame(raw_data['pos1']),
+                'AIIC_pos2': pd.DataFrame(raw_data['pos2']),
+                'AIIC_pos3': pd.DataFrame(raw_data['pos3']),
+                'AIIC_pos4': pd.DataFrame(raw_data['pos4']),
+                'AIIC_source': pd.DataFrame(raw_data['source_tap']),
+                'AIIC_carpet': pd.DataFrame(raw_data['carpet'])
             }
-        # return single_NICtest_data
+        )
+        return aiic_test
     else:
-        single_NICtest_data = None
+        return None
     
-    if curr_test['DTC_test'] == 1:
-        print("DTC testing enabled, copying data...")
-        ## move this into a calc_DTC_data function
-
-        srs_data = RAW_SLM_datapull(self,curr_test['Source'],'-831_Data.')
-        recive_data = RAW_SLM_datapull(self, curr_test['Recieve '],'-831_Data.')
-        bkgrnd_data = RAW_SLM_datapull(self,curr_test['BNL'],'-831_Data.')
-        rt = RAW_SLM_datapull(self,curr_test['RT'],'-RT_Data.')
-        srs_door_open = RAW_SLM_datapull(self,curr_test['Source_Door_Open'],'-831_Data.')
-        srs_door_closed = RAW_SLM_datapull(self,curr_test['Source_Door_Closed'],'-831_Data.')
-        recive_door_open = RAW_SLM_datapull(self, curr_test['Recieve_Door_Open '],'-831_Data.')
-        recive_door_closed = RAW_SLM_datapull(self, curr_test['Recieve_Door_Closed '],'-831_Data.')
-
-        if isinstance(rt, pd.DataFrame): # converting RT data to numeric for calcs 
-            rt_thirty = rt.values
-        rt_thirty = pd.to_numeric(rt_thirty, errors='coerce')
-        rt_thirty = np.round(rt_thirty,3)
-
-        single_DTCtest_data = {
-            'srs_data': pd.DataFrame(srs_data),
-            'recive_data': pd.DataFrame(recive_data),
-            'bkgrnd_data': pd.DataFrame(bkgrnd_data),
-            'rt': pd.DataFrame(rt_thirty),
-            'srs_door_open': pd.DataFrame(srs_door_open),
-            'srs_door_closed': pd.DataFrame(srs_door_closed),
-            'recive_door_open': pd.DataFrame(recive_door_open),
-            'recive_door_closed': pd.DataFrame(recive_door_closed),
-            }
-    else:
-        single_DTCtest_data = None
-
-    #### Put all dataframes into the data structure ####
-    test_data = TestData(
-        room_properties=room_properties,
-        single_AIICtest_data=single_AIICtest_data,
-        single_ASTCtest_data=single_ASTCtest_data,
-        single_NICtest_data=single_NICtest_data,
-        single_DTCtest_data=single_DTCtest_data
-    )
-    # Create ReportData object with collected data structures
-    report_data = ReportData(
-        test_data=test_data,
-        test_type=test_types
-    )
-    return report_data
 
 def RAW_SLM_datapull(self, find_datafile, datatype):
     # pass datatype as '-831_Data.' or '-RT_Data.' to pull the correct data
@@ -755,15 +660,10 @@ def process_single_test(test_plan_entry: pd.Series, slm_data_paths: Dict[str, Pa
     
 #     return report_paths
 
-# Constants (you might want to move these to a separate config file)
-FREQUENCIES = [125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
-NIC_VOLLIMIT = 883  # cu. ft.
-
 # Additional utility functions
 def sanitize_filepath(filepath: str) -> str:
     filepath = filepath.replace('T:', '//DLA-04/Shared/')
     filepath = filepath.replace('\\', '/')
     return filepath
 
-# def calculate_ASTM_results(test_data: TestData, test_type: TestType):
 
