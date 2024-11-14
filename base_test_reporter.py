@@ -159,6 +159,105 @@ class BaseTestReport:
     def get_report_title(self):
         raise NotImplementedError
     
+    @classmethod
+    def create_report(curr_test, test_data, reportOutputfolder, test_type):
+        """Factory method to create and build the appropriate test report"""
+        # Create the appropriate test report object based on test_type
+        if test_type == 'AIIC':
+            report = AIICTestReport(curr_test, test_data, reportOutputfolder)
+        elif test_type == 'ASTC':
+            report = ASTCTestReport(curr_test, test_data, reportOutputfolder)
+        elif test_type == 'NIC':
+            report = NICTestReport(curr_test, test_data, reportOutputfolder)
+        elif test_type == 'DTC':
+            report = DTCTestReport(curr_test, test_data, reportOutputfolder)
+        else:
+            raise ValueError(f"Unsupported test type: {test_type}")
+
+        # Setup document using the report's setup method
+        doc = report.setup_document()
+
+        # Generate content
+        main_elements = []
+        main_elements.extend(report.create_first_page())
+        main_elements.extend(report.create_second_page())
+        main_elements.extend(report.create_third_page())
+        main_elements.extend(report.create_fourth_page())
+
+        # Build and save document
+        doc.build(main_elements)
+        print(f"Report saved as: {report.get_doc_name()}")
+        
+        return report
+
+    def create_first_page(self):
+        main_elements = []
+        ### STANDARDS ###
+        styleHeading = ParagraphStyle('heading', parent=self.styles['Normal'], spaceAfter=10)
+        main_elements.append(Paragraph('<u>STANDARDS:</u>', styleHeading))
+        standards_table = Table(self.get_standards_data(), hAlign='LEFT')
+        # ... (set table style)
+        main_elements.append(standards_table)
+
+        # statement of conformance
+        main_elements.append(Paragraph("<u>STATEMENT OF CONFORMANCE:</u>", styleHeading))
+        main_elements.append(Paragraph(self.get_statement_of_conformance()))
+
+        main_elements.append(Paragraph(self.get_test_environment()))
+        return main_elements
+
+    def create_second_page(self): 
+        main_elements = []
+        
+        # Test Procedure
+        main_elements.append(Paragraph("<u>TEST PROCEDURE:</u>", self.custom_title_style))
+        main_elements.append(Paragraph(self.get_test_procedure()))
+        main_elements.append(Spacer(1,10))
+        
+        # Test Instrumentation and Calibration
+        main_elements.append(Paragraph("<u>TEST INSTRUMENTATION:</u>", self.custom_title_style))
+        
+        test_instrumentation_table = self.get_test_instrumentation()
+        test_instrumentation_table = Table(test_instrumentation_table, hAlign='LEFT')
+        test_instrumentation_table.setStyle(TableStyle([
+            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
+            ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ALIGN',(0,0), (-1,-1),'LEFT')
+        ]))
+        
+        main_elements.append(test_instrumentation_table)
+        main_elements.append(PageBreak())
+        
+        return main_elements
+
+    def create_third_page(self):
+        main_elements = []
+        main_elements.append(Paragraph("<u>STATEMENT OF TEST RESULTS:</u>", self.custom_title_style))
+        Test_result_table = self.get_test_results()
+        Test_result_table = Table(Test_result_table, hAlign='LEFT')
+        Test_result_table.setStyle(TableStyle([
+            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
+            ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ALIGN',(0,0), (-1,-1),'LEFT')
+        ]))
+        main_elements.append(Test_result_table)
+        return main_elements
+
+    def create_fourth_page(self):
+        main_elements = []
+        main_elements.append(self.create_plot())
+        return main_elements
+
 class AIICTestReport(BaseTestReport):
     def get_doc_name(self):
         return f"{self.single_test_dataframe['room_properties']['Project_Name'][0]} AIIC Test Report_{self.single_test_dataframe['room_properties']['Test_Label'][0]}.pdf"
@@ -179,7 +278,7 @@ class AIICTestReport(BaseTestReport):
         main_elements.append(Paragraph('The source room was '+self.single_test_dataframe['room_properties']['Source_Room'][0]+'. The space was'+self.single_test_dataframe['room_properties']['source_room_finish'][0]+'. The floor was '+self.single_test_dataframe['room_properties']['srs_floor'][0]+'. The ceiling was '+self.single_test_dataframe['room_properties']['srs_ceiling'][0]+". The walls were"+self.single_test_dataframe['room_properties']['srs_walls'][0]+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+self.single_test_dataframe['room_properties']['source_room_vol'][0]+"cu. ft."))
         main_elements.append(Spacer(1, 10))  # Adds some space 
         ### Recieve room paragraph
-        main_elements.append(Paragraph('The receiver room was '+single_test_dataframe['room_properties']['Receiving_Room'][0]+'. The space was'+single_test_dataframe['room_properties']['receiver_room_finish'][0]+'. The floor was '+single_test_dataframe['room_properties']['rec_floor'][0]+'. The ceiling was '+single_test_dataframe['room_properties']['rec_ceiling'][0]+". The walls were"+single_test_dataframe['room_properties']['rec_Wall'][0]+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+single_test_dataframe['room_properties']['receive_room_vol'][0]+"cu. ft."))
+        main_elements.append(Paragraph('The receiver room was '+self.single_test_dataframe['room_properties']['Receiving_Room'][0]+'. The space was'+single_test_dataframe['room_properties']['receiver_room_finish'][0]+'. The floor was '+single_test_dataframe['room_properties']['rec_floor'][0]+'. The ceiling was '+single_test_dataframe['room_properties']['rec_ceiling'][0]+". The walls were"+single_test_dataframe['room_properties']['rec_Wall'][0]+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+single_test_dataframe['room_properties']['receive_room_vol'][0]+"cu. ft."))
         main_elements.append(Spacer(1, 10))  # Adds some space 
         main_elements.append(Paragraph('The test assembly measured approximately '+single_test_dataframe['room_properties']['partition_dim'][0]+", and had an area of approximately "+single_test_dataframe['room_properties']['partition_area'][0]+"sq. ft."))
         main_elements.append(Spacer(1, 10))  # Adds some space 
@@ -377,127 +476,3 @@ class NICTestReport(BaseTestReport):
 class DTCTestReport(BaseTestReport):
     pass
     # Implement DTC-specific methods
-
-
-def create_report(self, curr_test, single_test_dataframe, reportOutputfolder, test_type):
-    # Create the appropriate test report object based on test_type
-    if test_type == 'AIIC':
-        report = AIICTestReport(curr_test, single_test_dataframe, reportOutputfolder)
-    elif test_type == 'ASTC':
-        report = ASTCTestReport(curr_test, single_test_dataframe, reportOutputfolder)
-    elif test_type == 'NIC':
-        report = NICTestReport(curr_test, single_test_dataframe, reportOutputfolder)
-    elif test_type == 'DTC':
-        report = DTCTestReport(curr_test, single_test_dataframe, reportOutputfolder)
-    else:
-        raise ValueError(f"Unsupported test type: {test_type}")
-
-    # Setup document using the report's setup method
-    doc = report.setup_document()
-
-    # Generate content
-    main_elements = []
-    main_elements.extend(create_first_page(report))
-    main_elements.extend(create_second_page(report))
-    main_elements.extend(create_third_page(report))
-    main_elements.extend(create_fourth_page(report))
-
-    # Build and save document
-    doc.build(main_elements)
-    print(f"Report saved as: {report.get_doc_name()}")
-
-def create_first_page(report):
-    main_elements = []
-    ### STANDARDS ###
-    styleHeading = ParagraphStyle('heading', parent=report.styles['Normal'], spaceAfter=10)
-    main_elements.append(Paragraph('<u>STANDARDS:</u>', styleHeading))
-    standards_table = Table(report.get_standards_data(), hAlign='LEFT')
-    # ... (set table style)
-    main_elements.append(standards_table)
-
-    # ... (add other elements using report methods)
-    # statement of conformance
-    main_elements.append(Paragraph("<u>STATEMENT OF CONFORMANCE:</u>", styleHeading))
-    main_elements.append(Paragraph(report.get_statement_of_conformace()))
-
-    main_elements.append(Paragraph(report.get_test_environment()))
-    return main_elements
-
-def create_second_page(report): 
-    main_elements = []
-    
-    # Test Procedure
-    main_elements.append(Paragraph("<u>TEST PROCEDURE:</u>", report.custom_title_style))
-    main_elements.append(Paragraph('Determination of space-average sound pressure levels was performed via the manually scanned microphones techique, described in ' + standards_data[0][0] + ', Paragraph 11.4.3.3.'+ "The source room was selected in accordance with ASTM E336-11 Paragraph 9.2.5, which states that 'If a corridor must be used as one of the spaces for measurement of ATL or FTL, it shall be used as the source space.'"))
-    main_elements.append(Spacer(1,10))
-    main_elements.append(Paragraph("Flanking transmission was not evaluated."))
-    main_elements.append(Paragraph("To evaluate room absorption, 1 microphone was used to measure 4 decays at 4 locations around the receiving room for a total of 16 measurements, per"+standards_data[2][0]))
-    
-    # Test Instrumentation and Calibration
-    main_elements.append(Paragraph("<u>TEST INSTRUMENTATION:</u>", report.custom_title_style))
-    
-    test_instrumentation_table = report.get_test_instrumentation()
-
-    
-    test_instrumentation_table = Table(test_instrumentation_table, hAlign='LEFT')
-    test_instrumentation_table.setStyle(TableStyle([
-        ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
-        ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
-        ('LEFTPADDING', (0, 0), (-1, -1), 6),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('ALIGN',(0,0), (-1,-1),'LEFT')
-    ]))
-    
-    main_elements.append(test_instrumentation_table)
-    main_elements.append(PageBreak())
-    
-    return main_elements
-
-def create_third_page(report):
-    main_elements = []
-    main_elements.append(Paragraph("<u>STATEMENT OF TEST RESULTS:</u>", report.custom_title_style))
-    Test_result_table = report.get_test_results()
-    Test_result_table = Table(Test_result_table, hAlign='LEFT') ## hardcoded, change to table variable for selected test
-    Test_result_table.setStyle(TableStyle([
-        ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
-        ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
-        ('LEFTPADDING', (0, 0), (-1, -1), 6),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('ALIGN',(0,0), (-1,-1),'LEFT')
-    ]))
-    main_elements.append(Test_result_table)
-    return main_elements
-
-def create_fourth_page(report):
-    main_elements = []
-    if test_type == 'AIIC':
-        plot_title = 'AIIC Reference Contour'
-        plt.plot(ATL_curve, freqbands)
-        plt.xlabel('Apparent Transmission Loss (dB)')
-        plt.ylabel('Frequency (Hz)')
-        plt.title('AIIC Reference Contour')
-        plt.grid()
-        plt.show()
-    elif test_type == 'ASTC':
-        plot_title = 'ASTC Reference Contour'
-        plt.plot(ATL_curve, freqbands)
-        plt.xlabel('Apparent Transmission Loss (dB)')
-        plt.ylabel('Frequency (Hz)')
-        plt.title('ASTC Reference Contour')
-        plt.grid()
-        plt.show()
-    elif test_type == 'NIC':
-        plot_title = 'NIC Reference Contour'
-        plt.plot(ATL_curve, freqbands)
-        plt.xlabel('Apparent Transmission Loss (dB)')
-        plt.ylabel('Frequency (Hz)')
-        plt.title('NIC Reference Contour')
-        plt.grid()
-        plt.show()
-    return main_elements

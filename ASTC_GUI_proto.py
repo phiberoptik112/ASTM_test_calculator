@@ -433,25 +433,33 @@ class FileLoaderApp(App):
                     # Create appropriate TestData instance
                     if test_type == TestType.ASTC:
                         test_data = ASTCTestData(room_props, raw_data)
+                        report = BaseTestReport.create_report(curr_test, test_data, report_output_folder, test_type)
+                        if debug:
+                            self.show_test_properties_popup(report)
                     elif test_type == TestType.AIIC:
                         test_data = AIICTestData(room_props, raw_data)
+                        report = BaseTestReport.create_report(curr_test, test_data, report_output_folder, test_type)
+                        if debug:
+                            self.show_test_properties_popup(report)
                     elif test_type == TestType.NIC:
                         test_data = NICTestData(room_props, raw_data)
+                        report = BaseTestReport.create_report(curr_test, test_data, report_output_folder, test_type)
+                        if debug:
+                            self.show_test_properties_popup(report)
                     elif test_type == TestType.DTC:
                         test_data = DTCtestData(room_props, raw_data)
+                        report = BaseTestReport.create_report(curr_test, test_data, report_output_folder, test_type)
+                        if debug:
+                            self.show_test_properties_popup(report)
 
-                    # Create ReportData instance
-                    report_data = ReportData(
-                        room_properties=room_props,
-                        test_data=test_data,
-                        test_type=test_type
-                    )
-
-                    if debug:
-                        self.show_test_properties_popup(report_data)
-                    
+                    # Create ReportData instance ### GENERIC< NEEDED?? ###
+                    # self.report_data = ReportData(
+                    #     room_properties=room_props,   
+                    #     test_data=test_data,
+                    #     test_type=test_type
+                    # )
                     # Generate report
-                    report_path = report_data.generate_report()
+                    # report_path = report_data.generate_report()
                     report_data_objects.append(report_data)
 
                     print(f'Generated {test_type.value} report for test {curr_test["Test Label"]}')
@@ -559,7 +567,10 @@ class FileLoaderApp(App):
         room_properties, test_types, test_data = load_test_plan(testplan_path)
         create_report(self, foundtest, test_data, reportOutputfolder, test_type=selected_test_type.value)
         self.status_label.text = f'Status: Single Test {single_test_text_input_value} Calculated'
-    def excel_import(self):
+    
+    
+    def excel_import(self):  
+        ## PRIMARILY DEUBUG #####
         # import the excel file from the testplan_path
         self.test_plan = pd.read_excel(self.test_plan_path)
         testnums = self.test_list['Test Label'] ## Determines the labels and number of excel files copied
@@ -571,7 +582,9 @@ class FileLoaderApp(App):
         # Iterate through each test in testnums
         for idx, test_row in testnums.iterrows():
             # Load test plan data for this row
-            room_properties, test_types, test_data = load_test_plan(self.test_plan_path, self)
+
+            ### previous func before classes ### 
+            # room_properties, test_types, test_data = load_test_plan(self.test_plan_path, self)
 
             
             # Check which test types are enabled for this test
