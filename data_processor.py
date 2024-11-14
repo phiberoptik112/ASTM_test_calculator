@@ -190,7 +190,12 @@ class ReportData:
         pass
     
     def _generate_astc_report(self):
-        pass
+        if not isinstance(self.test_data, ASTCTestData):
+            raise ValueError("Test data must be ASTCTestData for ASTC report")
+        
+        astc_value, results_table = process_astc_test(self.test_data)
+        # Generate report using astc_value and results_table
+        # ... report generation code ...
     
     def _generate_nic_report(self):
         pass
@@ -238,6 +243,7 @@ def calculate_onethird_Logavg(average_pos):
     onethird_rec_Total = np.round(onethird_rec_Total, 1)
     return onethird_rec_Total
 
+# this function will be depreciated, but i'll leave it for now - will be replaced with class and methods
 def load_test_plan(curr_test: pd.DataFrame) -> pd.DataFrame:
     # Load the test plan data from the Excel file
 
@@ -338,9 +344,34 @@ def load_test_plan(curr_test: pd.DataFrame) -> pd.DataFrame:
             }
         )
         return aiic_test
-    else:
-        return None
-    
+    elif test_type == 'ASTC':
+        ## obtain SLM data from overall dataframe
+        onethird_rec = format_SLMdata(single_test_dataframe['recive_data'])
+        onethird_srs = format_SLMdata(single_test_dataframe['srs_data'])
+        onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
+        rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
+        # Calculation of ATL
+        ATL_val,corrected_STC_recieve = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,single_test_dataframe['room_properties']['partition_area'][0],single_test_dataframe['room_properties']['receive_room_vol'][0],sabines)
+        # Calculation of NR
+        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,single_test_dataframe['room_properties']['receive_room_vol'][0],NIC_vollimit=883,testtype='ASTC')
+        # creating reference curve for ASTC graph
+        STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
+        ASTC_contour_final = list()
+        for vals in STCCurve:
+            ASTC_contour_final.append(vals+(ATL_val))
+        
+        Test_result_table = pd.DataFrame(
+            {
+                "Frequency": frequencies,
+                "L1, Average Source Room Level (dB)": onethird_srs,
+                "L2, Average Corrected Receiver Room Level (dB)":corrected_STC_recieve,
+                "Average Receiver Background Level (dB)": onethird_bkgrd,
+                "Average RT60 (Seconds)": rt_thirty,
+                "Noise Reduction, NR (dB)": calc_NR,
+                "Apparent Transmission Loss, ATL (dB)": ATL_val,
+                "Exceptions": ASTC_Exceptions
+            }
+        )
 
 def RAW_SLM_datapull(self, find_datafile, datatype):
     # pass datatype as '-831_Data.' or '-RT_Data.' to pull the correct data
@@ -665,5 +696,6 @@ def sanitize_filepath(filepath: str) -> str:
     filepath = filepath.replace('T:', '//DLA-04/Shared/')
     filepath = filepath.replace('\\', '/')
     return filepath
+
 
 

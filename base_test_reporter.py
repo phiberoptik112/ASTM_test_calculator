@@ -266,34 +266,53 @@ class ASTCTestReport(BaseTestReport):
     def get_statement_of_conformace(self):
         return "Testing was conducted in accordance with ASTM E336-20, ASTM E413-16, and ASTM E2235-04(2012), with exceptions noted below. All requrements for measuring abd reporting Airborne Sound Attenuation between Rooms in Buildings (ATL) and Apparent Sound Transmission Class (ASTC) were met."
     def get_test_results(self, single_test_dataframe):
-        ## obtain SLM data from overall dataframe
-        onethird_rec = format_SLMdata(single_test_dataframe['recive_data'])
-        onethird_srs = format_SLMdata(single_test_dataframe['srs_data'])
-        onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
-        rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
-        # Calculation of ATL
-        ATL_val,corrected_STC_recieve = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,single_test_dataframe['room_properties']['partition_area'][0],single_test_dataframe['room_properties']['receive_room_vol'][0],sabines)
-        # Calculation of NR
-        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,single_test_dataframe['room_properties']['receive_room_vol'][0],NIC_vollimit=883,testtype='ASTC')
-        # creating reference curve for ASTC graph
-        STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
-        ASTC_contour_final = list()
-        for vals in STCCurve:
-            ASTC_contour_final.append(vals+(ATL_val))
-        
-        Test_result_table = pd.DataFrame(
-            {
-                "Frequency": frequencies,
-                "L1, Average Source Room Level (dB)": onethird_srs,
-                "L2, Average Corrected Receiver Room Level (dB)":corrected_STC_recieve,
-                "Average Receiver Background Level (dB)": onethird_bkgrd,
-                "Average RT60 (Seconds)": rt_thirty,
-                "Noise Reduction, NR (dB)": calc_NR,
-                "Apparent Transmission Loss, ATL (dB)": ATL_val,
-                "Exceptions": ASTC_Exceptions
-            }
+        # Format the raw data
+        onethird_rec = format_SLMdata(test_data.recive_data)
+        onethird_srs = format_SLMdata(test_data.srs_data)
+        onethird_bkgrd = format_SLMdata(test_data.bkgrnd_data)
+        rt_thirty = test_data.rt['Unnamed: 10'][25:41]/1000
+
+        # Get room properties
+        partition_area = test_data.room_properties.partition_area
+        receive_vol = test_data.room_properties.receive_vol
+
+        # Calculate ATL and NR
+        ATL_val, corrected_STC_recieve = calc_atl_val(
+            onethird_srs, 
+            onethird_rec, 
+            onethird_bkgrd,
+            rt_thirty,
+            partition_area,
+            receive_vol
         )
-        return Test_result_table
+
+        calc_NR, sabines, corrected_recieve, Nrec_ANISPL = calc_nr_new(
+            onethird_srs, 
+            onethird_rec, 
+            onethird_bkgrd, 
+            rt_thirty,
+            receive_vol,
+            NIC_vollimit=883,
+            testtype='ASTC'
+        )
+
+        # Create ASTC reference curve
+        STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
+        ASTC_contour_final = [val + ATL_val for val in STCCurve]
+
+        # Create results table
+        Test_result_table = pd.DataFrame({
+            "Frequency": frequencies,
+            "L1, Average Source Room Level (dB)": onethird_srs,
+            "L2, Average Corrected Receiver Room Level (dB)": corrected_STC_recieve,
+            "Average Receiver Background Level (dB)": onethird_bkgrd,
+            "Average RT60 (Seconds)": rt_thirty,
+            "Noise Reduction, NR (dB)": calc_NR,
+            "Apparent Transmission Loss, ATL (dB)": ATL_val,
+            "Exceptions": ASTC_Exceptions
+        })
+        return ATL_val, Test_result_table
+    
     def get_results_plot(self):
         plot_title = 'ASTC Reference Contour'
         plt.plot(ATL_curve, freqbands)

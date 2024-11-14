@@ -369,7 +369,8 @@ class FileLoaderApp(App):
         print(self.D_datafiles)
         print(self.E_datafiles)
 
-        self.excel_import()
+        # self.excel_import()
+        self.load_test_data()
         # Display a message in the status label
         self.status_label.text = 'Status: All test files loaded, ready to generate reports'
         # open a popup window to display the test list
@@ -378,78 +379,136 @@ class FileLoaderApp(App):
 
     @classmethod
     def output_all_reports(self, instance):
-        # access the text from the load_data function
-        print('Arguments received by output_reports:', instance, self.test_plan_path, self.report_template_path, self.slm_data_d_path, self.slm_data_e_path, self.report_output_folder_path)
+        print('Arguments received by output_reports:', instance, self.test_plan_path, 
+              self.report_template_path, self.slm_data_d_path, self.slm_data_e_path, 
+              self.report_output_folder_path)
 
         testplan_path = self.test_plan_path
-        reportOutputfolder = self.report_output_folder_path
-
+        report_output_folder = self.report_output_folder_path
         test_list = pd.read_excel(testplan_path)
-        self.status_label.text = ('Test list:', test_list)
-        testnums = test_list['Test Label']
-        # pull the debug checkbox from the GUI and set it equal to debug
         debug = 1 if self.debug_check_box.active else 0
 
-        if debug == 1:  
-            print('Debug mode enabled')
-            print('Test list:', test_list)
-            print('Test numbers:', testnums)
-            print('Test plan path:', testplan_path)
-            print('Report output folder:', reportOutputfolder)
-        
-        # this will iterate through all the tests in the test plan and generate the reports
-        for i in range(len(testnums)):
-            curr_test = test_list.iloc[i]
+        # List to store all report data objects
+        report_data_objects = []
 
-            if debug == 1:
+        # Process each test in the test plan
+        for _, curr_test in test_list.iterrows():
+            if debug:
                 print('Current Test:', curr_test)
-            self.status_label.text = 'Status: Reporting test: ' + curr_test['Test Label']
-            
-            # Determine the test type and generate the report
-            # loop through the test types and generate the report for the first one that is enabled
-            self.room_properties, self.test_types, self.test_data = load_test_plan(testplan_path)
+            self.status_label.text = f'Status: Processing test: {curr_test["Test Label"]}'
 
-            selected_test_type = next((test_type for test_type in TestType if curr_test[test_type.value] == 1), None)
+            # Create RoomProperties instance
+            room_props = RoomProperties(
+                site_name=curr_test['Site_Name'],
+                client_name=curr_test['Client_Name'],
+                source_room=curr_test['Source_Room'],
+                receive_room=curr_test['Receiving_Room'], 
+                test_date=curr_test['Test_Date'],
+                report_date=curr_test['Report_Date'],
+                project_name=curr_test['Project_Name'],
+                test_label=curr_test['Test_Label'],
+                source_vol=curr_test['source room vol'],
+                receive_vol=curr_test['receive room vol'],
+                partition_area=curr_test['partition area'],
+                partition_dim=curr_test['partition dim.'],
+                source_room_finish=curr_test['source room finish'],
+                receive_room_finish=curr_test['receive room finish'],
+                srs_floor=curr_test['srs floor descrip.'],
+                srs_ceiling=curr_test['srs ceiling descrip.'],
+                srs_walls=curr_test['srs walls descrip.'],
+                rec_floor=curr_test['rec floor descrip.'],
+                rec_ceiling=curr_test['rec ceiling descrip.'],
+                rec_wall=curr_test['rec walls descrip.'],
+                test_assembly_type=curr_test['Test_assembly_Type']
+            )
 
-            # for all our test types, if the test type is enabled, generate the report
+            # Process each enabled test type
             for test_type in TestType:
                 if curr_test[test_type.value] == 1:
-                    self.status_label.text = f'Status: Generating report for {test_type.value} test...'
-                    # write a loop entry here to make a debug function where i can see/edit the data
-                    if debug == 1:
-                        ## open a popup window to display the room properties, test types, and test data
-                        self.show_test_properties_popup(self.room_properties, self.test_types, self.test_data)
-                        # pause the program until the user closes the popup
-                        self.popup.wait_window()
-                        ## create a debug popup window to edit the room properties, test types, and test data
-                        self.edit_test_properties_popup(self.room_properties, self.test_types, self.test_data)
-                    report_data = load_test_plan(curr_test, test_type.value)
-                    # test data for report debugging goes here before printing to PDF
-                    ####### function below for calculating the results from the loaded test plan 
-                    if test_type == TestType.DTC:
-                        DTC_report_data =self.calc_DTC_data(self, report_data) # does it need to have self?
-                        # now pass the report data to the create_report function
-                        create_report(self, curr_test, DTC_report_data, reportOutputfolder, test_type=selected_test_type.value)
-                    elif test_type == TestType.NIC:
-                        NIC_report_data = self.calc_NIC_data(self, report_data)
-                        create_report(self, curr_test, NIC_report_data, reportOutputfolder, test_type=selected_test_type.value)
-                    elif test_type == TestType.AIIC:
-                        AIIC_report_data = self.calc_AIIC_data(self, report_data)
-                        create_report(self, curr_test, AIIC_report_data, reportOutputfolder, test_type=selected_test_type.value)
-                    elif test_type == TestType.ASTC:
-                        ASTC_report_data = self.calc_ASTC_data(self, report_data)
-                        create_report(self, curr_test, ASTC_report_data, reportOutputfolder, test_type=selected_test_type.value)
-                    ## maybe write a log file generator here
-                    # write a function here to print a report number and potentially interuupt or restart the test load. 
-                    # print(test_data)
+                    self.status_label.text = f'Status: Generating {test_type.value} report...'
 
-                    create_report(self, curr_test, test_data, reportOutputfolder, test_type=selected_test_type.value)
-                    # print the test number label and test type]
-                    print(f'Test number: {curr_test["Test Label"]}, Test type: {selected_test_type.value}')
-            else:
-                print('No test type selected, skipping test...')
-                
-        
+                    # Load raw test data
+                    raw_data = self.load_test_data(curr_test, test_type)
+                    
+                    # Create appropriate TestData instance
+                    if test_type == TestType.ASTC:
+                        test_data = ASTCTestData(room_props, raw_data)
+                    elif test_type == TestType.AIIC:
+                        test_data = AIICTestData(room_props, raw_data)
+                    elif test_type == TestType.NIC:
+                        test_data = NICTestData(room_props, raw_data)
+                    elif test_type == TestType.DTC:
+                        test_data = DTCtestData(room_props, raw_data)
+
+                    # Create ReportData instance
+                    report_data = ReportData(
+                        room_properties=room_props,
+                        test_data=test_data,
+                        test_type=test_type
+                    )
+
+                    if debug:
+                        self.show_test_properties_popup(report_data)
+                    
+                    # Generate report
+                    report_path = report_data.generate_report()
+                    report_data_objects.append(report_data)
+
+                    print(f'Generated {test_type.value} report for test {curr_test["Test Label"]}')
+
+        self.status_label.text = 'Status: All reports generated successfully'
+        return report_data_objects
+
+    def load_test_data(self, curr_test: pd.Series, test_type: TestType) -> Union[AIICTestData, ASTCTestData, NICTestData, DTCtestData]:
+        """Load and format raw test data based on test type"""
+        # Create RoomProperties instance first
+        room_props = RoomProperties(
+            site_name=curr_test['Site_Name'],
+            client_name=curr_test['Client_Name'],
+            source_room=curr_test['Source_Room'],
+            # ... other properties
+            test_assembly_type=curr_test['Test_assembly_Type']
+        )
+
+        # Base data dictionary for all test types
+        base_data = {
+            'srs_data': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Source'], '-831_Data.')),
+            'recive_data': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Recieve '], '-831_Data.')),
+            'bkgrnd_data': pd.DataFrame(self.RAW_SLM_datapull(curr_test['BNL'], '-831_Data.')),
+            'rt': pd.DataFrame(self.RAW_SLM_datapull(curr_test['RT'], '-RT_Data.'))
+        }
+
+        # Create appropriate test data instance based on type
+        if test_type == TestType.AIIC:
+            aiic_data = base_data.copy()
+            aiic_data.update({
+                'AIIC_pos1': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Position1'], '-831_Data.')),
+                'AIIC_pos2': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Position2'], '-831_Data.')),
+                'AIIC_pos3': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Position3'], '-831_Data.')),
+                'AIIC_pos4': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Position4'], '-831_Data.')),
+                'AIIC_source': pd.DataFrame(self.RAW_SLM_datapull(curr_test['SourceTap'], '-831_Data.')),
+                'AIIC_carpet': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Carpet'], '-831_Data.'))
+            })
+            return AIICTestData(room_properties=room_props, test_data=aiic_data)
+
+        elif test_type == TestType.DTC:
+            dtc_data = base_data.copy()
+            dtc_data.update({
+                'srs_door_open': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Source_Door_Open'], '-831_Data.')),
+                'srs_door_closed': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Source_Door_Closed'], '-831_Data.')),
+                'recive_door_open': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Receive_Door_Open'], '-831_Data.')),
+                'recive_door_closed': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Receive_Door_Closed'], '-831_Data.'))
+            })
+            return DTCtestData(room_properties=room_props, test_data=dtc_data)
+
+        elif test_type == TestType.ASTC:
+            return ASTCTestData(room_properties=room_props, test_data=base_data)
+
+        elif test_type == TestType.NIC:
+            return NICTestData(room_properties=room_props, test_data=base_data)
+
+        else:
+            raise ValueError(f"Unsupported test type: {test_type}")
 
     def calculate_single_test(self, instance):
         # NEED TO DEBUG
@@ -513,6 +572,7 @@ class FileLoaderApp(App):
         for idx, test_row in testnums.iterrows():
             # Load test plan data for this row
             room_properties, test_types, test_data = load_test_plan(self.test_plan_path, self)
+
             
             # Check which test types are enabled for this test
             for test_type in TestType:
