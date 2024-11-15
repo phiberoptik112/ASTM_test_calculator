@@ -148,71 +148,7 @@ class TestType(Enum):
     # ASTC = "ASTC"
     # NIC = "NIC"
     # DTC = "DTC"
-@dataclass
-class ReportData:
-    def __init__(self, room_properties: RoomProperties, test_data: TestData, test_type: TestType):
-        self.room_properties = room_properties
-        self.test_data = test_data
-        self.test_type = test_type
-    test_type: TestType
-    test_data: Union[AIICTestData, ASTCTestData, NICTestData, DTCtestData]
 
-    def __post_init__(self):
-        if not isinstance(self.test_data, TestData):
-            raise ValueError("test_data must be an instance of TestData")
-        test_data_types = {
-            TestType.AIIC: AIICTestData,
-            TestType.ASTC: ASTCTestData,
-            TestType.NIC: NICTestData,
-            TestType.DTC: DTCtestData
-        }
-        expected_test_data_type = test_data_types[self.test_type]
-        if not isinstance(self.test_data, expected_test_data_type):
-            raise ValueError(f"test_data must be an instance of {expected_test_data_type.__name__}")
-        
-    @property
-    def room_properties(self) -> RoomProperties:
-        return self.test_data.room_properties
-    
-    def generate_report(self):
-        if self.test_type == TestType.AIIC:
-            return self._generate_aiic_report()
-        elif self.test_type == TestType.ASTC:
-            return self._generate_astc_report()
-        elif self.test_type == TestType.NIC:
-            return self._generate_nic_report()
-        elif self.test_type == TestType.DTC:
-            return self._generate_dtc_report()
-        else:
-            raise ValueError(f"Unsupported test type: {self.test_type}")
-        
-    def _generate_aiic_report(self):
-        pass
-    
-    def _generate_astc_report(self):
-        if not isinstance(self.test_data, ASTCTestData):
-            raise ValueError("Test data must be ASTCTestData for ASTC report")
-        
-        astc_value, results_table = process_astc_test(self.test_data)
-        # Generate report using astc_value and results_table
-        # ... report generation code ...
-    
-    # def _generate_nic_report(self):
-    #     pass
-    
-    # def _generate_dtc_report(self):
-    #     pass
-#####
-## Usage example:
-# aiic_report = ReportData(
-#     test_type=TestType.AIIC,
-#     test_data=aiic_test  # AIICTestData instance
-# )
-
-# astc_report = ReportData(
-#     test_type=TestType.ASTC,
-#     test_data=astc_test  # ASTCTestData instance
-# )
 ### SLM import - hardcoded - gives me the willies, but it works for now.
 ### maybe change to something thats a better troubleshooting effort later ###
 ##  ask GPT later about how best to do this, maybe a config file or something? 
