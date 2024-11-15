@@ -197,11 +197,11 @@ class ReportData:
         # Generate report using astc_value and results_table
         # ... report generation code ...
     
-    def _generate_nic_report(self):
-        pass
+    # def _generate_nic_report(self):
+    #     pass
     
-    def _generate_dtc_report(self):
-        pass
+    # def _generate_dtc_report(self):
+    #     pass
 #####
 ## Usage example:
 # aiic_report = ReportData(
@@ -670,26 +670,6 @@ def process_single_test(test_plan_entry: pd.Series, slm_data_paths: Dict[str, Pa
     report_path = create_report(test_data, output_folder, test_type)
     
     return report_path
-
-## this function below is a generated function, not sure if im going to include it or just use the GUI interface to iterate through all the tests by default. 
-# i guess it makes the single test function much more clean, since i can just troublshoot that single test process if i want to do the entire thing...
-## ok try to work this in. add it to the list. 
-# def process_all_tests(test_plan_path: Path, slm_data_folder: Path, output_folder: Path) -> List[Path]:
-#     test_plan = load_test_plan(test_plan_path)
-#     report_paths = []
-    
-#     for _, test_entry in test_plan.iterrows():
-#         slm_data_paths = {
-#             'source': slm_data_folder / f"{test_entry['SourceFile']}.xlsx",
-#             'receive': slm_data_folder / f"{test_entry['ReceiveFile']}.xlsx",
-#             'background': slm_data_folder / f"{test_entry['BackgroundFile']}.xlsx",
-#             'rt': slm_data_folder / f"{test_entry['RTFile']}.xlsx",
-#         }
-        
-#         report_path = process_single_test(test_entry, slm_data_paths, output_folder)
-#         report_paths.append(report_path)
-    
-#     return report_paths
 
 # Additional utility functions
 def sanitize_filepath(filepath: str) -> str:

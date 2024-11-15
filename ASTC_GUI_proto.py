@@ -327,11 +327,10 @@ class FileLoaderApp(App):
         #refactoring to use a dictionary for the input values
         input_values = {
             'test_plan_path': sanitized_values[0],
-            'report_template_path': sanitized_values[1],
-            'slm_data_d_path': sanitized_values[2],
-            'slm_data_e_path': sanitized_values[3],
-            'report_output_folder_path': sanitized_values[4],
-            'single_test_text_input': sanitized_values[5]
+            'slm_data_d_path': sanitized_values[1],
+            'slm_data_e_path': sanitized_values[2],
+            'report_output_folder_path': sanitized_values[3],
+            'single_test_text_input': sanitized_values[4]
         }
         
         for attr, value in input_values.items():
@@ -342,19 +341,17 @@ class FileLoaderApp(App):
         print('Value from the second text box:', sanitized_values[1])
         print('Value from the third text box:', sanitized_values[2])
         print('Value from the fourth text box:', sanitized_values[3])
-        print('Value from the fifth text box:', sanitized_values[4])
-        print('Value from the single test text box:', sanitized_values[5])
+        print('Value from the single test text box:', sanitized_values[4])
 
         # Display a message in the status label
         self.status_label.text = 'Status: Loading Data...'
         # Add logic to load data from file paths
-        print('Arguments received by load_data:', instance, self.test_plan_path, self.report_template_path, self.slm_data_d_path, self.slm_data_e_path, self.report_output_folder_path)
+        print('Arguments received by load_data:', instance, self.test_plan_path, self.slm_data_d_path, self.slm_data_e_path, self.report_output_folder_path)
 
         # For demonstration purposes, let's just print the file paths
-        print('File Paths:', [sanitized_values[0], sanitized_values[1], sanitized_values[2], sanitized_values[3], sanitized_values[4], sanitized_values[5]])
+        print('File Paths:', [sanitized_values[0], sanitized_values[1], sanitized_values[2], sanitized_values[3], sanitized_values[4]])
                 # Access the text from all text boxes
         testplan_path = self.test_plan_path
-        # rawReportpath = self.report_template_path
         rawDtestpath = self.slm_data_d_path
         rawEtestpath = self.slm_data_e_path
         outputfolder = self.report_output_folder_path
@@ -380,8 +377,7 @@ class FileLoaderApp(App):
     @classmethod
     def output_all_reports(self, instance):
         print('Arguments received by output_reports:', instance, self.test_plan_path, 
-              self.report_template_path, self.slm_data_d_path, self.slm_data_e_path, 
-              self.report_output_folder_path)
+              self.slm_data_d_path, self.slm_data_e_path, self.report_output_folder_path)
 
         testplan_path = self.test_plan_path
         report_output_folder = self.report_output_folder_path
@@ -460,7 +456,7 @@ class FileLoaderApp(App):
                     # )
                     # Generate report
                     # report_path = report_data.generate_report()
-                    report_data_objects.append(report_data)
+                    # report_data_objects.append(report_data)
 
                     print(f'Generated {test_type.value} report for test {curr_test["Test Label"]}')
 
@@ -560,7 +556,7 @@ class FileLoaderApp(App):
         create_report(self, foundtest, test_data, reportOutputfolder, test_type=selected_test_type.value)
         self.status_label.text = f'Status: Single Test {single_test_text_input_value} Calculated'
     
-    
+    ### PRIMARILY DEBUG ###
     def excel_import(self):  
         ## PRIMARILY DEUBUG #####
         # import the excel file from the testplan_path

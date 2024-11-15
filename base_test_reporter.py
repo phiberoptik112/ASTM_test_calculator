@@ -218,6 +218,8 @@ class BaseTestReport:
         main_elements.append(Paragraph(self.get_statement_of_conformance()))
 
         main_elements.append(Paragraph(self.get_test_environment()))
+
+        main_elements.append(self.get_test_assembly())
         return main_elements
 
     def create_second_page(self): 
@@ -265,16 +267,30 @@ class BaseTestReport:
             ('ALIGN',(0,0), (-1,-1),'LEFT')
         ]))
         main_elements.append(Test_result_table)
+
+        main_elements.append(self.get_testres_table_notes())
+        ### need to figure out a single text box that displays the IIC test result single number 
+        main_elements.append(Paragraph("<u>AIIC:</u>", self.custom_title_style))
+        ### need to debug - append the test calc result here
+        main_elements.append(Spacer(1,10))
+        main_elements.append(self.get_test_results_paragraph())
+        main_elements.append(PageBreak())
         return main_elements
 
     def create_fourth_page(self):
         main_elements = []
         main_elements.append(self.create_plot())
+        main_elements.append(Paragraph("<u>AIIC:</u>", self.custom_title_style))
+        #### sane here -single number result from the test calc
+        main_elements.append(Spacer(1,10))
+        main_elements.append(self.get_signatures())
+        # main_elements.append(PageBreak())
         return main_elements
 
 class AIICTestReport(BaseTestReport):
     def get_doc_name(self):
-        return f"{self.single_test_dataframe['room_properties']['Project_Name'][0]} AIIC Test Report_{self.single_test_dataframe['room_properties']['Test_Label'][0]}.pdf"
+        props = self.test_data.room_properties
+        return f"{props['Project_Name'][0]} AIIC Test Report_{props['Test_Label'][0]}.pdf"
 
     def get_standards_data(self):
         return [
@@ -305,8 +321,6 @@ class AIICTestReport(BaseTestReport):
         #   main_elements.append(PageBreak())
         return main_elements
     
-    
-        
 
     def get_test_instrumentation(self):
         equipment = super().get_test_instrumentation()
@@ -316,14 +330,15 @@ class AIICTestReport(BaseTestReport):
         ]
         return equipment + aiic_equipment
     
-    def get_test_results(self, single_test_dataframe):
+    def get_test_results(self):
                 #dataframe for AIIC is in single_test_dataframe
-        onethird_srs = format_SLMdata(single_test_dataframe['AIIC_source']) 
+        onethird_srs = format_SLMdata(self.test_data.srs_data) 
         average_pos = []
+        main_elements = []
         # get average of 4 tapper positions for recieve total OBA
         for i in range(1, 5):
             pos_input = f'AIIC_pos{i}'
-            pos_data = format_SLMdata(single_test_dataframe[pos_input])
+            pos_data = format_SLMdata(self.test_data.recive_data[pos_input]) ### need to verify if this is working correctly, should be pulling from all positions
             average_pos.append(pos_data)
 
         onethird_rec_Total = sum(average_pos) / len(average_pos)
@@ -333,10 +348,10 @@ class AIICTestReport(BaseTestReport):
         onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
         rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
 
-        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_new(onethird_srs, onethird_rec_Total, onethird_bkgrd, rt_thirty,single_test_dataframe['room_properties']['receive_room_vol'][0],NIC_vollimit=883,testtype='AIIC')
+        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_nr_new(onethird_srs, onethird_rec_Total, onethird_bkgrd, rt_thirty,single_test_dataframe['room_properties']['receive_room_vol'][0],NIC_vollimit=883,testtype='AIIC')
         
         # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,rt_thirty,room_properties['Partition area'][0],room_properties['Recieve Vol'][0])
-        AIIC_contour_val, Contour_curve_result = calc_AIIC_val(Nrec_ANISPL)
+        AIIC_contour_val, Contour_curve_result = calc_aiic_val(Nrec_ANISPL)
 
         IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
         IIC_contour_final = list()
@@ -359,7 +374,7 @@ class AIICTestReport(BaseTestReport):
         )
         main_elements.append(Paragraph("The Apparent Impact Insulation Class (AIIC) was calculated. The AIIC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_data[0][0]))
 
-        return Test_result_table
+        return main_elements, Test_result_table
 
     # Implement other methods specific to AIIC
 
@@ -381,16 +396,16 @@ class ASTCTestReport(BaseTestReport):
         return equipment + astc_equipment
     def get_statement_of_conformace(self):
         return "Testing was conducted in accordance with ASTM E336-20, ASTM E413-16, and ASTM E2235-04(2012), with exceptions noted below. All requrements for measuring abd reporting Airborne Sound Attenuation between Rooms in Buildings (ATL) and Apparent Sound Transmission Class (ASTC) were met."
-    def get_test_results(self, single_test_dataframe):
+    def get_test_results(self):
         # Format the raw data
-        onethird_rec = format_SLMdata(test_data.recive_data)
-        onethird_srs = format_SLMdata(test_data.srs_data)
-        onethird_bkgrd = format_SLMdata(test_data.bkgrnd_data)
-        rt_thirty = test_data.rt['Unnamed: 10'][25:41]/1000
+        onethird_rec = format_SLMdata(self.test_data.recive_data)
+        onethird_srs = format_SLMdata(self.test_data.srs_data)
+        onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)
+        rt_thirty = self.test_data.rt['Unnamed: 10'][25:41]/1000
 
         # Get room properties
-        partition_area = test_data.room_properties.partition_area
-        receive_vol = test_data.room_properties.receive_vol
+        partition_area = self.test_data.room_properties.partition_area
+        receive_vol = self.test_data.room_properties.receive_vol
 
         # Calculate ATL and NR
         ATL_val, corrected_STC_recieve = calc_atl_val(
@@ -463,9 +478,9 @@ class NICTestReport(BaseTestReport):
         onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
         rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
         # Calculation of ATL
-        ATL_val,corrected_STC_recieve = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,single_test_dataframe['room_properties']['partition_area'][0],single_test_dataframe['room_properties']['receive_room_vol'][0],sabines)
+        ATL_val,corrected_STC_recieve = calc_atl_val(onethird_srs, onethird_rec, onethird_bkgrd,single_test_dataframe['room_properties']['partition_area'][0],single_test_dataframe['room_properties']['receive_room_vol'][0],sabines)
         # Calculation of NR
-        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_NR_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,single_test_dataframe['room_properties']['receive_room_vol'][0],NIC_vollimit=883,testtype='ASTC')
+        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_nr_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,single_test_dataframe['room_properties']['receive_room_vol'][0],NIC_vollimit=883,testtype='NIC')
         # creating reference curve for ASTC graph
         STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
         ASTC_contour_final = list()
