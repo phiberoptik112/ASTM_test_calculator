@@ -10,9 +10,9 @@ from config import *
 from data_processor import *
 
 class BaseTestReport:
-    def __init__(self, curr_test, single_test_dataframe, reportOutputfolder):
+    def __init__(self, curr_test, test_data, reportOutputfolder):
         self.curr_test = curr_test
-        self.single_test_dataframe = single_test_dataframe
+        self.test_data = test_data
         self.reportOutputfolder = reportOutputfolder
         self.doc = None
         self.styles = getSampleStyleSheet()
@@ -73,18 +73,19 @@ class BaseTestReport:
 
     def header_elements(self):
         elements = []
+        props = self.test_data.room_properties
         elements.append(Paragraph(self.get_report_title(), self.custom_title_style))
         elements.append(Spacer(1, 10))
         
         leftside_data = [
-            ["Report Date:", self.single_test_dataframe['room_properties']['ReportDate'][0]],
-            ['Test Date:', self.single_test_dataframe['room_properties']['Testdate'][0]],
-            ['DLAA Test No', self.single_test_dataframe['room_properties']['Test number'][0]]
+            ["Report Date:", props['ReportDate'][0]],
+            ['Test Date:', props['Testdate'][0]],
+            ['DLAA Test No', props['Test number'][0]]
         ]
         rightside_data = [
-            ["Source Room:", self.single_test_dataframe['room_properties']['Source Room Name'][0]],
-            ["Receiver Room:", self.single_test_dataframe['room_properties']['Recieve Room Name'][0]],
-            ["Test Assembly:", self.single_test_dataframe['room_properties']['Tested Assembly'][0]]
+            ["Source Room:", props['Source Room Name'][0]],
+            ["Receiver Room:", props['Recieve Room Name'][0]],
+            ["Test Assembly:", props['Tested Assembly'][0]]
         ]
 
         table_left = Table(leftside_data)
@@ -95,9 +96,9 @@ class BaseTestReport:
         table_combined_lr = Table([[table_left, table_right]], colWidths=[self.doc.width / 2.0] * 2)
         elements.append(KeepInFrame(maxWidth=self.doc.width, maxHeight=self.header_height, content=[table_combined_lr], hAlign='LEFT'))
         elements.append(Spacer(1, 10))
-        elements.append(Paragraph('Test site: ' + self.single_test_dataframe['room_properties']['Site_Name'][0], self.styles['Normal']))
+        elements.append(Paragraph('Test site: ' + props['Site_Name'][0], self.styles['Normal']))
         elements.append(Spacer(1, 5))
-        elements.append(Paragraph('Client: ' + self.single_test_dataframe['room_properties']['Client_Name'][0], self.styles['Normal']))
+        elements.append(Paragraph('Client: ' + props['Client_Name'][0], self.styles['Normal']))
         return elements
 
     def header_footer(self, canvas, doc):
@@ -160,21 +161,34 @@ class BaseTestReport:
         raise NotImplementedError
     
     @classmethod
-    def create_report(curr_test, test_data, reportOutputfolder, test_type):
-        """Factory method to create and build the appropriate test report"""
+    def create_report(cls, curr_test, test_data, reportOutputfolder, test_type):
+        """Factory method to create and build the appropriate test report
+        
+        Args:
+            curr_test: Current test information
+            test_data: TestData instance containing all test measurements and properties
+            reportOutputfolder: Output directory for the report
+            test_type: Type of test (AIIC, ASTC, NIC, or DTC)
+            
+        Returns:
+            BaseTestReport: The generated report instance
+        """
         # Create the appropriate test report object based on test_type
-        if test_type == 'AIIC':
-            report = AIICTestReport(curr_test, test_data, reportOutputfolder)
-        elif test_type == 'ASTC':
-            report = ASTCTestReport(curr_test, test_data, reportOutputfolder)
-        elif test_type == 'NIC':
-            report = NICTestReport(curr_test, test_data, reportOutputfolder)
-        elif test_type == 'DTC':
-            report = DTCTestReport(curr_test, test_data, reportOutputfolder)
-        else:
+        report_classes = {
+            TestType.AIIC: AIICTestReport,
+            TestType.ASTC: ASTCTestReport,
+            TestType.NIC: NICTestReport,
+            TestType.DTC: DTCTestReport
+        }
+        
+        report_class = report_classes.get(test_type)
+        if not report_class:
             raise ValueError(f"Unsupported test type: {test_type}")
-
-        # Setup document using the report's setup method
+            
+        # Create report instance
+        report = report_class(curr_test, test_data, reportOutputfolder)
+        
+        # Setup document
         doc = report.setup_document()
 
         # Generate content
@@ -274,23 +288,26 @@ class AIICTestReport(BaseTestReport):
     
     def get_test_environment(self,styleHeading,):
         main_elements = []
+        props = self.test_data.room_properties
         main_elements.append(Paragraph("<u>TEST ENVIRONMENT:</u>", styleHeading))
-        main_elements.append(Paragraph('The source room was '+self.single_test_dataframe['room_properties']['Source_Room'][0]+'. The space was'+self.single_test_dataframe['room_properties']['source_room_finish'][0]+'. The floor was '+self.single_test_dataframe['room_properties']['srs_floor'][0]+'. The ceiling was '+self.single_test_dataframe['room_properties']['srs_ceiling'][0]+". The walls were"+self.single_test_dataframe['room_properties']['srs_walls'][0]+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+self.single_test_dataframe['room_properties']['source_room_vol'][0]+"cu. ft."))
+        main_elements.append(Paragraph('The source room was '+props['Source_Room'][0]+'. The space was'+props['source_room_finish'][0]+'. The floor was '+props['srs_floor'][0]+'. The ceiling was '+props['srs_ceiling'][0]+". The walls were"+props['srs_walls'][0]+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+props['source_room_vol'][0]+"cu. ft."))
         main_elements.append(Spacer(1, 10))  # Adds some space 
         ### Recieve room paragraph
-        main_elements.append(Paragraph('The receiver room was '+self.single_test_dataframe['room_properties']['Receiving_Room'][0]+'. The space was'+single_test_dataframe['room_properties']['receiver_room_finish'][0]+'. The floor was '+single_test_dataframe['room_properties']['rec_floor'][0]+'. The ceiling was '+single_test_dataframe['room_properties']['rec_ceiling'][0]+". The walls were"+single_test_dataframe['room_properties']['rec_Wall'][0]+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+single_test_dataframe['room_properties']['receive_room_vol'][0]+"cu. ft."))
+        main_elements.append(Paragraph('The receiver room was '+props['Receiving_Room'][0]+'. The space was'+props['receiver_room_finish'][0]+'. The floor was '+props['rec_floor'][0]+'. The ceiling was '+props['rec_ceiling'][0]+". The walls were"+props['rec_Wall'][0]+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+props['receive_room_vol'][0]+"cu. ft."))
         main_elements.append(Spacer(1, 10))  # Adds some space 
-        main_elements.append(Paragraph('The test assembly measured approximately '+single_test_dataframe['room_properties']['partition_dim'][0]+", and had an area of approximately "+single_test_dataframe['room_properties']['partition_area'][0]+"sq. ft."))
+        main_elements.append(Paragraph('The test assembly measured approximately '+props['partition_dim'][0]+", and had an area of approximately "+props['partition_area'][0]+"sq. ft."))
         main_elements.append(Spacer(1, 10))  # Adds some space 
         # Heading 'TEST ENVIRONMENT'
         main_elements.append(Paragraph("<u>TEST ASSEMBLY:</u>", styleHeading))
         main_elements.append(Spacer(1, 10))  # Adds some space 
-        main_elements.append(Paragraph("The tested assembly was the"+single_test_dataframe['room_properties']['Test_Assembly_Type'][0]+"The assembly was not field verified, and was based on information provided by the client and drawings for the project. The client advised that no slab treatment or self-leveling was applied. Results may vary if slab treatment or self-leveling or any adhesive is used in other installations."))
+        main_elements.append(Paragraph("The tested assembly was the"+props['Test_Assembly_Type'][0]+"The assembly was not field verified, and was based on information provided by the client and drawings for the project. The client advised that no slab treatment or self-leveling was applied. Results may vary if slab treatment or self-leveling or any adhesive is used in other installations."))
+        # ##### END OF FIRST PAGE TEXT  - ########
+        #   main_elements.append(PageBreak())
         return main_elements
     
-    # ##### END OF FIRST PAGE TEXT  - ########
+    
         
-    main_elements.append(PageBreak())
+
     def get_test_instrumentation(self):
         equipment = super().get_test_instrumentation()
         # Add AIIC-specific equipment

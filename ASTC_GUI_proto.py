@@ -425,30 +425,30 @@ class FileLoaderApp(App):
             # Process each enabled test type
             for test_type in TestType:
                 if curr_test[test_type.value] == 1:
-                    self.status_label.text = f'Status: Generating {test_type.value} report...'
-
-                    # Load raw test data
-                    raw_data = self.load_test_data(curr_test, test_type)
-                    
+                    self.status_label.text = f'Status: Generating {test_type.value} report...'                    
                     # Create appropriate TestData instance
                     if test_type == TestType.ASTC:
+                        raw_data = self.load_test_data(curr_test, test_type, room_props)
                         test_data = ASTCTestData(room_props, raw_data)
-                        report = BaseTestReport.create_report(curr_test, test_data, report_output_folder, test_type)
+                        report = ASTCTestReport.create_report(curr_test, test_data, report_output_folder, test_type)
                         if debug:
                             self.show_test_properties_popup(report)
                     elif test_type == TestType.AIIC:
+                        raw_data = self.load_test_data(curr_test, test_type, room_props)
                         test_data = AIICTestData(room_props, raw_data)
-                        report = BaseTestReport.create_report(curr_test, test_data, report_output_folder, test_type)
+                        report = AIICTestReport.create_report(curr_test, test_data, report_output_folder, test_type)
                         if debug:
                             self.show_test_properties_popup(report)
                     elif test_type == TestType.NIC:
+                        raw_data = self.load_test_data(curr_test, test_type, room_props)
                         test_data = NICTestData(room_props, raw_data)
-                        report = BaseTestReport.create_report(curr_test, test_data, report_output_folder, test_type)
+                        report = NICTestReport.create_report(curr_test, test_data, report_output_folder, test_type)
                         if debug:
                             self.show_test_properties_popup(report)
                     elif test_type == TestType.DTC:
+                        raw_data = self.load_test_data(curr_test, test_type, room_props)
                         test_data = DTCtestData(room_props, raw_data)
-                        report = BaseTestReport.create_report(curr_test, test_data, report_output_folder, test_type)
+                        report = DTCTestReport.create_report(curr_test, test_data, report_output_folder, test_type)
                         if debug:
                             self.show_test_properties_popup(report)
 
@@ -467,16 +467,8 @@ class FileLoaderApp(App):
         self.status_label.text = 'Status: All reports generated successfully'
         return report_data_objects
 
-    def load_test_data(self, curr_test: pd.Series, test_type: TestType) -> Union[AIICTestData, ASTCTestData, NICTestData, DTCtestData]:
+    def load_test_data(self, curr_test: pd.Series, test_type: TestType, room_props: RoomProperties) -> Union[AIICTestData, ASTCTestData, NICTestData, DTCtestData]:
         """Load and format raw test data based on test type"""
-        # Create RoomProperties instance first
-        room_props = RoomProperties(
-            site_name=curr_test['Site_Name'],
-            client_name=curr_test['Client_Name'],
-            source_room=curr_test['Source_Room'],
-            # ... other properties
-            test_assembly_type=curr_test['Test_assembly_Type']
-        )
 
         # Base data dictionary for all test types
         base_data = {
