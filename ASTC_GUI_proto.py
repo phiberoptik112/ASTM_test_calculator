@@ -374,7 +374,6 @@ class FileLoaderApp(App):
         self.show_test_list_popup(self.test_list)
         #
 
-    @classmethod
     def output_all_reports(self, instance):
         print('Arguments received by output_reports:', instance, self.test_plan_path, 
               self.slm_data_d_path, self.slm_data_e_path, self.report_output_folder_path)
@@ -426,7 +425,17 @@ class FileLoaderApp(App):
                     if test_type == TestType.ASTC:
                         raw_data = self.load_test_data(curr_test, test_type, room_props)
                         test_data = ASTCTestData(room_props, raw_data)
-                        report = ASTCTestReport.create_report(curr_test, test_data, report_output_folder, test_type)
+
+                        report = ASTCTestReport.create_report(
+                            test_data=test_data,
+                            room_properties=room_props,
+                            output_folder=report_output_folder,
+                            test_type=test_type
+                        )
+
+
+
+
                         if debug:
                             self.show_test_properties_popup(report)
                     elif test_type == TestType.AIIC:

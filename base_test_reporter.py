@@ -270,7 +270,14 @@ class BaseTestReport:
 
         main_elements.append(self.get_testres_table_notes())
         ### need to figure out a single text box that displays the IIC test result single number 
-        main_elements.append(Paragraph("<u>AIIC:</u>", self.custom_title_style))
+        test_type_labels = {
+            TestType.AIIC: "AIIC",
+            TestType.ASTC: "ASTC",
+            TestType.NIC: "NIC",
+            TestType.DTC: "DTC"
+        }
+        test_label = test_type_labels.get(self.curr_test.test_type, "Unknown")
+        main_elements.append(Paragraph(f"<u>{test_label}:</u>", self.custom_title_style))
         ### need to debug - append the test calc result here
         main_elements.append(Spacer(1,10))
         main_elements.append(self.get_test_results_paragraph())
@@ -280,8 +287,15 @@ class BaseTestReport:
     def create_fourth_page(self):
         main_elements = []
         main_elements.append(self.create_plot())
-        main_elements.append(Paragraph("<u>AIIC:</u>", self.custom_title_style))
-        #### sane here -single number result from the test calc
+        test_type_labels = {
+            TestType.AIIC: "AIIC",
+            TestType.ASTC: "ASTC",
+            TestType.NIC: "NIC",
+            TestType.DTC: "DTC"
+        }
+        test_label = test_type_labels.get(self.curr_test.test_type, "Unknown")
+        main_elements.append(Paragraph(f"<u>{test_label}:</u>", self.custom_title_style))
+        # #### sane here -single number result from the test calc
         main_elements.append(Spacer(1,10))
         main_elements.append(self.get_signatures())
         # main_elements.append(PageBreak())
@@ -376,6 +390,17 @@ class AIICTestReport(BaseTestReport):
 
         return main_elements, Test_result_table
 
+    def get_testres_table_notes(self):
+        return "*This test does fully conform to the requir"
+    def get_test_results_paragraph(self): 
+        return (
+            f"The Apparent Impact Insulation Class (AIIC) of {self.AIIC_contour_val} "
+            f"and an Impact Sound Rating (ISR) of {self.ISR_val} was calculated. "
+            "The AIIC rating is based on Apparent Transmission Loss (ATL), and includes "
+            "the effects of noise flanking. The AIIC reference contour is shown on the "
+            "next page, and has been fit to the Apparent Transmission Loss values, in "
+            f"accordance with the procedure of {self.standards_data[0][0]}"
+        )
     # Implement other methods specific to AIIC
 
 class ASTCTestReport(BaseTestReport):
