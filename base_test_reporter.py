@@ -401,8 +401,13 @@ class AIICTestReport(BaseTestReport):
             "next page, and has been fit to the Apparent Transmission Loss values, in "
             f"accordance with the procedure of {self.standards_data[0][0]}"
         )
-    # Implement other methods specific to AIIC
-
+    def nic_reporting_note(self):
+        if int(self.test_data.room_properties['source room vol']) >= 5300 or int(self.test_data.room_properties['receive room vol']) >= 5300:
+            NICreporting_Note = 'The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver and/or source room was greater than the maximum allowed per E336-16, Paragraph 9.4.1.2.'
+        elif int(self.test_data.room_properties['source room vol']) <= 833 or int(self.test_data.room_properties['receive room vol']) <= 833:
+            NICreporting_Note = 'The receiver and/or source room has a volume less than the minimum volume requirement of 25 m3 (883 cu. ft.).'
+        else:
+            NICreporting_Note = '---'
 class ASTCTestReport(BaseTestReport):
     # Implement ASTC-specific methods
     def get_standards_data(self):
@@ -423,6 +428,7 @@ class ASTCTestReport(BaseTestReport):
         return "Testing was conducted in accordance with ASTM E336-20, ASTM E413-16, and ASTM E2235-04(2012), with exceptions noted below. All requrements for measuring abd reporting Airborne Sound Attenuation between Rooms in Buildings (ATL) and Apparent Sound Transmission Class (ASTC) were met."
     def get_test_results(self):
         # Format the raw data
+        main_elements = []
         onethird_rec = format_SLMdata(self.test_data.recive_data)
         onethird_srs = format_SLMdata(self.test_data.srs_data)
         onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)
@@ -467,7 +473,20 @@ class ASTCTestReport(BaseTestReport):
             "Apparent Transmission Loss, ATL (dB)": ATL_val,
             "Exceptions": ASTC_Exceptions
         })
-        return ATL_val, Test_result_table
+        Test_result_table = Table(Test_result_table, hAlign='LEFT') ## hardcoded, change to table variable for selected test
+        Test_result_table.setStyle(TableStyle([
+            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
+            ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ALIGN',(0,0), (-1,-1),'LEFT')
+        ]))
+        main_elements.append(Test_result_table)
+        main_elements.append(Paragraph("The Apparent Sound Transmission Class (ASTC) was calculated. The ASTC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The ASTC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_data[0][0]))
+        return main_elements
     
     def get_results_plot(self):
         plot_title = 'ASTC Reference Contour'

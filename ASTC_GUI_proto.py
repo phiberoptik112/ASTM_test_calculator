@@ -361,7 +361,8 @@ class FileLoaderApp(App):
         # self.room_properties, self.test_types = load_test_plan(testplan_path)
 
         ### each line of the testplan loaded from testplan_path is a test that may require up to 4 test reports to be generated.
-        
+        ### TestData -> BaseTestReport subclasses -> PDF Report ###
+
         ### debug print outs here for the datafiles ### 
         print(self.D_datafiles)
         print(self.E_datafiles)
@@ -373,7 +374,7 @@ class FileLoaderApp(App):
         # open a popup window to display the test list
         self.show_test_list_popup(self.test_list)
         #
-
+    ## TestData -> BaseTestReport subclasses -> PDF Report ###
     def output_all_reports(self, instance):
         print('Arguments received by output_reports:', instance, self.test_plan_path, 
               self.slm_data_d_path, self.slm_data_e_path, self.report_output_folder_path)
@@ -424,36 +425,47 @@ class FileLoaderApp(App):
                     # Create appropriate TestData instance
                     if test_type == TestType.ASTC:
                         raw_data = self.load_test_data(curr_test, test_type, room_props)
+                        ### need to validate the raw data - this is actualy the ASTCTestData instance
                         test_data = ASTCTestData(room_props, raw_data)
-
                         report = ASTCTestReport.create_report(
                             test_data=test_data,
                             room_properties=room_props,
                             output_folder=report_output_folder,
                             test_type=test_type
                         )
-
-
-
-
                         if debug:
                             self.show_test_properties_popup(report)
                     elif test_type == TestType.AIIC:
                         raw_data = self.load_test_data(curr_test, test_type, room_props)
                         test_data = AIICTestData(room_props, raw_data)
-                        report = AIICTestReport.create_report(curr_test, test_data, report_output_folder, test_type)
+                        report = AIICTestReport.create_report(
+                            test_data=test_data,
+                            room_properties=room_props,
+                            output_folder=report_output_folder,
+                            test_type=test_type
+                        )
                         if debug:
                             self.show_test_properties_popup(report)
                     elif test_type == TestType.NIC:
                         raw_data = self.load_test_data(curr_test, test_type, room_props)
                         test_data = NICTestData(room_props, raw_data)
-                        report = NICTestReport.create_report(curr_test, test_data, report_output_folder, test_type)
+                        report = NICTestReport.create_report(
+                            test_data=test_data,
+                            room_properties=room_props,
+                            output_folder=report_output_folder,
+                            test_type=test_type
+                        )
                         if debug:
                             self.show_test_properties_popup(report)
                     elif test_type == TestType.DTC:
                         raw_data = self.load_test_data(curr_test, test_type, room_props)
                         test_data = DTCtestData(room_props, raw_data)
-                        report = DTCTestReport.create_report(curr_test, test_data, report_output_folder, test_type)
+                        report = DTCTestReport.create_report(
+                            test_data=test_data,
+                            room_properties=room_props,
+                            output_folder=report_output_folder,
+                            test_type=test_type
+                        )
                         if debug:
                             self.show_test_properties_popup(report)
 
