@@ -69,7 +69,9 @@ class RoomProperties:
     partition_area: float
     partition_dim: str
     source_room_finish: str
+    source_room_name: str
     receive_room_finish: str
+    receive_room_name: str
     tested_assembly: str
     expected_performance: str
     annex_2_used: bool

@@ -78,14 +78,14 @@ class BaseTestReport:
         elements.append(Spacer(1, 10))
         
         leftside_data = [
-            ["Report Date:", props['ReportDate'][0]],
-            ['Test Date:', props['Testdate'][0]],
-            ['DLAA Test No', props['Test number'][0]]
+            ["Report Date:", props.report_date],
+            ['Test Date:', props.test_date],
+            ['DLAA Test No', props.test_number]
         ]
         rightside_data = [
-            ["Source Room:", props['Source Room Name'][0]],
-            ["Receiver Room:", props['Recieve Room Name'][0]],
-            ["Test Assembly:", props['Tested Assembly'][0]]
+            ["Source Room:", props.source_room_name],
+            ["Receiver Room:", props.recieve_room_name],
+            ["Test Assembly:", props.tested_assembly]
         ]
 
         table_left = Table(leftside_data)
@@ -96,9 +96,9 @@ class BaseTestReport:
         table_combined_lr = Table([[table_left, table_right]], colWidths=[self.doc.width / 2.0] * 2)
         elements.append(KeepInFrame(maxWidth=self.doc.width, maxHeight=self.header_height, content=[table_combined_lr], hAlign='LEFT'))
         elements.append(Spacer(1, 10))
-        elements.append(Paragraph('Test site: ' + props['Site_Name'][0], self.styles['Normal']))
+        elements.append(Paragraph('Test site: ' + props.site_name, self.styles['Normal']))
         elements.append(Spacer(1, 5))
-        elements.append(Paragraph('Client: ' + props['Client_Name'][0], self.styles['Normal']))
+        elements.append(Paragraph('Client: ' + props.client_name, self.styles['Normal']))
         return elements
 
     def header_footer(self, canvas, doc):
@@ -185,71 +185,134 @@ class BaseTestReport:
         if not report_class:
             raise ValueError(f"Unsupported test type: {test_type}")
             
-        # Create report instance
-        report = report_class(curr_test, test_data, reportOutputfolder)
-        
-        # Setup document
-        doc = report.setup_document()
+        try:
+            # Create report instance
+            report = report_class(curr_test, test_data, reportOutputfolder)
+            
+            # Setup document
+            doc = report.setup_document()
 
-        # Generate content
-        main_elements = []
-        main_elements.extend(report.create_first_page())
-        main_elements.extend(report.create_second_page())
-        main_elements.extend(report.create_third_page())
-        main_elements.extend(report.create_fourth_page())
-
-        # Build and save document
-        doc.build(main_elements)
-        print(f"Report saved as: {report.get_doc_name()}")
-        
-        return report
+            # Generate content with error handling
+            main_elements = []
+            try:
+                main_elements.extend(report.create_first_page())
+                main_elements.extend(report.create_second_page())
+                main_elements.extend(report.create_third_page())
+                main_elements.extend(report.create_fourth_page())
+            except ReportGenerationError as e:
+                print(f"Error generating report pages: {str(e)}")
+                raise
+            
+            # Build and save document
+            doc.build(main_elements)
+            print(f"Report saved as: {report.get_doc_name()}")
+            
+            return report
+            
+        except Exception as e:
+            print(f"Failed to create report: {str(e)}")
+            raise
 
     def create_first_page(self):
-        main_elements = []
-        ### STANDARDS ###
-        styleHeading = ParagraphStyle('heading', parent=self.styles['Normal'], spaceAfter=10)
-        main_elements.append(Paragraph('<u>STANDARDS:</u>', styleHeading))
-        standards_table = Table(self.get_standards_data(), hAlign='LEFT')
-        # ... (set table style)
-        main_elements.append(standards_table)
+        """Creates the first page of the report with standards and conformance info.
+        
+        Returns:
+            list: List of report elements for the first page
+            
+        Raises:
+            ValueError: If required data is missing or invalid
+            ReportGenerationError: If there's an error creating report elements
+        """
+        try:
+            main_elements = []
+            
+            # Standards section
+            styleHeading = ParagraphStyle('heading', parent=self.styles['Normal'], spaceAfter=10)
+            main_elements.append(Paragraph('<u>STANDARDS:</u>', styleHeading))
+            
+            # Get and validate standards data
+            standards_data = self.get_standards_data()
+            if not standards_data:
+                raise ValueError("Standards data is missing")
+                
+            standards_table = Table(standards_data, hAlign='LEFT')
+            standards_table.setStyle(TableStyle([
+                ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
+                ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT')
+            ]))
+            main_elements.append(standards_table)
 
-        # statement of conformance
-        main_elements.append(Paragraph("<u>STATEMENT OF CONFORMANCE:</u>", styleHeading))
-        main_elements.append(Paragraph(self.get_statement_of_conformance()))
+            # Statement of conformance
+            main_elements.append(Paragraph("<u>STATEMENT OF CONFORMANCE:</u>", styleHeading))
+            conformance_statement = self.get_statement_of_conformance()
+            if not conformance_statement:
+                raise ValueError("Conformance statement is missing")
+            main_elements.append(Paragraph(conformance_statement))
 
-        main_elements.append(Paragraph(self.get_test_environment()))
+            # Test environment
+            test_env = self.get_test_environment()
+            if not test_env:
+                raise ValueError("Test environment information is missing")
+            main_elements.append(Paragraph(test_env))
 
-        main_elements.append(self.get_test_assembly())
-        return main_elements
+            # Test assembly
+            test_assembly = self.get_test_assembly()
+            if not test_assembly:
+                raise ValueError("Test assembly information is missing")
+            main_elements.append(test_assembly)
 
-    def create_second_page(self): 
-        main_elements = []
+            return main_elements
+
+        except AttributeError as e:
+            raise ValueError(f"Missing required attribute: {str(e)}")
+        except Exception as e:
+            raise ReportGenerationError(f"Error generating first page: {str(e)}")
+
+    def create_second_page(self):
+        """Creates the second page with test procedure and instrumentation.
         
-        # Test Procedure
-        main_elements.append(Paragraph("<u>TEST PROCEDURE:</u>", self.custom_title_style))
-        main_elements.append(Paragraph(self.get_test_procedure()))
-        main_elements.append(Spacer(1,10))
-        
-        # Test Instrumentation and Calibration
-        main_elements.append(Paragraph("<u>TEST INSTRUMENTATION:</u>", self.custom_title_style))
-        
-        test_instrumentation_table = self.get_test_instrumentation()
-        test_instrumentation_table = Table(test_instrumentation_table, hAlign='LEFT')
-        test_instrumentation_table.setStyle(TableStyle([
-            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
-            ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('ALIGN',(0,0), (-1,-1),'LEFT')
-        ]))
-        
-        main_elements.append(test_instrumentation_table)
-        main_elements.append(PageBreak())
-        
-        return main_elements
+        Returns:
+            list: List of report elements for the second page
+        """
+        try:
+            main_elements = []
+            
+            # Test Procedure
+            procedure = self.get_test_procedure()
+            if not procedure:
+                raise ValueError("Test procedure is missing")
+                
+            main_elements.append(Paragraph("<u>TEST PROCEDURE:</u>", self.custom_title_style))
+            main_elements.append(Paragraph(procedure))
+            main_elements.append(Spacer(1, 10))
+            
+            # Test Instrumentation
+            main_elements.append(Paragraph("<u>TEST INSTRUMENTATION:</u>", self.custom_title_style))
+            
+            instrumentation = self.get_test_instrumentation()
+            if not instrumentation:
+                raise ValueError("Test instrumentation data is missing")
+                
+            test_instrumentation_table = Table(instrumentation, hAlign='LEFT')
+            test_instrumentation_table.setStyle(TableStyle([
+                ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
+                ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT')
+            ]))
+            
+            main_elements.append(test_instrumentation_table)
+            main_elements.append(PageBreak())
+            
+            return main_elements
+            
+        except Exception as e:
+            raise ReportGenerationError(f"Error generating second page: {str(e)}")
 
     def create_third_page(self):
         main_elements = []
@@ -359,10 +422,10 @@ class AIICTestReport(BaseTestReport):
         # this needs to be an average of the 4 tapper positions, stored in a dataframe of the average of the 4 dataframes octave band results. 
 
 
-        onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
-        rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
+        onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)
+        rt_thirty = self.test_data.rt['Unnamed: 10'][25:41]/1000
 
-        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_nr_new(onethird_srs, onethird_rec_Total, onethird_bkgrd, rt_thirty,single_test_dataframe['room_properties']['receive_room_vol'][0],NIC_vollimit=883,testtype='AIIC')
+        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_nr_new(onethird_srs, onethird_rec_Total, onethird_bkgrd, rt_thirty,self.test_data.room_properties['receive_room_vol'][0],NIC_vollimit=883,testtype='AIIC')
         
         # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,rt_thirty,room_properties['Partition area'][0],room_properties['Recieve Vol'][0])
         AIIC_contour_val, Contour_curve_result = calc_aiic_val(Nrec_ANISPL)
@@ -544,7 +607,12 @@ class NICTestReport(BaseTestReport):
         return Test_result_table
 
     def create_plot(self):
-        pass
+        plot_title = 'NIC Reference Contour'
+        plt.plot(ATL_curve, freqbands)
+        plt.xlabel('Apparent Transmission Loss (dB)')
+        plt.ylabel('Frequency (Hz)')
+        plt.title('NIC Reference Contour')
+        plt.grid()
 
     def get_report_title(self):
         return "Noise Isolation Class (NIC) Test Report"
@@ -552,3 +620,8 @@ class NICTestReport(BaseTestReport):
 class DTCTestReport(BaseTestReport):
     pass
     # Implement DTC-specific methods
+
+# Custom exception class for report generation errors
+class ReportGenerationError(Exception):
+    """Custom exception for errors during report generation"""
+    pass

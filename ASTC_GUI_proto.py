@@ -408,7 +408,9 @@ class FileLoaderApp(App):
                 partition_area=curr_test['partition area'],
                 partition_dim=curr_test['partition dim.'],
                 source_room_finish=curr_test['source room finish'],
+                source_room_name=curr_test['source room name'],
                 receive_room_finish=curr_test['receive room finish'],
+                receive_room_name=curr_test['receive room name'],
                 srs_floor=curr_test['srs floor descrip.'],
                 srs_ceiling=curr_test['srs ceiling descrip.'],
                 srs_walls=curr_test['srs walls descrip.'],
@@ -423,12 +425,21 @@ class FileLoaderApp(App):
                 if curr_test[test_type.value] == 1:
                     self.status_label.text = f'Status: Generating {test_type.value} report...'                    
                     # Create appropriate TestData instance
+                    raw_data = self.load_test_data(curr_test, test_type, room_props)
+
+                    # When test_type is AIIC:
+                    # raw_data will be AIICTestData with base_data + position data
+                    # When test_type is DTC:
+                    # raw_data will be DTCTestData with base_data + door measurements
+                    # When test_type is ASTC:
+                    # raw_data will be ASTCTestData with base_data only
+                    # When test_type is NIC:
+                    # raw_data will be NICTestData with base_data only
+
                     if test_type == TestType.ASTC:
-                        raw_data = self.load_test_data(curr_test, test_type, room_props)
                         ### need to validate the raw data - this is actualy the ASTCTestData instance
-                        test_data = ASTCTestData(room_props, raw_data)
                         report = ASTCTestReport.create_report(
-                            test_data=test_data,
+                            test_data=raw_data,
                             room_properties=room_props,
                             output_folder=report_output_folder,
                             test_type=test_type
@@ -436,10 +447,8 @@ class FileLoaderApp(App):
                         if debug:
                             self.show_test_properties_popup(report)
                     elif test_type == TestType.AIIC:
-                        raw_data = self.load_test_data(curr_test, test_type, room_props)
-                        test_data = AIICTestData(room_props, raw_data)
                         report = AIICTestReport.create_report(
-                            test_data=test_data,
+                            test_data=raw_data,
                             room_properties=room_props,
                             output_folder=report_output_folder,
                             test_type=test_type
@@ -447,10 +456,8 @@ class FileLoaderApp(App):
                         if debug:
                             self.show_test_properties_popup(report)
                     elif test_type == TestType.NIC:
-                        raw_data = self.load_test_data(curr_test, test_type, room_props)
-                        test_data = NICTestData(room_props, raw_data)
                         report = NICTestReport.create_report(
-                            test_data=test_data,
+                            test_data=raw_data,
                             room_properties=room_props,
                             output_folder=report_output_folder,
                             test_type=test_type
@@ -458,10 +465,8 @@ class FileLoaderApp(App):
                         if debug:
                             self.show_test_properties_popup(report)
                     elif test_type == TestType.DTC:
-                        raw_data = self.load_test_data(curr_test, test_type, room_props)
-                        test_data = DTCtestData(room_props, raw_data)
                         report = DTCTestReport.create_report(
-                            test_data=test_data,
+                            test_data=raw_data,
                             room_properties=room_props,
                             output_folder=report_output_folder,
                             test_type=test_type
