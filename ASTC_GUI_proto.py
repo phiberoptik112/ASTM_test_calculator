@@ -444,6 +444,8 @@ class FileLoaderApp(App):
                             output_folder=report_output_folder,
                             test_type=test_type
                         )
+                        ## save all reports to the report output folder
+                        report.save_report()
                         if debug:
                             self.show_test_properties_popup(report)
                     elif test_type == TestType.AIIC:
@@ -453,6 +455,8 @@ class FileLoaderApp(App):
                             output_folder=report_output_folder,
                             test_type=test_type
                         )
+                        ## save all reports to the report output folder
+                        report.save_report()
                         if debug:
                             self.show_test_properties_popup(report)
                     elif test_type == TestType.NIC:
@@ -462,6 +466,8 @@ class FileLoaderApp(App):
                             output_folder=report_output_folder,
                             test_type=test_type
                         )
+                        ## save all reports to the report output folder
+                        report.save_report()
                         if debug:
                             self.show_test_properties_popup(report)
                     elif test_type == TestType.DTC:
@@ -471,6 +477,8 @@ class FileLoaderApp(App):
                             output_folder=report_output_folder,
                             test_type=test_type
                         )
+                        ## save all reports to the report output folder
+                        report.save_report()
                         if debug:
                             self.show_test_properties_popup(report)
 
@@ -485,6 +493,7 @@ class FileLoaderApp(App):
                     # report_data_objects.append(report_data)
 
                     print(f'Generated {test_type.value} report for test {curr_test["Test Label"]}')
+
 
         self.status_label.text = 'Status: All reports generated successfully'
         return report_data_objects
@@ -533,55 +542,78 @@ class FileLoaderApp(App):
             raise ValueError(f"Unsupported test type: {test_type}")
 
     def calculate_single_test(self, instance):
-        # NEED TO DEBUG
-        # Access the text from the single test text input box
-        single_test_text_input_value = self.single_test_text_input.text
-        # Display a message in the status label
-        self.status_label.text = f'Status: Calculating Single Test {single_test_text_input_value}...'
-        # open another window to display the test results
-        window = tk.Tk()
-        window.title(f'Single Test Results for: {single_test_text_input_value}')
-        window.geometry("400x400")
-        # Create a status text box
-        status_text_box = tk.Text(window, height=10, width=40)
-        status_text_box.pack()
-        # single test find 
-        testplan_path = self.test_plan_path
-        testplanfile = pd.read_excel(testplan_path) # 
+        """Calculate and generate report for a single test based on test label input"""
+        try:
+            # Get test label from input
+            test_label = self.single_test_text_input.text
+            self.status_label.text = f'Status: Processing test {test_label}...'
 
-        # rawReportpath = self.report_output_folder_path
-        # reports =  [f for f in listdir(rawReportpath) if isfile(join(rawReportpath,f))]
+            # Create results window
+            window = tk.Tk()
+            window.title(f'Test Results: {test_label}')
+            window.geometry("600x400")
+            
+            status_text = tk.Text(window, height=20, width=70)
+            status_text.pack(padx=10, pady=10)
 
-        # find_test = '0.1.1'
-        find_test = single_test_text_input_value
-        mask = testplanfile.applymap(lambda x: find_test in x if isinstance(x,str) else False).to_numpy()
-        indices = np.argwhere(mask) 
-        # print(indices)
-        index = indices[0,0]
-        # print(index)
-        status_text_box.insert(tk.END,testplanfile.iloc[index])
-        foundtest = testplanfile.iloc[index]
-        # print the found test in the status box
-        status_text_box.insert(tk.END, foundtest) # must come before mainloop
+            # Load and find test in test plan
+            try:
+                test_plan_df = pd.read_excel(self.test_plan_path)
+                mask = test_plan_df.applymap(lambda x: test_label in str(x) if pd.notna(x) else False)
+                test_row_idx = mask.any(axis=1).idxmax()
+                curr_test = test_plan_df.iloc[test_row_idx]
+                
+                status_text.insert(tk.END, "Found test entry:\n")
+                status_text.insert(tk.END, f"{curr_test.to_string()}\n\n")
+            except Exception as e:
+                raise ValueError(f"Could not find test {test_label} in test plan: {str(e)}")
 
-        report_string = '_'+foundtest+'_' 
-        status_text_box.insert(tk.END, f"Report string: '{report_string}'")
+            # Create room properties dataclass instance
+            room_props = RoomProperties(
+                site_name=curr_test['Site Name'],
+                client_name=curr_test['Client'],
+                source_room=curr_test['Source Room'],
+                receive_room=curr_test['Receive Room'], 
+                test_date=curr_test['Test Date'],
+                report_date=curr_test['Report Date'],
+                project_name=curr_test['Project Name'],
+                test_label=curr_test['Test Label'],
+                source_vol=float(curr_test['Source Vol']),
+                receive_vol=float(curr_test['Receive Vol']),
+                partition_area=float(curr_test['Partition Area']),
+                partition_dim=curr_test['Partition Dimensions'],
+                source_room_finish=curr_test['Source Room Finish'],
+                source_room_name=curr_test['Source Room Name'],
+                receive_room_finish=curr_test['Receive Room Finish'], 
+                receive_room_name=curr_test['Receive Room Name'],
+                tested_assembly=curr_test['Tested Assembly'],
+                expected_performance=curr_test['Expected Performance'],
+                annex_2_used=bool(curr_test['Annex 2 Used']),
+                test_assembly_type=curr_test['Test Assembly Type']
+            )
 
-        print('Current Test:', foundtest)
-        
-        # output reports function takes in the entire instance, we need to pass it the foundtest 
-        FileLoaderApp.output_reports(self, instance)
+            # Determine test type and create appropriate test data object
+            test_type = TestType(curr_test['Test Type'])
+            test_data = self.load_test_data(curr_test, test_type, room_props)
 
-        window.mainloop()
+            status_text.insert(tk.END, f"Generating {test_type.value} report...\n")
 
-        # Add logic to calculate single test results
-        print('Single Test:', single_test_text_input_value)
-        # Display a message in the status label
-        self.status_label.text = f'Status: Calculating Single Test {single_test_text_input_value}...'
-        room_properties, test_types, test_data = load_test_plan(testplan_path)
-        create_report(self, foundtest, test_data, reportOutputfolder, test_type=selected_test_type.value)
-        self.status_label.text = f'Status: Single Test {single_test_text_input_value} Calculated'
-    
+            # Generate report
+            report = create_report(curr_test, test_data, self.report_output_folder_path)
+            
+            status_text.insert(tk.END, f"Report generated successfully: {report.get_doc_name()}\n")
+            self.status_label.text = f'Status: Test {test_label} report generated successfully'
+
+            window.mainloop()
+
+        except Exception as e:
+            error_msg = f"Error processing test {test_label}: {str(e)}"
+            self.status_label.text = f'Status: Error - {error_msg}'
+            if 'status_text' in locals():
+                status_text.insert(tk.END, f"ERROR: {error_msg}\n")
+            print(error_msg)
+
+
     ### PRIMARILY DEBUG ###
     def excel_import(self):  
         ## PRIMARILY DEUBUG #####

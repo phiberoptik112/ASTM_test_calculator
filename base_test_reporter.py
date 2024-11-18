@@ -27,49 +27,56 @@ class BaseTestReport:
         self.footer_height = 0.5 * inch
 
     def setup_document(self):
-        doc_name = f"{self.reportOutputfolder}/{self.get_doc_name()}"
-        self.doc = BaseDocTemplate(
-            doc_name, 
-            pagesize=letter,
-            leftMargin=self.left_margin, 
-            rightMargin=self.right_margin,
-            topMargin=self.top_margin, 
-            bottomMargin=self.bottom_margin
-        )
+        """Setup the document template with proper frames and margins"""
+        try:
+            # Create output path
+            output_path = Path(self.reportOutputfolder) / self.get_doc_name()
+            
+            self.doc = BaseDocTemplate(
+                str(output_path),  # Convert Path to string
+                pagesize=letter,
+                leftMargin=self.left_margin, 
+                rightMargin=self.right_margin,
+                topMargin=self.top_margin, 
+                bottomMargin=self.bottom_margin
+            )
 
-        # Define frames
-        self.header_frame = Frame(
-            self.left_margin, 
-            letter[1] - self.top_margin - self.header_height, 
-            letter[0] - 2 * self.left_margin, 
-            self.header_height, 
-            id='header'
-        )
-        
-        self.main_frame = Frame(
-            self.left_margin, 
-            self.bottom_margin + self.footer_height, 
-            letter[0] - 2 * self.left_margin, 
-            letter[1] - self.top_margin - self.header_height - self.footer_height - self.bottom_margin, 
-            id='main'
-        )
-        
-        self.footer_frame = Frame(
-            self.left_margin, 
-            self.bottom_margin, 
-            letter[0] - 2 * self.left_margin, 
-            self.footer_height, 
-            id='footer'
-        )
+            # Define frames
+            self.header_frame = Frame(
+                self.left_margin, 
+                letter[1] - self.top_margin - self.header_height, 
+                letter[0] - 2 * self.left_margin, 
+                self.header_height, 
+                id='header'
+            )
+            
+            self.main_frame = Frame(
+                self.left_margin, 
+                self.bottom_margin + self.footer_height, 
+                letter[0] - 2 * self.left_margin, 
+                letter[1] - self.top_margin - self.header_height - self.footer_height - self.bottom_margin, 
+                id='main'
+            )
+            
+            self.footer_frame = Frame(
+                self.left_margin, 
+                self.bottom_margin, 
+                letter[0] - 2 * self.left_margin, 
+                self.footer_height, 
+                id='footer'
+            )
 
-        # Create page template
-        page_template = PageTemplate(
-            id='Standard', 
-            frames=[self.main_frame, self.header_frame, self.footer_frame], 
-            onPage=self.header_footer
-        )
-        self.doc.addPageTemplates([page_template])
-        return self.doc
+            # Create page template
+            page_template = PageTemplate(
+                id='Standard', 
+                frames=[self.main_frame, self.header_frame, self.footer_frame], 
+                onPage=self.header_footer
+            )
+            self.doc.addPageTemplates([page_template])
+            return self.doc
+            
+        except Exception as e:
+            raise ReportGenerationError(f"Failed to setup document: {str(e)}")
 
     def header_elements(self):
         elements = []
@@ -160,20 +167,40 @@ class BaseTestReport:
     def get_report_title(self):
         raise NotImplementedError
     
+    def nic_reporting_note(self):
+        if int(self.test_data.room_properties['source room vol']) >= 5300 or int(self.test_data.room_properties['receive room vol']) >= 5300:
+            NICreporting_Note = 'The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver and/or source room was greater than the maximum allowed per E336-16, Paragraph 9.4.1.2.'
+        elif int(self.test_data.room_properties['source room vol']) <= 833 or int(self.test_data.room_properties['receive room vol']) <= 833:
+            NICreporting_Note = 'The receiver and/or source room has a volume less than the minimum volume requirement of 25 m3 (883 cu. ft.).'
+        else:
+            NICreporting_Note = '---'
+        return NICreporting_Note
+    
+    def save_report(self):
+        self.doc.save()
+    
     @classmethod
-    def create_report(cls, curr_test, test_data, reportOutputfolder, test_type):
+    def create_report(cls, curr_test, test_data, reportOutputfolder: Path, test_type):
         """Factory method to create and build the appropriate test report
         
         Args:
             curr_test: Current test information
             test_data: TestData instance containing all test measurements and properties
-            reportOutputfolder: Output directory for the report
+            reportOutputfolder: Path object for the output directory
             test_type: Type of test (AIIC, ASTC, NIC, or DTC)
             
         Returns:
             BaseTestReport: The generated report instance
+            
+        Raises:
+            ReportGenerationError: If report creation or saving fails
+            ValueError: If test type is unsupported or path is invalid
         """
-        # Create the appropriate test report object based on test_type
+        # Validate output directory
+        output_dir = Path(reportOutputfolder)
+        if not output_dir.exists():
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
         report_classes = {
             TestType.AIIC: AIICTestReport,
             TestType.ASTC: ASTCTestReport,
@@ -187,7 +214,7 @@ class BaseTestReport:
             
         try:
             # Create report instance
-            report = report_class(curr_test, test_data, reportOutputfolder)
+            report = report_class(curr_test, test_data, output_dir)
             
             # Setup document
             doc = report.setup_document()
@@ -204,14 +231,18 @@ class BaseTestReport:
                 raise
             
             # Build and save document
-            doc.build(main_elements)
-            print(f"Report saved as: {report.get_doc_name()}")
+            output_path = output_dir / report.get_doc_name()
+            doc.build(main_elements, filename=str(output_path))
             
+            if not output_path.exists():
+                raise ReportGenerationError(f"Failed to save report to {output_path}")
+                
+            print(f"Report saved successfully to: {output_path}")
             return report
             
         except Exception as e:
             print(f"Failed to create report: {str(e)}")
-            raise
+            raise ReportGenerationError(f"Report generation failed: {str(e)}")
 
     def create_first_page(self):
         """Creates the first page of the report with standards and conformance info.
@@ -315,38 +346,64 @@ class BaseTestReport:
             raise ReportGenerationError(f"Error generating second page: {str(e)}")
 
     def create_third_page(self):
-        main_elements = []
-        main_elements.append(Paragraph("<u>STATEMENT OF TEST RESULTS:</u>", self.custom_title_style))
-        Test_result_table = self.get_test_results()
-        Test_result_table = Table(Test_result_table, hAlign='LEFT')
-        Test_result_table.setStyle(TableStyle([
-            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
-            ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('ALIGN',(0,0), (-1,-1),'LEFT')
-        ]))
-        main_elements.append(Test_result_table)
+        """Creates the third page with test results table and summary.
+        
+        Returns:
+            list: List of report elements for the third page
+            
+        Raises:
+            ReportGenerationError: If there is an error generating the page content
+        """
+        try:
+            main_elements = []
+            
+            # Add test results heading
+            main_elements.append(Paragraph("<u>STATEMENT OF TEST RESULTS:</u>", self.custom_title_style))
+            
+            # Get and format test results table
+            try:
+                test_results = self.get_test_results()
+                results_table = Table(test_results, hAlign='LEFT')
+                results_table.setStyle(TableStyle([
+                    ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
+                    ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                    ('TOPPADDING', (0, 0), (-1, -1), 6),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('ALIGN',(0,0), (-1,-1),'LEFT')
+                ]))
+                main_elements.append(results_table)
+            except Exception as e:
+                raise ReportGenerationError(f"Error creating test results table: {str(e)}")
 
-        main_elements.append(self.get_testres_table_notes())
-        ### need to figure out a single text box that displays the IIC test result single number 
-        test_type_labels = {
-            TestType.AIIC: "AIIC",
-            TestType.ASTC: "ASTC",
-            TestType.NIC: "NIC",
-            TestType.DTC: "DTC"
-        }
-        test_label = test_type_labels.get(self.curr_test.test_type, "Unknown")
-        main_elements.append(Paragraph(f"<u>{test_label}:</u>", self.custom_title_style))
-        ### need to debug - append the test calc result here
-        main_elements.append(Spacer(1,10))
-        main_elements.append(self.get_test_results_paragraph())
-        main_elements.append(PageBreak())
-        return main_elements
+            # Add table notes
+            try:
+                main_elements.append(self.get_testres_table_notes())
+            except Exception as e:
+                raise ReportGenerationError(f"Error adding table notes: {str(e)}")
 
+            # Add test type label
+            test_type_labels = {
+                TestType.AIIC: "AIIC",
+                TestType.ASTC: "ASTC", 
+                TestType.NIC: "NIC",
+                TestType.DTC: "DTC"
+            }
+            test_label = test_type_labels.get(self.curr_test.test_type, "Unknown")
+            main_elements.append(Paragraph(f"<u>{test_label}:</u>", self.custom_title_style))
+            
+            # Add spacing and test results paragraph
+            main_elements.append(Spacer(1,10))
+            main_elements.append(self.get_test_results_paragraph())
+            main_elements.append(PageBreak())
+            
+            return main_elements
+            
+        except Exception as e:
+            raise ReportGenerationError(f"Error generating third page: {str(e)}")
+        
     def create_fourth_page(self):
         main_elements = []
         main_elements.append(self.create_plot())
@@ -464,13 +521,7 @@ class AIICTestReport(BaseTestReport):
             "next page, and has been fit to the Apparent Transmission Loss values, in "
             f"accordance with the procedure of {self.standards_data[0][0]}"
         )
-    def nic_reporting_note(self):
-        if int(self.test_data.room_properties['source room vol']) >= 5300 or int(self.test_data.room_properties['receive room vol']) >= 5300:
-            NICreporting_Note = 'The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver and/or source room was greater than the maximum allowed per E336-16, Paragraph 9.4.1.2.'
-        elif int(self.test_data.room_properties['source room vol']) <= 833 or int(self.test_data.room_properties['receive room vol']) <= 833:
-            NICreporting_Note = 'The receiver and/or source room has a volume less than the minimum volume requirement of 25 m3 (883 cu. ft.).'
-        else:
-            NICreporting_Note = '---'
+
 class ASTCTestReport(BaseTestReport):
     # Implement ASTC-specific methods
     def get_standards_data(self):
@@ -578,16 +629,17 @@ class NICTestReport(BaseTestReport):
         pass
 
     def get_test_results(self, single_test_dataframe):
+        props = self.test_data.room_properties
         ## obtain SLM data from overall dataframe
         ## need to convert all of this to use the dataclasses and the data_processor.py functions 
-        onethird_rec = format_SLMdata(single_test_dataframe['recive_data'])
-        onethird_srs = format_SLMdata(single_test_dataframe['srs_data'])
-        onethird_bkgrd = format_SLMdata(single_test_dataframe['bkgrnd_data'])
-        rt_thirty = single_test_dataframe['rt']['Unnamed: 10'][25:41]/1000
+        onethird_rec = format_SLMdata(self.test_data.recive_data)
+        onethird_srs = format_SLMdata(self.test_data.srs_data)
+        onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)
+        rt_thirty = self.test_data.rt['Unnamed: 10'][25:41]/1000
         # Calculation of ATL
-        ATL_val,corrected_STC_recieve = calc_atl_val(onethird_srs, onethird_rec, onethird_bkgrd,single_test_dataframe['room_properties']['partition_area'][0],single_test_dataframe['room_properties']['receive_room_vol'][0],sabines)
+        ATL_val,corrected_STC_recieve = calc_atl_val(onethird_srs, onethird_rec, onethird_bkgrd,props.partition_area,props.receive_room_vol,sabines)
         # Calculation of NR
-        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_nr_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,single_test_dataframe['room_properties']['receive_room_vol'][0],NIC_vollimit=883,testtype='NIC')
+        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_nr_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,props.receive_room_vol,NIC_vollimit=883,testtype='NIC')
         # creating reference curve for ASTC graph
         STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
         ASTC_contour_final = list()
@@ -596,11 +648,11 @@ class NICTestReport(BaseTestReport):
         
         Test_result_table = pd.DataFrame(
             {
-                "Frequency": frequencies,
+                "Frequency": FREQUENCIES,
                 "Source OBA": onethird_srs,
                 "Reciever OBA": onethird_rec,
                 "Background OBA": onethird_bkgrd,
-                "NR": rt['NR'],
+                "NR": calc_NR,
                 "Exceptions": NIC_exceptions
             }
         )
@@ -608,7 +660,7 @@ class NICTestReport(BaseTestReport):
 
     def create_plot(self):
         plot_title = 'NIC Reference Contour'
-        plt.plot(ATL_curve, freqbands)
+        plt.plot(ATL_curve, FREQUENCIES)
         plt.xlabel('Apparent Transmission Loss (dB)')
         plt.ylabel('Frequency (Hz)')
         plt.title('NIC Reference Contour')
