@@ -456,6 +456,7 @@ class AIICTestReport(BaseTestReport):
         return main_elements
     
 
+
     def get_test_instrumentation(self):
         equipment = super().get_test_instrumentation()
         # Add AIIC-specific equipment
