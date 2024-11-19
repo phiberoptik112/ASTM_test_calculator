@@ -321,7 +321,7 @@ class FileLoaderApp(App):
     def load_data(self, instance):
         # # Access the text from all text boxes
         # seems like just a debug step, may not need this once full output report PDF gen. is working since it pulls directly from the SLM datafiles. 
-        text_input_fields = [self.test_plan_path, self.output_folder_path, self.slm_data_d_path, self.slm_data_e_path, self.fifth_text_input]
+        text_input_fields = [self.test_plan_path, self.output_folder_path, self.slm_data_d_path, self.slm_data_e_path]
         sanitized_values = [sanitize_filepath(field.text) for field in text_input_fields]
 
         #refactoring to use a dictionary for the input values
