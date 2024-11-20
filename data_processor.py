@@ -230,28 +230,7 @@ def calculate_onethird_Logavg(average_pos):
     onethird_rec_Total = np.round(onethird_rec_Total, 1)
     return onethird_rec_Total
 
-def RAW_SLM_datapull(self, find_datafile, datatype):
-    # pass datatype as '-831_Data.' or '-RT_Data.' to pull the correct data
-    raw_testpaths = {
-        'D': self.slm_data_d_path,
-        'E': self.slm_data_e_path,
-        # 'A': self.slm_data_a_path
-    }
-    datafiles = {}
-    for key, path in raw_testpaths.items():
-        datafiles[key] = [f for f in listdir(path) if isfile(join(path, f))]
 
-    if find_datafile[0] in datafiles:
-        datafile_num = datatype + find_datafile[1:] + '.xlsx'
-        slm_found = [x for x in datafiles[find_datafile[0]] if datafile_num in x]
-        slm_found[0] = raw_testpaths[find_datafile[0]] + slm_found[0]  # If this line errors, the test file is mislabeled or doesn't exist 
-
-    print(slm_found[0])
-    if datatype == '-831_Data.':
-        srs_data = pd.read_excel(slm_found[0], sheet_name='OBA')
-    elif datatype == '-RT_Data.': ## may change to -RT60Pink. for RT60 data
-        srs_data = pd.read_excel(slm_found[0], sheet_name='Summary')  # data must be in Summary tab for RT meas.
-    return srs_data
 
 ### NEW REWORK OF NR CALC ### # functional as of 7/25/24 ### 
 def calc_nr_new(srs_overalloct: pd.Series, rec_overalloct: pd.Series, 

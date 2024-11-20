@@ -36,7 +36,6 @@ from data_processor import (
     NICTestData,
     DTCtestData,
     TestData,
-    RAW_SLM_datapull,
     calc_atl_val,
     calc_astc_val,
     format_SLMdata,
@@ -173,13 +172,61 @@ class FileLoaderApp(App):
         """Populate test input fields with default test paths"""
         # Set default test paths
         self.test_plan_path.text = "./Exampledata/TestPlan_ASTM_testingv2.xlsx"
-        self.output_folder_path.text = "./Exampledata/testeroutputs"
-        self.slm_data_d_path.text = "./Exampledata/RawData/A_Meter" 
-        self.slm_data_e_path.text = "./Exampledata/RawData/E_Meter"
+        self.output_folder_path.text = "./Exampledata/testeroutputs/"
+        self.slm_data_d_path.text = "./Exampledata/RawData/A_Meter/" 
+        self.slm_data_e_path.text = "./Exampledata/RawData/E_Meter/"
         # self.single_test_input_box.text = "1"
         
         # Update status label
         self.status_label.text = "Status: Test inputs populated"
+    def RAW_SLM_datapull(self, find_datafile, datatype):
+        """Pull data from SLM files"""
+        # Use the class's data file paths
+        raw_testpaths = {
+            'A': self.slm_data_d_path,  # Path for A meter files
+            'D': self.slm_data_d_path,  # Path for D meter files
+            'E': self.slm_data_e_path   # Path for E meter files
+        }
+
+        if self.debug_check_box.active:
+            print(f"Looking for file with prefix {find_datafile} in paths:")
+            print(raw_testpaths)
+
+        meter_id = find_datafile[0]
+        if meter_id not in raw_testpaths:
+            raise ValueError(f"Unknown meter identifier: {meter_id}")
+
+        path = raw_testpaths[meter_id]
+        
+        # Use the already loaded datafiles
+        if meter_id in ['A', 'D']:
+            datafiles = self.D_datafiles
+        elif meter_id == 'E':
+            datafiles = self.E_datafiles
+        else:
+            raise ValueError(f"Unknown meter type: {meter_id}")
+
+        datafile_num = datatype + find_datafile[1:] + '.xlsx'
+        slm_found = [x for x in datafiles if datafile_num in x]
+
+        if not slm_found:
+            raise ValueError(f"No matching files found for {datafile_num} in {path}")
+
+        full_path = os.path.join(path, slm_found[0])
+        
+        if self.debug_check_box.active:
+            print(f"Loading file: {full_path}")
+
+        try:
+            if datatype == '-831_Data.':
+                return pd.read_excel(full_path, sheet_name='OBA')
+            elif datatype == '-RT_Data.':
+                return pd.read_excel(full_path, sheet_name='Summary')
+            else:
+                raise ValueError(f"Unknown datatype: {datatype}")
+        except Exception as e:
+            raise ValueError(f"Error reading file {full_path}: {str(e)}")
+    
     def on_text_validate(self, instance):
         # Check if the widget is a TextInput before updating instance variables
         if isinstance(instance, TextInput):
@@ -210,10 +257,9 @@ class FileLoaderApp(App):
         # # Access the text from all text boxes
         # seems like just a debug step, may not need this once full output report PDF gen. is working since it pulls directly from the SLM datafiles. 
         try:
-            text_input_fields = [self.test_plan_path, self.output_folder_path, self.slm_data_d_path, self.slm_data_e_path, self.single_test_input_box]
+            text_input_fields = [self.test_plan_path, self.slm_data_d_path, self.slm_data_e_path, self.output_folder_path, self.single_test_input_box]
             sanitized_values = [sanitize_filepath(field.text) for field in text_input_fields]
-
-        #refactoring to use a dictionary for the input values
+            #refactoring to use a dictionary for the input values
             input_values = {
                 'test_plan_path': sanitized_values[0],
                 'slm_data_d_path': sanitized_values[1],
@@ -253,22 +299,22 @@ class FileLoaderApp(App):
             ### TestData -> BaseTestReport subclasses -> PDF Report ###
 
             ### debug print outs here for the datafiles ### 
-            print(self.D_datafiles)
-            print(self.E_datafiles)
+            print('D_datafiles:', self.D_datafiles)
+            print('E_datafiles:', self.E_datafiles)
             print('Arguments received by output_reports:', instance, self.test_plan_path, 
               self.slm_data_d_path, self.slm_data_e_path, self.report_output_folder_path)
             print('--=-=----=-=-=-=-=-=-=-=-=-=-=-=-=-=-===-=-=-'
             )
             testplan_path = self.test_plan_path
             report_output_folder = self.report_output_folder_path
-            test_list = pd.read_excel(testplan_path)
+            self.test_list = pd.read_excel(testplan_path)
             debug = 1 if self.debug_check_box.active else 0
 
         # List to store all report data objects
             report_data_objects = []
 
         # Process each test in the test plan
-            for _, curr_test in test_list.iterrows():
+            for _, curr_test in self.test_list.iterrows():
                 if debug:
                     print('Current Test:', curr_test)
                 self.status_label.text = f'Status: Processing test: {curr_test["Test_Label"]}'
@@ -490,8 +536,10 @@ class FileLoaderApp(App):
 
     def load_test_data(self, curr_test: pd.Series, test_type: TestType, room_props: RoomProperties) -> Union[AIICTestData, ASTCTestData, NICTestData, DTCtestData]:
         """Load and format raw test data based on test type"""
-
+        
         # Base data dictionary for all test types
+        if self.debug_check_box.active:
+            print('Loading base data for test:', curr_test['Test_Label'])
         base_data = {
             'srs_data': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Source'], '-831_Data.')),
             'recive_data': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Recieve '], '-831_Data.')),
