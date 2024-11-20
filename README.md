@@ -12,10 +12,4 @@ Run the GUI (to get file locations)
 
 
 
-Run report lab with ():
-
-`pip install pandas matplotlib openpyxl IPython reportlab`
-
-`python report_generatorv1.py` and you should see a GUI pop up window
-
 

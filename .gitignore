@@ -5,18 +5,15 @@
 *.pyd
 *.pyw
 *.pyz
-*.py
 *.pyc
 *.pyo
 *.pyd
 *.pyw
 *.pyz
-*.pyc
 *.pyo
 *.pyd
 *.pyw
 *.pyz
-*.py
 *.pyc
 *.pyo
 *.pyd
@@ -43,3 +40,4 @@
 .env/
 .vscode/
 /Exampledata/
+.DS_Store

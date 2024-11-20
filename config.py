@@ -1,5 +1,6 @@
 # Config file for standards and stock notes for the report generator
 import pandas as pd
+from reportlab.platypus import Paragraph, Spacer, Table, TableStyle, KeepInFrame, PageBreak 
 stockNIC_note = ["The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver and/or source room was greater than the maximum allowed per E336-16, Paragraph 9.4.1.2.",
                  "The receiver and/or source room was not an enclosed space.",
                  "The receiver and/or source room has a volume less than the minimum volume requirement of 25 m3 (883 cu. ft.).",

@@ -578,7 +578,7 @@ class ASTCTestReport(BaseTestReport):
 
         # Create results table
         Test_result_table = pd.DataFrame({
-            "Frequency": frequencies,
+            "Frequency": FREQUENCIES,
             "L1, Average Source Room Level (dB)": onethird_srs,
             "L2, Average Corrected Receiver Room Level (dB)": corrected_STC_recieve,
             "Average Receiver Background Level (dB)": onethird_bkgrd,
@@ -604,7 +604,7 @@ class ASTCTestReport(BaseTestReport):
     
     def get_results_plot(self):
         plot_title = 'ASTC Reference Contour'
-        plt.plot(ATL_curve, freqbands)
+        plt.plot(ATL_curve, FREQUENCIES)
         plt.xlabel('Apparent Transmission Loss (dB)')
         plt.ylabel('Frequency (Hz)')
         plt.title('ASTC Reference Contour')

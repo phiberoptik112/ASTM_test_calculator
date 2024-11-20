@@ -72,6 +72,12 @@ class RoomProperties:
     source_room_name: str
     receive_room_finish: str
     receive_room_name: str
+    srs_floor: str
+    srs_walls: str
+    srs_ceiling: str
+    rec_floor: str
+    rec_walls: str
+    rec_ceiling: str
     tested_assembly: str
     expected_performance: str
     annex_2_used: bool
@@ -139,15 +145,10 @@ class NICTestData(TestData):
         self.rt = test_data['rt']
 
 class TestType(Enum):
-    def __init__(self, aiic: bool, astc: bool, nic: bool, dtc: bool):
-        self.aiic = aiic
-        self.astc = astc
-        self.nic = nic
-        self.dtc = dtc  
-    # AIIC = "AIIC"
-    # ASTC = "ASTC"
-    # NIC = "NIC"
-    # DTC = "DTC"
+    AIIC = "AIIC"
+    ASTC = "ASTC"
+    NIC = "NIC"
+    DTC = "DTC"
 
 ######### SLM import - hardcoded - gives me the willies, but it works for now.##########
 ### maybe change to something thats a better troubleshooting effort later ###
