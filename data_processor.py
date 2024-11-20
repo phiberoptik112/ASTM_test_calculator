@@ -69,7 +69,9 @@ class RoomProperties:
     partition_area: float
     partition_dim: str
     source_room_finish: str
+    source_room_name: str
     receive_room_finish: str
+    receive_room_name: str
     tested_assembly: str
     expected_performance: str
     annex_2_used: bool
@@ -136,8 +138,6 @@ class NICTestData(TestData):
         self.bkgrnd_data = test_data['bkgrnd_data']
         self.rt = test_data['rt']
 
-
-
 class TestType(Enum):
     def __init__(self, aiic: bool, astc: bool, nic: bool, dtc: bool):
         self.aiic = aiic
@@ -148,67 +148,8 @@ class TestType(Enum):
     # ASTC = "ASTC"
     # NIC = "NIC"
     # DTC = "DTC"
-@dataclass
-class ReportData:
-    def __init__(self, room_properties: RoomProperties, test_data: TestData, test_type: TestType):
-        self.room_properties = room_properties
-        self.test_data = test_data
-        self.test_type = test_type
-    test_type: TestType
-    test_data: Union[AIICTestData, ASTCTestData, NICTestData, DTCtestData]
 
-    def __post_init__(self):
-        if not isinstance(self.test_data, TestData):
-            raise ValueError("test_data must be an instance of TestData")
-        test_data_types = {
-            TestType.AIIC: AIICTestData,
-            TestType.ASTC: ASTCTestData,
-            TestType.NIC: NICTestData,
-            TestType.DTC: DTCtestData
-        }
-        expected_test_data_type = test_data_types[self.test_type]
-        if not isinstance(self.test_data, expected_test_data_type):
-            raise ValueError(f"test_data must be an instance of {expected_test_data_type.__name__}")
-        
-    @property
-    def room_properties(self) -> RoomProperties:
-        return self.test_data.room_properties
-    
-    def generate_report(self):
-        if self.test_type == TestType.AIIC:
-            return self._generate_aiic_report()
-        elif self.test_type == TestType.ASTC:
-            return self._generate_astc_report()
-        elif self.test_type == TestType.NIC:
-            return self._generate_nic_report()
-        elif self.test_type == TestType.DTC:
-            return self._generate_dtc_report()
-        else:
-            raise ValueError(f"Unsupported test type: {self.test_type}")
-        
-    def _generate_aiic_report(self):
-        pass
-    
-    def _generate_astc_report(self):
-        pass
-    
-    def _generate_nic_report(self):
-        pass
-    
-    def _generate_dtc_report(self):
-        pass
-#####
-## Usage example:
-# aiic_report = ReportData(
-#     test_type=TestType.AIIC,
-#     test_data=aiic_test  # AIICTestData instance
-# )
-
-# astc_report = ReportData(
-#     test_type=TestType.ASTC,
-#     test_data=astc_test  # ASTCTestData instance
-# )
-### SLM import - hardcoded - gives me the willies, but it works for now.
+######### SLM import - hardcoded - gives me the willies, but it works for now.##########
 ### maybe change to something thats a better troubleshooting effort later ###
 ##  ask GPT later about how best to do this, maybe a config file or something? 
 def format_SLMdata(srs_data):
@@ -217,6 +158,56 @@ def format_SLMdata(srs_data):
     srs_thirdoct = srs_thirdoct[13:31] # select only the frequency bands of interest
     # verify step to check for SPL info? 
     return srs_thirdoct
+
+def extract_sound_levels(slm_data: pd.DataFrame, 
+                        freq_bands: list = [125, 160, 200, 250, 315, 400, 500, 630, 800, 
+                                          1000, 1250, 1600, 2000, 2500, 3150, 4000]) -> pd.Series:
+    """
+    Extracts sound pressure level measurements for 1/3 octave bands from SLM export file.
+    
+    Args:
+        slm_data: DataFrame containing SLM measurement data
+        freq_bands: List of frequency bands in Hz to validate against
+        
+    Returns:
+        pd.Series: Sound pressure levels (dB) for each frequency band
+        
+    Raises:
+        ValueError: If data format is incorrect or SPL data cannot be validated
+    """
+    try:
+        # Find the overall spectrum row (typically contains "Overall 1/3 Spectra" or similar)
+        spectrum_row_idx = slm_data.apply(lambda x: x.astype(str).str.contains('Overall 1/3 Spectra')).any(axis=1).idxmax()
+        
+        # Get frequency labels (one row above spectrum data)
+        freq_labels = pd.to_numeric(slm_data.iloc[spectrum_row_idx - 1, 13:31], errors='coerce')
+        
+        # Validate frequency bands
+        if not all(f in freq_labels.values for f in freq_bands):
+            raise ValueError(f"Expected frequency bands not found.\nExpected: {freq_bands}\nFound: {freq_labels.values}")
+        
+        # Extract SPL values
+        spl_data = pd.to_numeric(slm_data.iloc[spectrum_row_idx, 13:31], errors='coerce')
+        
+        # Validate SPL data
+        if spl_data.isnull().any():
+            raise ValueError("Invalid or missing SPL values found")
+        
+        if not (0 <= spl_data).all() and (spl_data <= 140).all():
+            raise ValueError("SPL values outside expected range (0-140 dB)")
+            
+        return spl_data[freq_labels.index[freq_labels.isin(freq_bands)]]
+        
+    except Exception as e:
+        raise ValueError(f"Failed to extract SPL data: {str(e)}\n"
+                        f"Please verify SLM data format is correct.") from e
+### useage: 
+# try:
+#     spectrum_data = extract_third_octave_bands(slm_data)
+#     print("Successfully extracted frequency bands:", spectrum_data)
+# except ValueError as e:
+#     print(f"Error processing SLM data: {e}")
+
 
 def calculate_onethird_Logavg(average_pos):
     if isinstance(average_pos, pd.DataFrame):
@@ -237,110 +228,6 @@ def calculate_onethird_Logavg(average_pos):
             onethird_rec_Total.append(np.nan)
     onethird_rec_Total = np.round(onethird_rec_Total, 1)
     return onethird_rec_Total
-
-def load_test_plan(curr_test: pd.DataFrame) -> pd.DataFrame:
-    # Load the test plan data from the Excel file
-
-    # do i need to run the format_slm_data function here?
-
-    if int(curr_test['source room vol']) >= 5300 or int(curr_test['receive room vol']) >= 5300:
-        NICreporting_Note = 'The receiver and/or source room had a volume exceeding 150 m3 (5,300 cu. ft.), and the absorption of the receiver and/or source room was greater than the maximum allowed per E336-16, Paragraph 9.4.1.2.'
-    elif int(curr_test['source room vol']) <= 833 or int(curr_test['receive room vol']) <= 833:
-        NICreporting_Note = 'The receiver and/or source room has a volume less than the minimum volume requirement of 25 m3 (883 cu. ft.).'
-    else:
-        NICreporting_Note = '---'
-    
-    # load a test properties dataframe
-    # rewrite to the TestType enum
-    test_types = {
-        TestType.AIIC: bool(curr_test['AIIC_test'].iloc[0]),  # Convert to boolean
-        TestType.NIC: bool(curr_test['NIC_test'].iloc[0]),
-        TestType.ASTC: bool(curr_test['ASTC_test'].iloc[0]),
-        TestType.DTC: bool(curr_test['DTC_test'].iloc[0])
-    }
-    # test_properties = pd.DataFrame(
-    #     {
-    #         "AIIC_test": curr_test['AIIC_test'],
-    #         "NIC_test": curr_test['NIC_test'],
-    #         "ASTC_test": curr_test['ASTC_test'],
-    #         "DTC_test": curr_test['DTC_test']
-    #     },
-    #     index=[0]
-    # )
-    room_properties = RoomProperties(
-        site_name=curr_test['Site_Name'],
-        client_name=curr_test['Client_Name'],
-        source_room=curr_test['Source_Room'],
-        receive_room=curr_test['Receiving_Room'],
-        test_date=curr_test['Test_Date'],
-        report_date=curr_test['Report_Date'],
-        project_name=curr_test['Project_Name'],
-        test_label=curr_test['Test_Label'],
-        source_vol=curr_test['source room vol'],
-        receive_vol=curr_test['receive room vol'],
-        partition_area=curr_test['partition area'],
-        partition_dim=curr_test['partition dim.'],
-        source_room_finish=curr_test['source room finish'],
-        receive_room_finish=curr_test['receive room finish'],
-        srs_floor=curr_test['srs floor descrip.'],
-        srs_ceiling=curr_test['srs ceiling descrip.'],
-        srs_walls=curr_test['srs walls descrip.'],
-        rec_floor=curr_test['rec floor descrip.'],
-        rec_ceiling=curr_test['rec ceiling descrip.'],
-        rec_wall=curr_test['rec walls descrip.'],   
-    )
-
-    if curr_test['AIIC_test'] == 1:
-        print("AIIC testing enabled, copying data...")
-        
-        # Collect raw data
-        raw_data = {
-            'source': RAW_SLM_datapull(self, curr_test['Source'], '-831_Data.'),
-            'receive': RAW_SLM_datapull(self, curr_test['Recieve '], '-831_Data.'),
-            'bnl': RAW_SLM_datapull(self, curr_test['BNL'], '-831_Data.'),
-            'rt': RAW_SLM_datapull(self, curr_test['RT'], '-RT_Data.'),
-            'pos1': RAW_SLM_datapull(self, curr_test['Position1'], '-831_Data.'),
-            'pos2': RAW_SLM_datapull(self, curr_test['Position2'], '-831_Data.'),
-            'pos3': RAW_SLM_datapull(self, curr_test['Position3'], '-831_Data.'),
-            'pos4': RAW_SLM_datapull(self, curr_test['Position4'], '-831_Data.'),
-            'carpet': RAW_SLM_datapull(self, curr_test['Carpet'], '-831_Data.'),
-            'source_tap': RAW_SLM_datapull(self, curr_test['SourceTap'], '-831_Data.')
-        }
-
-        # Process RT data
-        rt_thirty = raw_data['rt']['Unnamed: 10'][24:42]/1000
-        rt_thirty = pd.to_numeric(rt_thirty, errors='coerce')
-        rt_thirty = np.round(rt_thirty, 3)
-
-        # Process position data
-        average_pos = []
-        for i in range(1, 5):
-            pos_data = format_SLMdata(raw_data[f'pos{i}'])
-            average_pos.append(pos_data)
-        
-        average_pos = pd.concat(average_pos, axis=1)
-        onethird_rec_Total = calculate_onethird_Logavg(average_pos)
-
-        # Create AIICTestData instance
-        aiic_test = AIICTestData(
-            room_properties=room_properties,
-            test_data={
-                'srs_data': pd.DataFrame(raw_data['source']),
-                'recive_data': pd.DataFrame(raw_data['receive']),
-                'bkgrnd_data': pd.DataFrame(raw_data['bnl']),
-                'rt': pd.DataFrame(rt_thirty),
-                'AIIC_pos1': pd.DataFrame(raw_data['pos1']),
-                'AIIC_pos2': pd.DataFrame(raw_data['pos2']),
-                'AIIC_pos3': pd.DataFrame(raw_data['pos3']),
-                'AIIC_pos4': pd.DataFrame(raw_data['pos4']),
-                'AIIC_source': pd.DataFrame(raw_data['source_tap']),
-                'AIIC_carpet': pd.DataFrame(raw_data['carpet'])
-            }
-        )
-        return aiic_test
-    else:
-        return None
-    
 
 def RAW_SLM_datapull(self, find_datafile, datatype):
     # pass datatype as '-831_Data.' or '-RT_Data.' to pull the correct data
@@ -640,30 +527,11 @@ def process_single_test(test_plan_entry: pd.Series, slm_data_paths: Dict[str, Pa
     
     return report_path
 
-## this function below is a generated function, not sure if im going to include it or just use the GUI interface to iterate through all the tests by default. 
-# i guess it makes the single test function much more clean, since i can just troublshoot that single test process if i want to do the entire thing...
-## ok try to work this in. add it to the list. 
-# def process_all_tests(test_plan_path: Path, slm_data_folder: Path, output_folder: Path) -> List[Path]:
-#     test_plan = load_test_plan(test_plan_path)
-#     report_paths = []
-    
-#     for _, test_entry in test_plan.iterrows():
-#         slm_data_paths = {
-#             'source': slm_data_folder / f"{test_entry['SourceFile']}.xlsx",
-#             'receive': slm_data_folder / f"{test_entry['ReceiveFile']}.xlsx",
-#             'background': slm_data_folder / f"{test_entry['BackgroundFile']}.xlsx",
-#             'rt': slm_data_folder / f"{test_entry['RTFile']}.xlsx",
-#         }
-        
-#         report_path = process_single_test(test_entry, slm_data_paths, output_folder)
-#         report_paths.append(report_path)
-    
-#     return report_paths
-
 # Additional utility functions
 def sanitize_filepath(filepath: str) -> str:
     filepath = filepath.replace('T:', '//DLA-04/Shared/')
     filepath = filepath.replace('\\', '/')
     return filepath
+
 
 
