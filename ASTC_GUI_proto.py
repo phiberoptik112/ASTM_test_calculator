@@ -27,7 +27,23 @@ import matplotlib.pyplot as plt
 # from Report_generatorv1 import create_report,calc_AIIC_val, RAW_SLM_datpull, sanitize_filepath,
 
 from config import *
-from data_processor import *
+# from data_processor import *
+from data_processor import (
+    TestType, 
+    RoomProperties,
+    AIICTestData,
+    ASTCTestData,
+    NICTestData,
+    DTCtestData,
+    TestData,
+    RAW_SLM_datapull,
+    calc_atl_val,
+    calc_astc_val,
+    format_SLMdata,
+    extract_sound_levels,
+    calculate_onethird_Logavg
+)
+
 from base_test_reporter import *
 # this is a new function combines RT and ASTC datapulls
 
@@ -71,6 +87,10 @@ class TestListPopup(GridLayout):
 
 # GPT code - kivy GUI 
 class FileLoaderApp(App):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.test_data_processor = None
+        self.total_test_data = pd.DataFrame()
     def build(self):
         # Initialize path variables as instance variables
         self.test_plan_path = ''
@@ -254,35 +274,35 @@ class FileLoaderApp(App):
                 self.status_label.text = f'Status: Processing test: {curr_test["Test_Label"]}'
                 print('Creating RoomProperties instance')
                 # Create RoomProperties instance
-
-                room_props = RoomProperties(
-                    site_name=curr_test['Site_Name'],
-                    client_name=curr_test['Client_Name'],
-                    source_room=curr_test['Source Room'],
-                    receive_room=curr_test['Receiving Room'], 
-                    test_date=curr_test['Test Date'],
-                    report_date=curr_test['Report Date'],
-                    project_name=curr_test['Project Name'],
-                    test_label=curr_test['Test_Label'],
-                    source_vol=curr_test['source room vol'],
-                    receive_vol=curr_test['receive room vol'],
-                    partition_area=curr_test['partition area'],
-                    partition_dim=curr_test['partition dim'],
-                    source_room_finish=curr_test['source room finish'],
-                    source_room_name=curr_test['Source Room'],
-                    receive_room_finish=curr_test['receive room finish'],
-                    receive_room_name=curr_test['Receiving Room'],
-                    srs_floor=curr_test['srs floor descrip.'],
-                    srs_ceiling=curr_test['srs ceiling descrip.'],
-                    srs_walls=curr_test['srs walls descrip.'],
-                    rec_floor=curr_test['rec floor descrip.'],
-                    rec_ceiling=curr_test['rec ceiling descrip.'],
-                    rec_walls=curr_test['rec walls descrip.'],
-                    annex_2_used=curr_test['Annex 2 used?'],
-                    tested_assembly=curr_test['tested assembly'],  ## potentially redunant - expect to remove
-                    test_assembly_type=curr_test['Test assembly Type'],
-                    expected_performance=curr_test['expected performance']
-                )
+                room_props = self.assign_room_properties(curr_test)
+                # room_props = RoomProperties(
+                #     site_name=curr_test['Site_Name'],
+                #     client_name=curr_test['Client_Name'],
+                #     source_room=curr_test['Source Room'],
+                #     receive_room=curr_test['Receiving Room'], 
+                #     test_date=curr_test['Test Date'],
+                #     report_date=curr_test['Report Date'],
+                #     project_name=curr_test['Project Name'],
+                #     test_label=curr_test['Test_Label'],
+                #     source_vol=curr_test['source room vol'],
+                #     receive_vol=curr_test['receive room vol'],
+                #     partition_area=curr_test['partition area'],
+                #     partition_dim=curr_test['partition dim'],
+                #     source_room_finish=curr_test['source room finish'],
+                #     source_room_name=curr_test['Source Room'],
+                #     receive_room_finish=curr_test['receive room finish'],
+                #     receive_room_name=curr_test['Receiving Room'],
+                #     srs_floor=curr_test['srs floor descrip.'],
+                #     srs_ceiling=curr_test['srs ceiling descrip.'],
+                #     srs_walls=curr_test['srs walls descrip.'],
+                #     rec_floor=curr_test['rec floor descrip.'],
+                #     rec_ceiling=curr_test['rec ceiling descrip.'],
+                #     rec_walls=curr_test['rec walls descrip.'],
+                #     annex_2_used=curr_test['Annex 2 used?'],
+                #     tested_assembly=curr_test['tested assembly'],  ## potentially redunant - expect to remove
+                #     test_assembly_type=curr_test['Test assembly Type'],
+                #     expected_performance=curr_test['expected performance']
+                # )
                 # Initialize total_test_data at class level or method start
                 self.total_test_data = pd.DataFrame()
 
@@ -349,34 +369,36 @@ class FileLoaderApp(App):
             self.status_label.text = f'Status: Processing test: {curr_test["Test_Label"]}'
 
             # Create RoomProperties instance
-            room_props = RoomProperties(
-                site_name=curr_test['Site_Name'],
-                client_name=curr_test['Client_Name'],
-                source_room=curr_test['Source Room'],
-                receive_room=curr_test['Receiving Room'], 
-                test_date=curr_test['Test Date'],
-                report_date=curr_test['Report Date'],
-                project_name=curr_test['Project Name'],
-                test_label=curr_test['Test_Label'],
-                source_vol=curr_test['source room vol'],
-                receive_vol=curr_test['receive room vol'],
-                partition_area=curr_test['partition area'],
-                partition_dim=curr_test['partition dim'],
-                source_room_finish=curr_test['source room finish'],
-                source_room_name=curr_test['Source Room'],
-                receive_room_finish=curr_test['receive room finish'],
-                receive_room_name=curr_test['Receiving Room'],
-                srs_floor=curr_test['srs floor descrip.'],
-                srs_ceiling=curr_test['srs ceiling descrip.'],
-                srs_walls=curr_test['srs walls descrip.'],
-                rec_floor=curr_test['rec floor descrip.'],
-                rec_ceiling=curr_test['rec ceiling descrip.'],
-                rec_walls=curr_test['rec walls descrip.'],
-                annex_2_used=curr_test['Annex 2 used?'],
-                tested_assembly=curr_test['tested assembly'],  ## potentially redunant - expect to remove
-                test_assembly_type=curr_test['Test assembly Type'],
-                expected_performance=curr_test['expected performance']
-            )
+            room_props = self.assign_room_properties(curr_test)
+
+            # room_props = RoomProperties(
+            #     site_name=curr_test['Site_Name'],
+            #     client_name=curr_test['Client_Name'],
+            #     source_room=curr_test['Source Room'],
+            #     receive_room=curr_test['Receiving Room'], 
+            #     test_date=curr_test['Test Date'],
+            #     report_date=curr_test['Report Date'],
+            #     project_name=curr_test['Project Name'],
+            #     test_label=curr_test['Test_Label'],
+            #     source_vol=curr_test['source room vol'],
+            #     receive_vol=curr_test['receive room vol'],
+            #     partition_area=curr_test['partition area'],
+            #     partition_dim=curr_test['partition dim'],
+            #     source_room_finish=curr_test['source room finish'],
+            #     source_room_name=curr_test['Source Room'],
+            #     receive_room_finish=curr_test['receive room finish'],
+            #     receive_room_name=curr_test['Receiving Room'],
+            #     srs_floor=curr_test['srs floor descrip.'],
+            #     srs_ceiling=curr_test['srs ceiling descrip.'],
+            #     srs_walls=curr_test['srs walls descrip.'],
+            #     rec_floor=curr_test['rec floor descrip.'],
+            #     rec_ceiling=curr_test['rec ceiling descrip.'],
+            #     rec_walls=curr_test['rec walls descrip.'],
+            #     annex_2_used=curr_test['Annex 2 used?'],
+            #     tested_assembly=curr_test['tested assembly'],  ## potentially redunant - expect to remove
+            #     test_assembly_type=curr_test['Test assembly Type'],
+            #     expected_performance=curr_test['expected performance']
+            # )
             # Create list of enabled test types based on binary values in test columns
             enabled_tests = []
             test_type_columns = {
@@ -537,34 +559,35 @@ class FileLoaderApp(App):
                 raise ValueError(f"Could not find test {test_label} in test plan: {str(e)}")
 
             # Create room properties dataclass instance
-            room_props = RoomProperties(
-                site_name=curr_test['Site_Name'],
-                client_name=curr_test['Client_Name'],
-                source_room=curr_test['Source Room'],
-                receive_room=curr_test['Receiving Room'], 
-                test_date=curr_test['Test Date'],
-                report_date=curr_test['Report Date'],
-                project_name=curr_test['Project Name'],
-                test_label=curr_test['Test_Label'],
-                source_vol=curr_test['source room vol'],
-                receive_vol=curr_test['receive room vol'],
-                partition_area=curr_test['partition area'],
-                partition_dim=curr_test['partition dim'],
-                source_room_finish=curr_test['source room finish'],
-                source_room_name=curr_test['Source Room'],
-                receive_room_finish=curr_test['receive room finish'],
-                receive_room_name=curr_test['Receiving Room'],
-                srs_floor=curr_test['srs floor descrip.'],
-                srs_ceiling=curr_test['srs ceiling descrip.'],
-                srs_walls=curr_test['srs walls descrip.'],
-                rec_floor=curr_test['rec floor descrip.'],
-                rec_ceiling=curr_test['rec ceiling descrip.'],
-                rec_walls=curr_test['rec walls descrip.'],
-                annex_2_used=curr_test['Annex 2 used?'],
-                tested_assembly=curr_test['tested assembly'],  ## potentially redunant - expect to remove
-                test_assembly_type=curr_test['Test assembly Type'],
-                expected_performance=curr_test['Expected Performance']
-            )
+            room_props = self.assign_room_properties(curr_test)
+            # room_props = RoomProperties(
+            #     site_name=curr_test['Site_Name'],
+            #     client_name=curr_test['Client_Name'],
+            #     source_room=curr_test['Source Room'],
+            #     receive_room=curr_test['Receiving Room'], 
+            #     test_date=curr_test['Test Date'],
+            #     report_date=curr_test['Report Date'],
+            #     project_name=curr_test['Project Name'],
+            #     test_label=curr_test['Test_Label'],
+            #     source_vol=curr_test['source room vol'],
+            #     receive_vol=curr_test['receive room vol'],
+            #     partition_area=curr_test['partition area'],
+            #     partition_dim=curr_test['partition dim'],
+            #     source_room_finish=curr_test['source room finish'],
+            #     source_room_name=curr_test['Source Room'],
+            #     receive_room_finish=curr_test['receive room finish'],
+            #     receive_room_name=curr_test['Receiving Room'],
+            #     srs_floor=curr_test['srs floor descrip.'],
+            #     srs_ceiling=curr_test['srs ceiling descrip.'],
+            #     srs_walls=curr_test['srs walls descrip.'],
+            #     rec_floor=curr_test['rec floor descrip.'],
+            #     rec_ceiling=curr_test['rec ceiling descrip.'],
+            #     rec_walls=curr_test['rec walls descrip.'],
+            #     annex_2_used=curr_test['Annex 2 used?'],
+            #     tested_assembly=curr_test['tested assembly'],  ## potentially redunant - expect to remove
+            #     test_assembly_type=curr_test['Test assembly Type'],
+            #     expected_performance=curr_test['Expected Performance']
+            # )
 
             # Determine test type and create appropriate test data object
             test_type = TestType(curr_test['Test Type'])
@@ -640,9 +663,10 @@ class FileLoaderApp(App):
                     text_widget.configure(state='disabled')
 
         print(f"Generated {len(report_data_list)} report data windows")
+    @classmethod
     def assign_room_properties(self, curr_test: pd.Series):
         """Assign room properties to a RoomProperties instance"""
-        print('current test:', curr_test)
+        # print('current test:', curr_test)
         room_props = RoomProperties(
             site_name=curr_test['Site_Name'],
             client_name=curr_test['Client_Name'],
