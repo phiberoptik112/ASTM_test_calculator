@@ -223,8 +223,11 @@ class BaseTestReport:
             main_elements = []
             try:
                 main_elements.extend(report.create_first_page())
+                main_elements.append(PageBreak())   
                 main_elements.extend(report.create_second_page())
+                main_elements.append(PageBreak())
                 main_elements.extend(report.create_third_page())
+                main_elements.append(PageBreak())
                 main_elements.extend(report.create_fourth_page())
             except ReportGenerationError as e:
                 print(f"Error generating report pages: {str(e)}")
@@ -455,6 +458,7 @@ class AIICTestReport(BaseTestReport):
         #   main_elements.append(PageBreak())
         return main_elements
     
+
 
     def get_test_instrumentation(self):
         equipment = super().get_test_instrumentation()
