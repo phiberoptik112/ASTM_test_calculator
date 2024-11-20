@@ -172,10 +172,10 @@ class FileLoaderApp(App):
     def populate_test_inputs(self, instance):
         """Populate test input fields with default test paths"""
         # Set default test paths
-        self.test_plan_path.text = "/Users/jakepfitsch/Documents/Documents - Jake’s iMac/Python_projects/STC_tester_reporter/Exampledata/TestPlan_ASTM_testingv2.xlsx"
-        self.output_folder_path.text = "/Users/jakepfitsch/Documents/Documents - Jake’s iMac/Python_projects/STC_tester_reporter/Exampledata/testeroutputs"
-        self.slm_data_d_path.text = "/Users/jakepfitsch/Documents/Documents - Jake’s iMac/Python_projects/STC_tester_reporter/Exampledata/RawData/A_Meter" 
-        self.slm_data_e_path.text = "/Users/jakepfitsch/Documents/Documents - Jake’s iMac/Python_projects/STC_tester_reporter/Exampledata/RawData/E_Meter"
+        self.test_plan_path.text = "./Exampledata/TestPlan_ASTM_testingv2.xlsx"
+        self.output_folder_path.text = "./Exampledata/testeroutputs"
+        self.slm_data_d_path.text = "./Exampledata/RawData/A_Meter" 
+        self.slm_data_e_path.text = "./Exampledata/RawData/E_Meter"
         # self.single_test_input_box.text = "1"
         
         # Update status label
