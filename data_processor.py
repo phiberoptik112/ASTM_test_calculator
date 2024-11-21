@@ -16,44 +16,6 @@ from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame, Paragraph, 
 from reportlab.lib.units import inch
 
 
-## having gone through the PDF edit, this room properties will need to be revised 
-# im not even sure if moving to a class variable from a dataframe is best, 
-# i think it will work for now.  
-    # room_properties = pd.DataFrame(
-    #     {
-    #         "Site Name": curr_test['Site_Name'],
-    #         "Client Name": curr_test['Client_Name'],
-    #         "Source Room Name": curr_test['Source_Room'],
-    #         "Recieve Room Name": curr_test['Receiving_Room'],
-    #         "Testdate": curr_test['Test_Date'],
-    #         "ReportDate": curr_test['Report_Date'],
-    #         "Project Name": curr_test['Project_Name'],
-    #         "Test number": curr_test['Test_Label'],
-    #         "Source Vol" : curr_test['source_room_vol'],
-    #         "Recieve Vol": curr_test['receive_room_vol'],
-    #         "Partition area": curr_test['partition_area'],
-    #         "Partition dim.": curr_test['partition_dim'],
-    #         "Source room Finish" : curr_test['source_room_finish'],
-    #         "Recieve room Finish": curr_test['receive_room_finish'],
-    #         "Srs Floor Descrip.": curr_test['srs_floor'],
-    #         "Srs Ceiling Descrip.": curr_test['srs_ceiling'],
-    #         "Srs Walls Descrip.": curr_test['srs_Walls'],
-    #         "Rec Floor Descrip.": curr_test['rec_floor'],
-    #         "Rec Ceiling Descrip.": curr_test['rec_ceiling'],
-    #         "Rec Walls Descrip.": curr_test['rec_Wall'],          
-    #         "Tested Assembly": curr_test['tested_assembly'],
-    #         "Expected Performance": curr_test['expected_performance'],
-    #         "Annex 2 used?": curr_test['Annex_2_used?'],
-    #         "Test assem. type": curr_test['Test_assembly_Type'],
-    #         "AIIC_test": curr_test['AIIC_test'],
-    #         "NIC_test": curr_test['NIC_test'],
-    #         "ASTC_test": curr_test['ASTC_test'],
-    #         "DTC_test": curr_test['DTC_test'],
-    #         "NIC reporting Note": NICreporting_Note
-    #     },
-    #     index=[0]
-    # )
-        ### 
 @dataclass
 class RoomProperties:
     site_name: str

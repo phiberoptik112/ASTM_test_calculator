@@ -1,12 +1,7 @@
 #ASTC GUI proto
-# import shutil
-# from kivy.app import App
-# from kivy.uix.boxlayout import BoxLayout
-# from kivy.uix.textinput import TextInput
-# from kivy.uix.button import Button
-# from kivy.uix.label import Label
 
-# import openpyxl 
+
+
 import string
 import time
 import pandas as pd
@@ -18,8 +13,7 @@ from openpyxl import cell
 from openpyxl.utils import get_column_letter
 from os import listdir, walk
 from os.path import isfile, join
-import tkinter as tk
-from tkinter import *
+
 from reportlab.platypus import Paragraph, Spacer, Table, TableStyle, KeepInFrame, PageBreak 
 
 import matplotlib.pyplot as plt
@@ -67,6 +61,7 @@ from kivy.uix.recycleview import RecycleView
 from kivy.uix.label import Label
 from kivy.uix.popup import Popup
 from kivy.uix.gridlayout import GridLayout
+from kivy.uix.scrollview import ScrollView
 
 print("GUI import complete")
 
@@ -93,11 +88,10 @@ class FileLoaderApp(App):
     def build(self):
         # Initialize path variables as instance variables
         self.test_plan_path = ''
-        self.report_template_path = ''
         self.slm_data_d_path = ''
         self.slm_data_e_path = ''
         self.report_output_folder_path = ''
-
+        self.single_test_input_box = ''
         # Layout
         layout = BoxLayout(orientation='vertical', spacing=10, padding=10)
         # put use description on the top of the window. 
@@ -247,10 +241,72 @@ class FileLoaderApp(App):
                 self.single_test_input_box = sanitize_filepath(instance.text)
                 instance.text = self.single_test_input_box
             
-    def show_test_list_popup(self, instance):
-        # Create a popup with the TestListPopup content
-        test_list_popup = TestListPopup(test_list=self.test_list)
-        popup = Popup(title='Test List Editor', content=test_list_popup, size_hint=(None, None), size=(400, 400))
+    def show_test_list_popup(self, test_list):
+        # Create popup window
+        popup = Popup(title='Loaded Test List',
+                     size_hint=(0.9, 0.9))  # 90% of screen size
+        
+        # Create main layout
+        layout = BoxLayout(orientation='vertical')
+        
+        # Create ScrollView
+        scroll_view = ScrollView(
+            size_hint=(1, 1),  # Take full size of parent
+            do_scroll_x=True,
+            do_scroll_y=True,
+            bar_width=10,
+            scroll_type=['bars']
+        )
+        
+        # Create GridLayout for the test data
+        grid = GridLayout(
+            cols=len(test_list.columns),
+            size_hint=(None, None),  # Neither dimension is bound to parent
+            spacing=10,
+            padding=10,
+            row_default_height=40
+        )
+        
+        # Calculate minimum width needed for content
+        col_width = 200  # Adjust this value based on your content
+        grid.width = col_width * len(test_list.columns)
+        grid.height = grid.row_default_height * (len(test_list) + 1)  # +1 for header
+        
+        # Add headers
+        for col in test_list.columns:
+            grid.add_widget(Label(
+                text=str(col),
+                size_hint=(None, None),
+                size=(col_width, grid.row_default_height),
+                halign='center'
+            ))
+        
+        # Add data
+        for _, row in test_list.iterrows():
+            for item in row:
+                grid.add_widget(Label(
+                    text=str(item),
+                    size_hint=(None, None),
+                    size=(col_width, grid.row_default_height),
+                    halign='center'
+                ))
+        
+        # Add grid to ScrollView
+        scroll_view.add_widget(grid)
+        
+        # Add ScrollView to layout
+        layout.add_widget(scroll_view)
+        
+        # Add close button
+        close_button = Button(
+            text='Close',
+            size_hint=(1, 0.1)
+        )
+        close_button.bind(on_press=popup.dismiss)
+        layout.add_widget(close_button)
+        
+        # Set popup content
+        popup.content = layout
         popup.open()
 
     def load_data(self, instance):
@@ -583,16 +639,8 @@ class FileLoaderApp(App):
         """Calculate and generate report for a single test based on test label input"""
         try:
             # Get test label from input
-            test_label = self.single_test_text_input.text
+            test_label = self.single_test_input_box.text
             self.status_label.text = f'Status: Processing test {test_label}...'
-
-            # Create results window
-            window = tk.Tk()
-            window.title(f'Test Results: {test_label}')
-            window.geometry("600x400")
-            
-            status_text = tk.Text(window, height=20, width=70)
-            status_text.pack(padx=10, pady=10)
 
             # Load and find test in test plan
             try:
@@ -600,117 +648,33 @@ class FileLoaderApp(App):
                 mask = test_plan_df.applymap(lambda x: test_label in str(x) if pd.notna(x) else False)
                 test_row_idx = mask.any(axis=1).idxmax()
                 curr_test = test_plan_df.iloc[test_row_idx]
-                
-                status_text.insert(tk.END, "Found test entry:\n")
-                status_text.insert(tk.END, f"{curr_test.to_string()}\n\n")
             except Exception as e:
                 raise ValueError(f"Could not find test {test_label} in test plan: {str(e)}")
 
-            # Create room properties dataclass instance
+            # Create room properties instance
             room_props = self.assign_room_properties(curr_test)
-            # room_props = RoomProperties(
-            #     site_name=curr_test['Site_Name'],
-            #     client_name=curr_test['Client_Name'],
-            #     source_room=curr_test['Source Room'],
-            #     receive_room=curr_test['Receiving Room'], 
-            #     test_date=curr_test['Test Date'],
-            #     report_date=curr_test['Report Date'],
-            #     project_name=curr_test['Project Name'],
-            #     test_label=curr_test['Test_Label'],
-            #     source_vol=curr_test['source room vol'],
-            #     receive_vol=curr_test['receive room vol'],
-            #     partition_area=curr_test['partition area'],
-            #     partition_dim=curr_test['partition dim'],
-            #     source_room_finish=curr_test['source room finish'],
-            #     source_room_name=curr_test['Source Room'],
-            #     receive_room_finish=curr_test['receive room finish'],
-            #     receive_room_name=curr_test['Receiving Room'],
-            #     srs_floor=curr_test['srs floor descrip.'],
-            #     srs_ceiling=curr_test['srs ceiling descrip.'],
-            #     srs_walls=curr_test['srs walls descrip.'],
-            #     rec_floor=curr_test['rec floor descrip.'],
-            #     rec_ceiling=curr_test['rec ceiling descrip.'],
-            #     rec_walls=curr_test['rec walls descrip.'],
-            #     annex_2_used=curr_test['Annex 2 used?'],
-            #     tested_assembly=curr_test['tested assembly'],  ## potentially redunant - expect to remove
-            #     test_assembly_type=curr_test['Test assembly Type'],
-            #     expected_performance=curr_test['Expected Performance']
-            # )
 
             # Determine test type and create appropriate test data object
             test_type = TestType(curr_test['Test Type'])
             test_data = self.load_test_data(curr_test, test_type, room_props)
 
-            status_text.insert(tk.END, f"Generating {test_type.value} report...\n")
+            self.status_label.text = f"Generating {test_type.value} report..."
 
             # Generate report
             report = create_report(curr_test, test_data, self.report_output_folder_path)
             
-            status_text.insert(tk.END, f"Report generated successfully: {report.get_doc_name()}\n")
+            # Show results in popup
+            show_results_popup(test_label, test_data)
+            
             self.status_label.text = f'Status: Test {test_label} report generated successfully'
-
-            window.mainloop()
 
         except Exception as e:
             error_msg = f"Error processing test {test_label}: {str(e)}"
             self.status_label.text = f'Status: Error - {error_msg}'
-            if 'status_text' in locals():
-                status_text.insert(tk.END, f"ERROR: {error_msg}\n")
             print(error_msg)
 
 
-    ### PRIMARILY DEBUG ###
-    def excel_import(self):  
-        ## PRIMARILY DEUBUG #####
-        # import the excel file from the testplan_path
-        self.test_plan = pd.read_excel(self.test_plan_path)
-        testnums = self.test_list['Test Label'] ## Determines the labels and number of excel files copied
-        project_name =  self.test_list['Project Name'] # need to access a cell within template the project name to copy to final reports
-        project_name = project_name.iloc[1]
-        # Initialize list to store ReportData objects
-        report_data_list = []
 
-        # Iterate through each test in testnums
-        for idx, test_row in testnums.iterrows():
-            # Load test plan data for this row
-
-            ### previous func before classes ### 
-            # room_properties, test_types, test_data = load_test_plan(self.test_plan_path, self)
-
-            
-            # Check which test types are enabled for this test
-            for test_type in TestType:
-                if test_types[test_type]:
-                    # Create ReportData object for this test type
-                    report_data = ReportData(
-                        room_properties=room_properties,
-                        test_data=test_data,
-                        test_type=test_type
-                    )
-                    report_data_list.append(report_data)
-                    
-                    # Create popup window for this report data
-                    report_window = tk.Toplevel()
-                    report_window.title(f"Test {test_row['Test Label']} - {test_type.value}")
-                    report_window.geometry("600x400")
-                    
-                    # Create text widget to display report data
-                    text_widget = tk.Text(report_window, height=20, width=70)
-                    text_widget.pack(padx=10, pady=10)
-                    
-                    # Insert report data details
-                    text_widget.insert(tk.END, f"Test Label: {test_row['Test Label']}\n")
-                    text_widget.insert(tk.END, f"Test Type: {test_type.value}\n\n")
-                    text_widget.insert(tk.END, f"Room Properties:\n")
-                    text_widget.insert(tk.END, f"Site Name: {room_properties.site_name}\n")
-                    text_widget.insert(tk.END, f"Source Room: {room_properties.source_room}\n")
-                    text_widget.insert(tk.END, f"Receive Room: {room_properties.receive_room}\n")
-                    text_widget.insert(tk.END, f"Test Date: {room_properties.test_date}\n")
-                    
-                    # Make text widget read-only
-                    text_widget.configure(state='disabled')
-
-        print(f"Generated {len(report_data_list)} report data windows")
     @classmethod
     def assign_room_properties(self, curr_test: pd.Series):
         """Assign room properties to a RoomProperties instance"""
@@ -746,44 +710,116 @@ class FileLoaderApp(App):
         return room_props
 ## this report display window should appear after the reports are generated, after the output_reports function has run. do i need to pass it more info? TBD.
 def display_report_window(report_paths, testplan, test_results):
-    # Create a new window
-    window = tk.Tk()
-    window.title("Report Results")
+    content = ReportDisplayWindow(report_paths, testplan, test_results)
+    popup = Popup(
+        title="Report Results",
+        content=content,
+        size_hint=(0.9, 0.9)
+    )
+    popup.open()
 
-    # Create a table for the testplan
-    tree = ttk.Treeview(window)
-    tree["columns"] = list(testplan.columns)
-    for i in tree["columns"]:
-        tree.heading(i, text=i)
-    for index, row in testplan.iterrows():
-        tree.insert("", "end", values=list(row))
-    tree.pack()
+class ResultWindow(GridLayout):
+    def __init__(self, test_label, test_data, **kwargs):
+        super().__init__(**kwargs)
+        self.cols = 1
+        self.padding = 10
+        self.spacing = 10
 
-    # Create a canvas for the plots
-    fig = Figure(figsize=(5, 5), dpi=100)
-    canvas = FigureCanvasTkAgg(fig, master=window)
-    canvas.draw()
-    canvas.get_tk_widget().pack()
+        # Title
+        self.add_widget(Label(text=f'Test Results: {test_label}', size_hint_y=None, height=40))
+        
+        # Scrollable content
+        scroll = ScrollView(size_hint=(1, None), size=(400, 300))
+        content = GridLayout(cols=1, spacing=10, size_hint_y=None)
+        content.bind(minimum_height=content.setter('height'))
+        
+        # Add test data
+        content.add_widget(Label(
+            text=f"Test Label: {test_label}\n"
+                 f"Room Properties:\n"
+                 f"Site Name: {test_data.room_properties.site_name}\n"
+                 f"Source Room: {test_data.room_properties.source_room}\n"
+                 f"Receive Room: {test_data.room_properties.receive_room}\n"
+                 f"Test Date: {test_data.room_properties.test_date}",
+            size_hint_y=None,
+            height=200,
+            text_size=(380, None)
+        ))
+        
+        scroll.add_widget(content)
+        self.add_widget(scroll)
+        
+        # Close button
+        close_btn = Button(
+            text='Close',
+            size_hint_y=None,
+            height=40
+        )
+        close_btn.bind(on_press=self.dismiss)
+        self.add_widget(close_btn)
+    
+    def dismiss(self, instance):
+        # Find the parent popup and dismiss it
+        parent = instance
+        while not isinstance(parent, Popup):
+            parent = parent.parent
+        parent.dismiss()
 
-    # Function to update the plot when a row is selected
-    def on_select(event):
-        selected_item = tree.selection()[0]
-        test_id = tree.item(selected_item)["values"][0]
-        ax = fig.add_subplot(111)
-        ax.clear()
-        ax.plot(test_results[test_id])
-        canvas.draw()
+def show_results_popup(test_label, test_data):
+    content = ResultWindow(test_label, test_data)
+    popup = Popup(
+        title=f'Test Results: {test_label}',
+        content=content,
+        size_hint=(0.8, 0.8)
+    )
+    popup.open()
 
-    tree.bind("<<TreeviewSelect>>", on_select)
+class ReportDisplayWindow(GridLayout):
+    def __init__(self, report_paths, testplan, test_results, **kwargs):
+        super().__init__(**kwargs)
+        self.cols = 1
+        self.padding = 10
+        self.spacing = 10
 
-    # Create a listbox for the report file paths
-    listbox = tk.Listbox(window)
-    for path in report_paths:
-        listbox.insert("end", path)
-    listbox.pack()
-
-    window.mainloop()
-
+        # Create table for testplan
+        table = GridLayout(cols=len(testplan.columns), size_hint_y=None)
+        table.bind(minimum_height=table.setter('height'))
+        
+        # Add headers
+        for col in testplan.columns:
+            table.add_widget(Label(text=str(col)))
+            
+        # Add rows
+        for _, row in testplan.iterrows():
+            for value in row:
+                table.add_widget(Label(text=str(value)))
+        
+        # Add table in a ScrollView
+        scroll = ScrollView(size_hint=(1, 0.7))
+        scroll.add_widget(table)
+        self.add_widget(scroll)
+        
+        # Add report paths list
+        paths_label = Label(
+            text='Generated Reports:',
+            size_hint_y=None,
+            height=30
+        )
+        self.add_widget(paths_label)
+        
+        paths_layout = GridLayout(cols=1, size_hint_y=None)
+        paths_layout.bind(minimum_height=paths_layout.setter('height'))
+        
+        for path in report_paths:
+            paths_layout.add_widget(Label(
+                text=str(path),
+                size_hint_y=None,
+                height=30
+            ))
+        
+        paths_scroll = ScrollView(size_hint=(1, 0.3))
+        paths_scroll.add_widget(paths_layout)
+        self.add_widget(paths_scroll)
 
 if __name__ == '__main__':
     FileLoaderApp().run()
