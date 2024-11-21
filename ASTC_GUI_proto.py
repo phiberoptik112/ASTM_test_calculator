@@ -267,6 +267,7 @@ class FileLoaderApp(App):
                 self.single_test_input_box = sanitize_filepath(instance.text)
                 instance.text = self.single_test_input_box
             
+    
     def show_test_list_popup(self, test_list):
         # Create popup window
         popup = Popup(title='Loaded Test List',
@@ -334,8 +335,87 @@ class FileLoaderApp(App):
         # Set popup content
         popup.content = layout
         popup.open()
+    
+    def show_test_data_popup(self, test_type: TestType, raw_data: dict):
+        """Display raw test data in a popup window"""
+        popup = Popup(
+            title=f'{test_type.value} Test Data Preview',
+            size_hint=(0.9, 0.9)
+        )
+        
+        # Create main layout
+        layout = BoxLayout(orientation='vertical', spacing=10, padding=10)
+        
+        # Create ScrollView for the data
+        scroll = ScrollView(size_hint=(1, 0.9))
+        
+        # Create content layout
+        content = GridLayout(
+            cols=1,
+            spacing=10,
+            padding=10,
+            size_hint_y=None
+        )
+        content.bind(minimum_height=content.setter('height'))
+        
+        # Add header
+        header = Label(
+            text=f'Raw Data Preview for {test_type.value} Test',
+            size_hint_y=None,
+            height=40,
+            bold=True
+        )
+        content.add_widget(header)
+        
+        # Add each dataframe preview
+        for key, df in raw_data.items():
+            # Section header
+            section = Label(
+                text=f'\n{key}:',
+                size_hint_y=None,
+                height=30,
+                bold=True
+            )
+            content.add_widget(section)
+            
+            # DataFrame info
+            if isinstance(df, pd.DataFrame):
+                info_text = (
+                    f'Shape: {df.shape}\n'
+                    f'Columns: {", ".join(str(col) for col in df.columns[:5])}...\n'
+                    f'\nFirst few rows:\n{df.head(3).to_string()}'
+                )
+            else:
+                info_text = "Not a DataFrame"
+                
+            info_label = TextInput(
+                text=info_text,
+                size_hint_y=None,
+                height=200,
+                readonly=True,
+                multiline=True
+            )
+            content.add_widget(info_label)
+        
+        # Add content to scroll view
+        scroll.add_widget(content)
+        layout.add_widget(scroll)
+        
+        # Add close button
+        close_button = Button(
+            text='Close',
+            size_hint=(1, 0.1)
+        )
+        close_button.bind(on_press=popup.dismiss)
+        layout.add_widget(close_button)
+        
+        # Set popup content and open
+        popup.content = layout
+        popup.open()
+
 
     def load_data(self, instance):
+        test_data_collection = {}
         # # Access the text from all text boxes
         # seems like just a debug step, may not need this once full output report PDF gen. is working since it pulls directly from the SLM datafiles. 
         try:
@@ -403,34 +483,7 @@ class FileLoaderApp(App):
                 print('Creating RoomProperties instance')
                 # Create RoomProperties instance
                 room_props = self.assign_room_properties(curr_test)
-                # room_props = RoomProperties(
-                #     site_name=curr_test['Site_Name'],
-                #     client_name=curr_test['Client_Name'],
-                #     source_room=curr_test['Source Room'],
-                #     receive_room=curr_test['Receiving Room'], 
-                #     test_date=curr_test['Test Date'],
-                #     report_date=curr_test['Report Date'],
-                #     project_name=curr_test['Project Name'],
-                #     test_label=curr_test['Test_Label'],
-                #     source_vol=curr_test['source room vol'],
-                #     receive_vol=curr_test['receive room vol'],
-                #     partition_area=curr_test['partition area'],
-                #     partition_dim=curr_test['partition dim'],
-                #     source_room_finish=curr_test['source room finish'],
-                #     source_room_name=curr_test['Source Room'],
-                #     receive_room_finish=curr_test['receive room finish'],
-                #     receive_room_name=curr_test['Receiving Room'],
-                #     srs_floor=curr_test['srs floor descrip.'],
-                #     srs_ceiling=curr_test['srs ceiling descrip.'],
-                #     srs_walls=curr_test['srs walls descrip.'],
-                #     rec_floor=curr_test['rec floor descrip.'],
-                #     rec_ceiling=curr_test['rec ceiling descrip.'],
-                #     rec_walls=curr_test['rec walls descrip.'],
-                #     annex_2_used=curr_test['Annex 2 used?'],
-                #     tested_assembly=curr_test['tested assembly'],  ## potentially redunant - expect to remove
-                #     test_assembly_type=curr_test['Test assembly Type'],
-                #     expected_performance=curr_test['expected performance']
-                # )
+
                 # Initialize total_test_data at class level or method start
                 self.total_test_data = pd.DataFrame()
 
@@ -454,18 +507,29 @@ class FileLoaderApp(App):
                     try:
                         self.status_label.text = f'Status: Processing {test_type.value} test...'
                         raw_data = self.load_test_data(curr_test, test_type, room_props)
-                        
-                        # Ensure raw_data is a DataFrame
-                        if not isinstance(raw_data, pd.DataFrame):
-                            raw_data = pd.DataFrame(raw_data)
-                        
+                        print('raw_data:', raw_data)
+
                         # Add metadata
-                        raw_data['test_label'] = curr_test['Test_Label']
-                        raw_data['test_type'] = test_type.value
+                        # Add test type and label metadata
+                        # raw_data['test_type'] = test_type.value
+                        # raw_data['test_label'] = curr_test['Test_Label']
                         
-                        # Append to total_test_data
-                        self.total_test_data = pd.concat([self.total_test_data, raw_data], 
-                                                        ignore_index=True)
+                        # Create appropriate TestData instance based on test type
+                        if self.debug_check_box.active:
+                            print(f'Creating {test_type.value} TestData instance')
+                        if test_type == TestType.AIIC:
+                            test_data_collection[test_type] = AIICTestData(room_props, raw_data)
+                        elif test_type == TestType.ASTC:
+                            test_data_collection[test_type] = ASTCTestData(room_props, raw_data)
+                        elif test_type == TestType.NIC:
+                            test_data_collection[test_type] = NICTestData(room_props, raw_data)
+                        elif test_type == TestType.DTC:
+                            test_data_collection[test_type] = DTCtestData(room_props, raw_data)
+                            
+                        # Show results popup for this test
+                        # self.show_test_data_popup(test_type, raw_data)
+
+
                         
                     except Exception as e:
                         print(f"Error processing {test_type.value} test: {str(e)}")
@@ -474,6 +538,7 @@ class FileLoaderApp(App):
                     self.status_label.text = 'Status: All test files loaded, ready to generate reports'
                     # open a popup window to display the test list
                     self.show_test_list_popup(self.test_list)
+            print('total dataset:', test_data_collection)
         except Exception as e:
             print(f"Error loading data: {str(e)}")
             self.status_label.text = f'Status: Error loading data: {str(e)}'
@@ -499,41 +564,13 @@ class FileLoaderApp(App):
             # Create RoomProperties instance
             room_props = self.assign_room_properties(curr_test)
 
-            # room_props = RoomProperties(
-            #     site_name=curr_test['Site_Name'],
-            #     client_name=curr_test['Client_Name'],
-            #     source_room=curr_test['Source Room'],
-            #     receive_room=curr_test['Receiving Room'], 
-            #     test_date=curr_test['Test Date'],
-            #     report_date=curr_test['Report Date'],
-            #     project_name=curr_test['Project Name'],
-            #     test_label=curr_test['Test_Label'],
-            #     source_vol=curr_test['source room vol'],
-            #     receive_vol=curr_test['receive room vol'],
-            #     partition_area=curr_test['partition area'],
-            #     partition_dim=curr_test['partition dim'],
-            #     source_room_finish=curr_test['source room finish'],
-            #     source_room_name=curr_test['Source Room'],
-            #     receive_room_finish=curr_test['receive room finish'],
-            #     receive_room_name=curr_test['Receiving Room'],
-            #     srs_floor=curr_test['srs floor descrip.'],
-            #     srs_ceiling=curr_test['srs ceiling descrip.'],
-            #     srs_walls=curr_test['srs walls descrip.'],
-            #     rec_floor=curr_test['rec floor descrip.'],
-            #     rec_ceiling=curr_test['rec ceiling descrip.'],
-            #     rec_walls=curr_test['rec walls descrip.'],
-            #     annex_2_used=curr_test['Annex 2 used?'],
-            #     tested_assembly=curr_test['tested assembly'],  ## potentially redunant - expect to remove
-            #     test_assembly_type=curr_test['Test assembly Type'],
-            #     expected_performance=curr_test['expected performance']
-            # )
             # Create list of enabled test types based on binary values in test columns
             enabled_tests = []
             test_type_columns = {
-                'AIIC_test': TestType.AIIC,
-                'ASTC_test': TestType.ASTC, 
-                'NIC_test': TestType.NIC,
-                'DTC_test': TestType.DTC
+                TestType.AIIC: 'AIIC',  # Changed from 'AIIC_test'
+                TestType.ASTC: 'ASTC',  # Changed from 'ASTC_test'
+                TestType.NIC: 'NIC',    # Changed from 'NIC_test'
+                TestType.DTC: 'DTC'     # Changed from 'DTC_test'
             }
             
             for col, test_type in test_type_columns.items():
@@ -618,13 +655,29 @@ class FileLoaderApp(App):
 
     def load_test_data(self, curr_test: pd.Series, test_type: TestType, room_props: RoomProperties) -> Union[AIICTestData, ASTCTestData, NICTestData, DTCtestData]:
         """Load and format raw test data based on test type"""
-        
-        # Base data dictionary for all test types
+            # First verify this test type is enabled for the current test
+        test_type_columns = {
+            TestType.AIIC: 'AIIC',  # Changed from 'AIIC_test'
+            TestType.ASTC: 'ASTC',  # Changed from 'ASTC_test'
+            TestType.NIC: 'NIC',    # Changed from 'NIC_test'
+            TestType.DTC: 'DTC'     # Changed from 'DTC_test'
+        }
+        # Check if this test type is enabled
+        test_column = test_type_columns.get(test_type)
+        if test_column not in curr_test or curr_test[test_column] != 1:
+            if self.debug_check_box.active:
+                print(f'Test type {test_type.value} is not enabled for test {curr_test["Test_Label"]}')
+            raise ValueError(f"Test type {test_type.value} is not enabled for this test")
+
+        # If we get here, the test type is valid and enabled
         if self.debug_check_box.active:
-            print('Loading base data for test:', curr_test['Test_Label'])
+            print(f'Loading base data for test: {curr_test["Test_Label"]} ({test_type.value})')
+    
         
         try:
             # Load each DataFrame separately and verify it's valid
+            if self.debug_check_box.active:
+                print('Loading base data')
             base_data = {
                 'srs_data': self.RAW_SLM_datapull(curr_test['Source'], '-831_Data.'),
                 'recive_data': self.RAW_SLM_datapull(curr_test['Recieve '], '-831_Data.'),
@@ -633,6 +686,8 @@ class FileLoaderApp(App):
             }
 
             # Verify each DataFrame is valid
+            if self.debug_check_box.active:
+                print('Verifying base data')
             for key, df in base_data.items():
                 if df is None or df.empty:
                     raise ValueError(f"Invalid or empty DataFrame for {key}")
@@ -641,6 +696,8 @@ class FileLoaderApp(App):
             if test_type == TestType.AIIC:
                 aiic_data = base_data.copy()
                 # Load additional AIIC-specific data
+                if self.debug_check_box.active:
+                    print('Loading AIIC-specific data')
                 additional_data = {
                     'AIIC_pos1': self.RAW_SLM_datapull(curr_test['Position1'], '-831_Data.'),
                     'AIIC_pos2': self.RAW_SLM_datapull(curr_test['Position2'], '-831_Data.'),
@@ -651,6 +708,8 @@ class FileLoaderApp(App):
                 }
                 
                 # Verify additional data
+                if self.debug_check_box.active:
+                    print('Verifying additional data')
                 for key, df in additional_data.items():
                     if df is None or df.empty:
                         raise ValueError(f"Invalid or empty DataFrame for {key}")
@@ -668,6 +727,8 @@ class FileLoaderApp(App):
                 }
                 
                 # Verify additional data
+                if self.debug_check_box.active:
+                    print('Verifying additional data')
                 for key, df in additional_data.items():
                     if df is None or df.empty:
                         raise ValueError(f"Invalid or empty DataFrame for {key}")
@@ -676,9 +737,13 @@ class FileLoaderApp(App):
                 return DTCtestData(room_properties=room_props, test_data=dtc_data)
 
             elif test_type == TestType.ASTC:
+                if self.debug_check_box.active:
+                    print('Creating ASTCTestData instance')
                 return ASTCTestData(room_properties=room_props, test_data=base_data)
 
             elif test_type == TestType.NIC:
+                if self.debug_check_box.active:
+                    print('Creating NICTestData instance')
                 return NICTestData(room_properties=room_props, test_data=base_data)
 
             else:
