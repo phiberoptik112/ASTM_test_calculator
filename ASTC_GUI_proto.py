@@ -174,7 +174,15 @@ class FileLoaderApp(App):
         # Update status label
         self.status_label.text = "Status: Test inputs populated"
     def RAW_SLM_datapull(self, find_datafile, datatype):
-        """Pull data from SLM files"""
+        """Pull data from SLM files
+        
+        Args:
+            find_datafile (str): File identifier to search for
+            datatype (str): Either '-831_Data.' for regular measurements or '-RT_Data.' for reverberation time
+            
+        Returns:
+            pd.DataFrame: Formatted measurement data
+        """
         # Use the class's data file paths
         raw_testpaths = {
             'A': self.slm_data_d_path,  # Path for A meter files
@@ -208,18 +216,36 @@ class FileLoaderApp(App):
 
         full_path = os.path.join(path, slm_found[0])
         
-        if self.debug_check_box.active:
-            print(f"Loading file: {full_path}")
-
         try:
+            if self.debug_check_box.active:
+                print(f"Reading file: {full_path}")
+                
             if datatype == '-831_Data.':
-                return pd.read_excel(full_path, sheet_name='OBA')
+                # Regular measurement data - use OBA sheet
+                print(f"Reading OBA sheet for measurement data")
+                df = pd.read_excel(full_path, sheet_name='OBA')
             elif datatype == '-RT_Data.':
-                return pd.read_excel(full_path, sheet_name='Summary')
+                # Reverberation time data - use Summary sheet
+                print(f"Reading Summary sheet for RT data")
+                df = pd.read_excel(full_path, sheet_name='Summary')
             else:
                 raise ValueError(f"Unknown datatype: {datatype}")
+            
+            if self.debug_check_box.active:
+                print(f"DataFrame shape: {df.shape}")
+                print(f"DataFrame columns: {df.columns.tolist()}")
+                
+            # Verify the DataFrame has expected data
+            if df.empty:
+                raise ValueError(f"Empty DataFrame loaded from {full_path}")
+                
+            return df
+            
         except Exception as e:
-            raise ValueError(f"Error reading file {full_path}: {str(e)}")
+            if self.debug_check_box.active:
+                print(f"Error in RAW_SLM_datapull: {str(e)}")
+                print(f"File: {find_datafile}, Datatype: {datatype}")
+            raise
     
     def on_text_validate(self, instance):
         # Check if the widget is a TextInput before updating instance variables
