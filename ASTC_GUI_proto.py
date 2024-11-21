@@ -472,18 +472,16 @@ class FileLoaderApp(App):
             self.test_list = pd.read_excel(testplan_path)
             debug = 1 if self.debug_check_box.active else 0
 
-        # List to store all report data objects
-            report_data_objects = []
 
         # Process each test in the test plan
             for _, curr_test in self.test_list.iterrows():
                 if self.debug_check_box.active:
-                    print('Current Test:', curr_test)
+                    print('Current Test:', curr_test['Test_Label'])
                 self.status_label.text = f'Status: Processing test: {curr_test["Test_Label"]}'
                 room_props = self.assign_room_properties(curr_test)
                 
                 # Create list of enabled tests
-                enabled_tests = []
+                curr_test_data = {}
                 for test_type, column in {
                     TestType.AIIC: 'AIIC',
                     TestType.ASTC: 'ASTC',
@@ -491,163 +489,97 @@ class FileLoaderApp(App):
                     TestType.DTC: 'DTC'
                 }.items():
                     if curr_test[column] == 1:
-                        enabled_tests.append(test_type)
-                        if self.debug_check_box.active:
-                            print(f'{test_type.value} enabled')
-
-                # Process each enabled test
-                curr_test_data = {}  # Store test data for current test
-                for test_type in enabled_tests:
-                    try:
-                        self.status_label.text = f'Status: Processing {test_type.value} test...'
-                        raw_data = self.load_test_data(curr_test, test_type, room_props)
-                        
-                        if self.debug_check_box.active:
-                            print(f'Creating {test_type.value} TestData instance')
-                            print(f'Raw data for {test_type.value}:', raw_data)
-
-                        # Create appropriate TestData instance
-                        test_data = None
-                        if test_type == TestType.AIIC:
-                            test_data = AIICTestData(room_props, raw_data)
-                        elif test_type == TestType.ASTC:
-                            test_data = ASTCTestData(room_props, raw_data)
-                        elif test_type == TestType.NIC:
-                            test_data = NICTestData(room_props, raw_data)
-                        elif test_type == TestType.DTC:
-                            test_data = DTCtestData(room_props, raw_data)
-
-                        if test_data:
-                            curr_test_data[test_type] = test_data
+                        try:
+                            self.status_label.text = f'Status: Loading {test_type.value} test data...'
+                            test_data = self.load_test_data(curr_test, test_type, room_props)
+                            curr_test_data[test_type] = {
+                                'room_properties': room_props,
+                                'test_data': test_data
+                                }
                             if self.debug_check_box.active:
-                                print(f'Successfully created {test_type.value} TestData instance')
-                                
-                    except Exception as e:
-                        print(f"Error processing {test_type.value} test: {str(e)}")
-                        continue
-
-                # Store all test data for this test
+                                print(f'Successfully loaded {test_type.value} data')
+                        except Exception as e:
+                            print(f"Error loading {test_type.value} test: {str(e)}")
+            
                 if curr_test_data:
-                    test_label = curr_test['Test_Label']
-                    self.test_data_collection[test_label] = curr_test_data
-                    
-                self.status_label.text = 'Status: All test files loaded, ready to generate reports'
-                if self.debug_check_box.active:
-                    print('Test data collection:', self.test_data_collection)
-                    
+                    self.test_data_collection[curr_test['Test_Label']] = curr_test_data
+
+            self.status_label.text = 'Status: All test data loaded successfully'
+            return True
+
         except Exception as e:
-            print(f"Error loading data: {str(e)}")
+            print(f"Error in load_data: {str(e)}")
             self.status_label.text = f'Status: Error loading data: {str(e)}'
+            return False
+
     ## TestData -> BaseTestReport subclasses -> PDF Report ###
     def output_all_reports(self, instance):
-        print('Arguments received by output_reports:', instance, self.test_plan_path, 
-              self.slm_data_d_path, self.slm_data_e_path, self.report_output_folder_path)
+        """Generate reports using previously loaded test data"""
+        if not self.test_data_collection:
+            self.status_label.text = 'Status: No test data loaded. Please load data first.'
+            return
 
-        testplan_path = self.test_plan_path.text
-        report_output_folder = self.report_output_folder_path
-        test_list = pd.read_excel(testplan_path)
-        debug = 1 if self.debug_check_box.active else 0
-
-        # List to store all report data objects
-        report_data_objects = []
-
-        # Process each test in the test plan
-        for _, curr_test in test_list.iterrows():
-            if debug:
-                print('Current Test:', curr_test)
-            self.status_label.text = f'Status: Processing test: {curr_test["Test_Label"]}'
-
-            # Create RoomProperties instance
-            room_props = self.assign_room_properties(curr_test)
-
-            # Create list of enabled test types based on binary values in test columns
-            enabled_tests = []
-            test_type_columns = {
-                TestType.AIIC: 'AIIC',  # Changed from 'AIIC_test'
-                TestType.ASTC: 'ASTC',  # Changed from 'ASTC_test'
-                TestType.NIC: 'NIC',    # Changed from 'NIC_test'
-                TestType.DTC: 'DTC'     # Changed from 'DTC_test'
-            }
+        try:
+            report_data_objects = []
             
-            for col, test_type in test_type_columns.items():
-                if curr_test[col] == 1:
-                    enabled_tests.append(test_type)
-            # Process each enabled test type
-            for test_type in enabled_tests:
-                self.status_label.text = f'Status: Generating {test_type.value} report...'                    
-                # Create appropriate TestData instance
-                raw_data = self.load_test_data(curr_test, test_type, room_props)
+            for test_label, test_data_dict in self.test_data_collection.items():
+                if self.debug_check_box.active:
+                    print(f'Generating reports for test: {test_label}')
+                
+                for test_type, data in test_data_dict.items():
+                    self.status_label.text = f'Status: Generating {test_type.value} report for {test_label}...'
+                    
+                    try:
+                        # Create appropriate report based on test type
+                        if test_type == TestType.ASTC:
+                            report = ASTCTestReport.create_report(
+                                test_data=data['test_data'],
+                                room_properties=data['room_properties'],
+                                output_folder=self.report_output_folder_path,
+                                test_type=test_type
+                            )
+                        elif test_type == TestType.AIIC:
+                            report = AIICTestReport.create_report(
+                                test_data=data['test_data'],
+                                room_properties=data['room_properties'],
+                                output_folder=self.report_output_folder_path,
+                                test_type=test_type
+                            )
+                        elif test_type == TestType.NIC:
+                            report = NICTestReport.create_report(
+                                test_data=data['test_data'],
+                                room_properties=data['room_properties'],
+                                output_folder=self.report_output_folder_path,
+                                test_type=test_type
+                            )
+                        elif test_type == TestType.DTC:
+                            report = DTCTestReport.create_report(
+                                test_data=data['test_data'],
+                                room_properties=data['room_properties'],
+                                output_folder=self.report_output_folder_path,
+                                test_type=test_type
+                            )
+                        
+                        # Save report and show debug info if enabled
+                        report.save_report()
+                        if self.debug_check_box.active:
+                            self.show_test_properties_popup(report)
+                        
+                        report_data_objects.append(report)
+                        print(f'Generated {test_type.value} report for test {test_label}')
+                    
+                    except Exception as e:
+                        print(f"Error generating {test_type.value} report for {test_label}: {str(e)}")
+                        continue
 
-                # When test_type is AIIC:
-                # raw_data will be AIICTestData with base_data + position data
-                # When test_type is DTC:
-                # raw_data will be DTCTestData with base_data + door measurements
-                # When test_type is ASTC:
-                # raw_data will be ASTCTestData with base_data only
-                # When test_type is NIC:
-                # raw_data will be NICTestData with base_data only
+            self.status_label.text = 'Status: All reports generated successfully'
+            return report_data_objects
 
-                if test_type == TestType.ASTC:
-                    ### need to validate the raw data - this is actualy the ASTCTestData instance
-                    report = ASTCTestReport.create_report(
-                        test_data=raw_data,
-                        room_properties=room_props,
-                        output_folder=report_output_folder,
-                        test_type=test_type
-                    )
-                    ## save all reports to the report output folder
-                    report.save_report()
-                    if debug:
-                        self.show_test_properties_popup(report)
-                elif test_type == TestType.AIIC:
-                    report = AIICTestReport.create_report(
-                        test_data=raw_data,
-                        room_properties=room_props,
-                        output_folder=report_output_folder,
-                        test_type=test_type
-                    )
-                    ## save all reports to the report output folder
-                    report.save_report()
-                    if debug:
-                        self.show_test_properties_popup(report)
-                elif test_type == TestType.NIC:
-                    report = NICTestReport.create_report(
-                        test_data=raw_data,
-                        room_properties=room_props,
-                        output_folder=report_output_folder,
-                        test_type=test_type
-                    )
-                    ## save all reports to the report output folder
-                    report.save_report()
-                    if debug:
-                        self.show_test_properties_popup(report)
-                elif test_type == TestType.DTC:
-                    report = DTCTestReport.create_report(
-                        test_data=raw_data,
-                        room_properties=room_props,
-                        output_folder=report_output_folder,
-                        test_type=test_type
-                    )
-                    ## save all reports to the report output folder
-                    report.save_report()
-                    if debug:
-                        self.show_test_properties_popup(report)
-
-                # Create ReportData instance ### GENERIC< NEEDED?? ###
-                # self.report_data = ReportData(
-                #     room_properties=room_props,   
-                #     test_data=test_data,
-                #     test_type=test_type
-                # )
-                # Generate report
-                # report_path = report_data.generate_report()
-                # report_data_objects.append(report_data)
-
-                print(f'Generated {test_type.value} report for test {curr_test["Test Label"]}')
-
-
-        self.status_label.text = 'Status: All reports generated successfully'
-        return report_data_objects
+        except Exception as e:
+            error_msg = f"Error generating reports: {str(e)}"
+            print(error_msg)
+            self.status_label.text = f'Status: Error - {error_msg}'
+            return None
 
     def load_test_data(self, curr_test: pd.Series, test_type: TestType, room_props: RoomProperties) -> Union[AIICTestData, ASTCTestData, NICTestData, DTCtestData]:
         """Load and format raw test data based on test type"""
