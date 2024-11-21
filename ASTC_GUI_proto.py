@@ -233,7 +233,7 @@ class FileLoaderApp(App):
             
             if self.debug_check_box.active:
                 print(f"DataFrame shape: {df.shape}")
-                print(f"DataFrame columns: {df.columns.tolist()}")
+                # print(f"DataFrame columns: {df.columns.tolist()}")
                 
             # Verify the DataFrame has expected data
             if df.empty:
@@ -267,7 +267,7 @@ class FileLoaderApp(App):
                 self.single_test_input_box = sanitize_filepath(instance.text)
                 instance.text = self.single_test_input_box
             
-    
+    ## not using right now 
     def show_test_list_popup(self, test_list):
         # Create popup window
         popup = Popup(title='Loaded Test List',
@@ -335,7 +335,7 @@ class FileLoaderApp(App):
         # Set popup content
         popup.content = layout
         popup.open()
-    
+    ## didn't end up implementing.... could be helpful? but the debug output i've got is good enough atm
     def show_test_data_popup(self, test_type: TestType, raw_data: dict):
         """Display raw test data in a popup window"""
         popup = Popup(
@@ -465,7 +465,7 @@ class FileLoaderApp(App):
             print('E_datafiles:', self.E_datafiles)
             print('Arguments received by output_reports:', instance, self.test_plan_path, 
               self.slm_data_d_path, self.slm_data_e_path, self.report_output_folder_path)
-            print('--=-=----=-=-=-=-=-=-=-=-=-=-=-=-=-=-===-=-=-'
+            print('--=-=---=-=-=-=--=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-===-=-=-'
             )
             testplan_path = self.test_plan_path
             report_output_folder = self.report_output_folder_path
@@ -490,7 +490,7 @@ class FileLoaderApp(App):
                 }.items():
                     if curr_test[column] == 1:
                         try:
-                            self.status_label.text = f'Status: Loading {test_type.value} test data...'
+                            self.status_label.text = f'-=-=-=-=-=-=-=-=-=-=-=-=-=-=-Status: Loading {test_type.value} test data...-=-=-=-=-=-=-=-=-=-==-==-=-=-=-=-=-=-=-'
                             test_data = self.load_test_data(curr_test, test_type, room_props)
                             curr_test_data[test_type] = {
                                 'room_properties': room_props,

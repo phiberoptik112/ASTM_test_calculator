@@ -500,17 +500,17 @@ class AIICTestReport(BaseTestReport):
         #### Contour_final is the AIIC contour that needs to be plotted vs the ANISPL curve- we have everything to plot the graphs and the results table  #####
         Ref_label = f'AIIC {AIIC_contour_val} Contour'
         Field_IIC_label = 'Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)'
-        frequencies =[125,160,200,250,315,400,500,630,800,1000,1250,1600,2000,2500,3150,4000]
+        # frequencies =[125,160,200,250,315,400,500,630,800,1000,1250,1600,2000,2500,3150,4000]
         Test_result_table = pd.DataFrame(
             {
-                "Frequency": frequencies,
+                "Frequency": FREQUENCIES,
                 "Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)	": Nrec_ANISPL,
                 "Average Receiver Background Level": onethird_bkgrd,
                 "Average RT60 (Seconds)": rt_thirty,
                 "Exceptions noted to ASTM E1007-14": AIIC_Exceptions
             }
         )
-        main_elements.append(Paragraph("The Apparent Impact Insulation Class (AIIC) was calculated. The AIIC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_data[0][0]))
+        main_elements.append(Paragraph("The Apparent Impact Insulation Class (AIIC) was calculated. The AIIC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+self.get_standards_data()[0][0]))
 
         return main_elements, Test_result_table
 
@@ -603,10 +603,10 @@ class ASTCTestReport(BaseTestReport):
             ('ALIGN',(0,0), (-1,-1),'LEFT')
         ]))
         main_elements.append(Test_result_table)
-        main_elements.append(Paragraph("The Apparent Sound Transmission Class (ASTC) was calculated. The ASTC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The ASTC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_data[0][0]))
+        main_elements.append(Paragraph("The Apparent Sound Transmission Class (ASTC) was calculated. The ASTC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The ASTC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+self.get_standards_data()[0][0]))
         return main_elements
     
-    def get_results_plot(self):
+    def get_results_plot(self, ATL_curve):
         plot_title = 'ASTC Reference Contour'
         plt.plot(ATL_curve, FREQUENCIES)
         plt.xlabel('Apparent Transmission Loss (dB)')
@@ -662,7 +662,7 @@ class NICTestReport(BaseTestReport):
         )
         return Test_result_table
 
-    def create_plot(self):
+    def get_results_plot(self, ATL_curve):
         plot_title = 'NIC Reference Contour'
         plt.plot(ATL_curve, FREQUENCIES)
         plt.xlabel('Apparent Transmission Loss (dB)')
