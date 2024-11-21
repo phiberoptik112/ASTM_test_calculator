@@ -415,10 +415,10 @@ class FileLoaderApp(App):
 
 
     def load_data(self, instance):
-        test_data_collection = {}
-        # # Access the text from all text boxes
-        # seems like just a debug step, may not need this once full output report PDF gen. is working since it pulls directly from the SLM datafiles. 
+        self.test_data_collection = {}  # Move to class level
         try:
+            # Access the text from all text boxes
+            # seems like just a debug step, may not need this once full output report PDF gen. is working since it pulls directly from the SLM datafiles. 
             text_input_fields = [self.test_plan_path, self.slm_data_d_path, self.slm_data_e_path, self.output_folder_path, self.single_test_input_box]
             sanitized_values = [sanitize_filepath(field.text) for field in text_input_fields]
             #refactoring to use a dictionary for the input values
@@ -477,68 +477,64 @@ class FileLoaderApp(App):
 
         # Process each test in the test plan
             for _, curr_test in self.test_list.iterrows():
-                if debug:
+                if self.debug_check_box.active:
                     print('Current Test:', curr_test)
                 self.status_label.text = f'Status: Processing test: {curr_test["Test_Label"]}'
-                print('Creating RoomProperties instance')
-                # Create RoomProperties instance
                 room_props = self.assign_room_properties(curr_test)
-
-                # Initialize total_test_data at class level or method start
-                self.total_test_data = pd.DataFrame()
-
-                # Create list of enabled tests based on curr_test values
+                
+                # Create list of enabled tests
                 enabled_tests = []
-                if curr_test['AIIC'] == 1:
-                    print('AIIC enabled')
-                    enabled_tests.append(TestType.AIIC)
-                if curr_test['ASTC'] == 1:
-                    print('ASTC enabled')
-                    enabled_tests.append(TestType.ASTC)
-                if curr_test['NIC'] == 1:
-                    print('NIC enabled')
-                    enabled_tests.append(TestType.NIC)
-                if curr_test['DTC'] == 1:
-                    print('DTC enabled')
-                    enabled_tests.append(TestType.DTC)
+                for test_type, column in {
+                    TestType.AIIC: 'AIIC',
+                    TestType.ASTC: 'ASTC',
+                    TestType.NIC: 'NIC',
+                    TestType.DTC: 'DTC'
+                }.items():
+                    if curr_test[column] == 1:
+                        enabled_tests.append(test_type)
+                        if self.debug_check_box.active:
+                            print(f'{test_type.value} enabled')
 
                 # Process each enabled test
+                curr_test_data = {}  # Store test data for current test
                 for test_type in enabled_tests:
                     try:
                         self.status_label.text = f'Status: Processing {test_type.value} test...'
                         raw_data = self.load_test_data(curr_test, test_type, room_props)
-                        print('raw_data:', raw_data)
-
-                        # Add metadata
-                        # Add test type and label metadata
-                        # raw_data['test_type'] = test_type.value
-                        # raw_data['test_label'] = curr_test['Test_Label']
                         
-                        # Create appropriate TestData instance based on test type
                         if self.debug_check_box.active:
                             print(f'Creating {test_type.value} TestData instance')
+                            print(f'Raw data for {test_type.value}:', raw_data)
+
+                        # Create appropriate TestData instance
+                        test_data = None
                         if test_type == TestType.AIIC:
-                            test_data_collection[test_type] = AIICTestData(room_props, raw_data)
+                            test_data = AIICTestData(room_props, raw_data)
                         elif test_type == TestType.ASTC:
-                            test_data_collection[test_type] = ASTCTestData(room_props, raw_data)
+                            test_data = ASTCTestData(room_props, raw_data)
                         elif test_type == TestType.NIC:
-                            test_data_collection[test_type] = NICTestData(room_props, raw_data)
+                            test_data = NICTestData(room_props, raw_data)
                         elif test_type == TestType.DTC:
-                            test_data_collection[test_type] = DTCtestData(room_props, raw_data)
-                            
-                        # Show results popup for this test
-                        # self.show_test_data_popup(test_type, raw_data)
+                            test_data = DTCtestData(room_props, raw_data)
 
-
-                        
+                        if test_data:
+                            curr_test_data[test_type] = test_data
+                            if self.debug_check_box.active:
+                                print(f'Successfully created {test_type.value} TestData instance')
+                                
                     except Exception as e:
                         print(f"Error processing {test_type.value} test: {str(e)}")
+                        continue
 
-                    # Display a message in the status label
-                    self.status_label.text = 'Status: All test files loaded, ready to generate reports'
-                    # open a popup window to display the test list
-                    self.show_test_list_popup(self.test_list)
-            print('total dataset:', test_data_collection)
+                # Store all test data for this test
+                if curr_test_data:
+                    test_label = curr_test['Test_Label']
+                    self.test_data_collection[test_label] = curr_test_data
+                    
+                self.status_label.text = 'Status: All test files loaded, ready to generate reports'
+                if self.debug_check_box.active:
+                    print('Test data collection:', self.test_data_collection)
+                    
         except Exception as e:
             print(f"Error loading data: {str(e)}")
             self.status_label.text = f'Status: Error loading data: {str(e)}'
@@ -547,7 +543,7 @@ class FileLoaderApp(App):
         print('Arguments received by output_reports:', instance, self.test_plan_path, 
               self.slm_data_d_path, self.slm_data_e_path, self.report_output_folder_path)
 
-        testplan_path = self.test_plan_path
+        testplan_path = self.test_plan_path.text
         report_output_folder = self.report_output_folder_path
         test_list = pd.read_excel(testplan_path)
         debug = 1 if self.debug_check_box.active else 0
