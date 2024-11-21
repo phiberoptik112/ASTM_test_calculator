@@ -596,44 +596,73 @@ class FileLoaderApp(App):
         # Base data dictionary for all test types
         if self.debug_check_box.active:
             print('Loading base data for test:', curr_test['Test_Label'])
-        base_data = {
-            'srs_data': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Source'], '-831_Data.')),
-            'recive_data': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Recieve '], '-831_Data.')),
-            'bkgrnd_data': pd.DataFrame(self.RAW_SLM_datapull(curr_test['BNL'], '-831_Data.')),
-            'rt': pd.DataFrame(self.RAW_SLM_datapull(curr_test['RT'], '-RT_Data.'))
-        }
+        
+        try:
+            # Load each DataFrame separately and verify it's valid
+            base_data = {
+                'srs_data': self.RAW_SLM_datapull(curr_test['Source'], '-831_Data.'),
+                'recive_data': self.RAW_SLM_datapull(curr_test['Recieve '], '-831_Data.'),
+                'bkgrnd_data': self.RAW_SLM_datapull(curr_test['BNL'], '-831_Data.'),
+                'rt': self.RAW_SLM_datapull(curr_test['RT'], '-RT_Data.')
+            }
 
-        # Create appropriate test data instance based on type
-        if test_type == TestType.AIIC:
-            aiic_data = base_data.copy()
-            aiic_data.update({
-                'AIIC_pos1': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Position1'], '-831_Data.')),
-                'AIIC_pos2': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Position2'], '-831_Data.')),
-                'AIIC_pos3': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Position3'], '-831_Data.')),
-                'AIIC_pos4': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Position4'], '-831_Data.')),
-                'AIIC_source': pd.DataFrame(self.RAW_SLM_datapull(curr_test['SourceTap'], '-831_Data.')),
-                'AIIC_carpet': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Carpet'], '-831_Data.'))
-            })
-            return AIICTestData(room_properties=room_props, test_data=aiic_data)
+            # Verify each DataFrame is valid
+            for key, df in base_data.items():
+                if df is None or df.empty:
+                    raise ValueError(f"Invalid or empty DataFrame for {key}")
 
-        elif test_type == TestType.DTC:
-            dtc_data = base_data.copy()
-            dtc_data.update({
-                'srs_door_open': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Source_Door_Open'], '-831_Data.')),
-                'srs_door_closed': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Source_Door_Closed'], '-831_Data.')),
-                'recive_door_open': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Receive_Door_Open'], '-831_Data.')),
-                'recive_door_closed': pd.DataFrame(self.RAW_SLM_datapull(curr_test['Receive_Door_Closed'], '-831_Data.'))
-            })
-            return DTCtestData(room_properties=room_props, test_data=dtc_data)
+            # Create appropriate test data instance based on type
+            if test_type == TestType.AIIC:
+                aiic_data = base_data.copy()
+                # Load additional AIIC-specific data
+                additional_data = {
+                    'AIIC_pos1': self.RAW_SLM_datapull(curr_test['Position1'], '-831_Data.'),
+                    'AIIC_pos2': self.RAW_SLM_datapull(curr_test['Position2'], '-831_Data.'),
+                    'AIIC_pos3': self.RAW_SLM_datapull(curr_test['Position3'], '-831_Data.'),
+                    'AIIC_pos4': self.RAW_SLM_datapull(curr_test['Position4'], '-831_Data.'),
+                    'AIIC_source': self.RAW_SLM_datapull(curr_test['SourceTap'], '-831_Data.'),
+                    'AIIC_carpet': self.RAW_SLM_datapull(curr_test['Carpet'], '-831_Data.')
+                }
+                
+                # Verify additional data
+                for key, df in additional_data.items():
+                    if df is None or df.empty:
+                        raise ValueError(f"Invalid or empty DataFrame for {key}")
+                
+                aiic_data.update(additional_data)
+                return AIICTestData(room_properties=room_props, test_data=aiic_data)
 
-        elif test_type == TestType.ASTC:
-            return ASTCTestData(room_properties=room_props, test_data=base_data)
+            elif test_type == TestType.DTC:
+                dtc_data = base_data.copy()
+                additional_data = {
+                    'srs_door_open': self.RAW_SLM_datapull(curr_test['Source_Door_Open'], '-831_Data.'),
+                    'srs_door_closed': self.RAW_SLM_datapull(curr_test['Source_Door_Closed'], '-831_Data.'),
+                    'recive_door_open': self.RAW_SLM_datapull(curr_test['Receive_Door_Open'], '-831_Data.'),
+                    'recive_door_closed': self.RAW_SLM_datapull(curr_test['Receive_Door_Closed'], '-831_Data.')
+                }
+                
+                # Verify additional data
+                for key, df in additional_data.items():
+                    if df is None or df.empty:
+                        raise ValueError(f"Invalid or empty DataFrame for {key}")
+                
+                dtc_data.update(additional_data)
+                return DTCtestData(room_properties=room_props, test_data=dtc_data)
 
-        elif test_type == TestType.NIC:
-            return NICTestData(room_properties=room_props, test_data=base_data)
+            elif test_type == TestType.ASTC:
+                return ASTCTestData(room_properties=room_props, test_data=base_data)
 
-        else:
-            raise ValueError(f"Unsupported test type: {test_type}")
+            elif test_type == TestType.NIC:
+                return NICTestData(room_properties=room_props, test_data=base_data)
+
+            else:
+                raise ValueError(f"Unsupported test type: {test_type}")
+
+        except Exception as e:
+            if self.debug_check_box.active:
+                print(f"Error loading data: {str(e)}")
+                print(f"Current test data: {curr_test}")
+            raise
 
     def calculate_single_test(self, instance):
         """Calculate and generate report for a single test based on test label input"""
