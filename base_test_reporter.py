@@ -34,9 +34,10 @@ class BaseTestReport:
     def setup_document(self):
         """Setup the document template with proper frames and margins"""
         try:
+            print('-=-=-=-=- INSIDE DOCUMENT SETUP =-=-=-=-=-=-')
             # Create output path
             output_path = Path(self.reportOutputfolder) / self.get_doc_name()
-            
+            print(f'Output path: {output_path}')
             self.doc = BaseDocTemplate(
                 str(output_path),  # Convert Path to string
                 pagesize=letter,
@@ -45,7 +46,7 @@ class BaseTestReport:
                 topMargin=self.top_margin, 
                 bottomMargin=self.bottom_margin
             )
-
+            print('Document created')
             # Define frames
             self.header_frame = Frame(
                 self.left_margin, 
@@ -85,15 +86,17 @@ class BaseTestReport:
 
     def header_elements(self):
         elements = []
+        print('Building header elements')
         props = self.test_data.room_properties
         elements.append(Paragraph(self.get_report_title(), self.custom_title_style))
         elements.append(Spacer(1, 10))
-        
+        print('Building left side data')
         leftside_data = [
             ["Report Date:", props.report_date],
             ['Test Date:', props.test_date],
             ['DLAA Test No', props.test_number]
         ]
+        print('Building right side data')
         rightside_data = [
             ["Source Room:", props.source_room_name],
             ["Receiver Room:", props.recieve_room_name],
@@ -115,7 +118,7 @@ class BaseTestReport:
 
     def header_footer(self, canvas, doc):
         canvas.saveState()
-        
+        print('Building header and footer')
         # Build header
         self.header_frame._leftPadding = self.header_frame._rightPadding = 0
         header_story = self.header_elements()
@@ -182,7 +185,9 @@ class BaseTestReport:
         return NICreporting_Note
     
     def get_doc_name(self):
-        raise NotImplementedError
+        print('Getting doc name')
+        props = self.test_data.room_properties
+        return f'{props.project_name} {self.test_type.value} Test Report_{props.test_label}.pdf'
 
     def save_report(self):
         self.doc.save()
@@ -208,7 +213,7 @@ class BaseTestReport:
         output_dir = Path(output_folder)
         if not output_dir.exists():
             output_dir.mkdir(parents=True, exist_ok=True)
-            
+        
         report_classes = {
             TestType.AIIC: AIICTestReport,
             TestType.ASTC: ASTCTestReport,
@@ -222,13 +227,14 @@ class BaseTestReport:
             
         try:
             # Create report instance using test_data which contains room_properties
+            print('--=-=-=-=-= Creating Report Class and setting up document -=-=-=-=-=-=-')
             report = report_class(test_data = test_data, 
                                   reportOutputfolder = output_dir, 
                                   test_type = test_type)
             
             # Setup document
             doc = report.setup_document()
-
+            print('Document setup complete')
             # Generate content with error handling
             main_elements = []
             try:
@@ -273,7 +279,7 @@ class BaseTestReport:
         """
         try:
             main_elements = []
-            
+            print('Creating standards section')
             # Standards section
             styleHeading = ParagraphStyle('heading', parent=self.styles['Normal'], spaceAfter=10)
             main_elements.append(Paragraph('<u>STANDARDS:</u>', styleHeading))
@@ -327,6 +333,7 @@ class BaseTestReport:
             main_elements = []
             
             # Test Procedure
+            print('Creating test procedure')
             procedure = self.get_test_procedure()
             if not procedure:
                 raise ValueError("Test procedure is missing")
@@ -635,7 +642,8 @@ class NICTestReport(BaseTestReport):
         # Add any NIC-specific initialization here
 
     def get_doc_name(self):
-        return f"{self.single_test_dataframe['room_properties']['Project_Name'][0]} NIC Test Report_{self.single_test_dataframe['room_properties']['Test_Label'][0]}.pdf"
+        self.props = self.test_data.room_properties
+        return f"{self.props['Project_Name'][0]} NIC Test Report_{self.props['Test_Label'][0]}.pdf"
 
     def get_standards_data(self):
         return [
@@ -651,7 +659,7 @@ class NICTestReport(BaseTestReport):
     def get_test_instrumentation(self):
         pass
 
-    def get_test_results(self, single_test_dataframe):
+    def get_test_results(self):
         props = self.test_data.room_properties
         ## obtain SLM data from overall dataframe
         ## need to convert all of this to use the dataclasses and the data_processor.py functions 
@@ -683,7 +691,8 @@ class NICTestReport(BaseTestReport):
 
     def get_results_plot(self, ATL_curve):
         plot_title = 'NIC Reference Contour'
-        plt.plot(ATL_curve, FREQUENCIES)
+        # plt.plot(ATL_curve, FREQUENCIES)
+        resultsplotfig = plot_curves(FREQUENCIES, 'Apparent Transmission Loss (dB)', ATL_curve, ATL_curve, 'NIC Reference Contour', 'NIC Reference Contour')
         plt.xlabel('Apparent Transmission Loss (dB)')
         plt.ylabel('Frequency (Hz)')
         plt.title('NIC Reference Contour')

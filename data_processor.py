@@ -14,6 +14,13 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame, Paragraph, Table, TableStyle, Spacer, PageBreak, KeepInFrame, Image
 from reportlab.lib.units import inch
+from reportlab.lib.utils import ImageReader
+from io import BytesIO
+import matplotlib
+matplotlib.use('Agg')  # Set backend to non-interactive
+import matplotlib.pyplot as plt
+from matplotlib import ticker
+from typing import List
 
 
 @dataclass
@@ -430,27 +437,49 @@ def calc_astc_val(atl_val: pd.Series) -> float:
         if ASTC_start >80: break
 
 def plot_curves(frequencies: List[float], y_label: str, ref_curve: pd.Series, 
-                field_curve: pd.Series, ref_label: str, field_label: str) -> plt.Figure:
-    # pass labels for both curves, depending on AIIC or ASTC 
-    # AIIC will be Nrec_ANISPL, ASTC will be ATL_val
+                field_curve: pd.Series, ref_label: str, field_label: str) -> ImageReader:
+    """Creates a plot and returns it in a format compatible with ReportLab.
+    
+    Args:
+        frequencies: List of frequency values for x-axis
+        y_label: Label for y-axis
+        ref_curve: Reference curve data
+        field_curve: Field measurement curve data
+        ref_label: Label for reference curve
+        field_label: Label for field curve
+        
+    Returns:
+        ImageReader: ReportLab-compatible image object
+    """
+    # Create figure
     plt.figure(figsize=(10, 6))
+    
+    # Plot curves
     plt.plot(frequencies, ref_curve, label=ref_label, color='red')
-    plt.plot(frequencies, field_curve, label=field_label, color='black', marker='s', linestyle='--')
+    plt.plot(frequencies, field_curve, label=field_label, color='black', 
+             marker='s', linestyle='--')
+    
+    # Configure axes and labels
     plt.xlabel('Frequency')
     plt.ylabel(y_label)
     plt.grid(True)
     plt.tick_params(axis='x', rotation=45)
     plt.xticks(frequencies)
     plt.xscale('log')
-    plt.gca().get_xaxis().set_major_formatter(plt.ScalarFormatter())  # Format x-ticks as scalars
-    plt.gca().xaxis.set_major_locator(ticker.FixedLocator(frequencies))  # Force all x-ticks to display
-    # plt.title('Reference vs Measured')
+    plt.gca().get_xaxis().set_major_formatter(plt.ScalarFormatter())
+    plt.gca().xaxis.set_major_locator(ticker.FixedLocator(frequencies))
     plt.legend()
-    # plt.show()
-    fig = plt.get_figure()
-    fig.savefig('plot.png')
-    plot_fig = Image('plot.png')
-    return fig
+    
+    # Save plot to bytes buffer instead of file
+    img_buffer = BytesIO()
+    plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=300)
+    img_buffer.seek(0)
+    
+    # Clear the current figure to free memory
+    plt.close()
+    
+    # Create ReportLab ImageReader object
+    return ImageReader(img_buffer)
 
 def process_single_test(test_plan_entry: pd.Series, slm_data_paths: Dict[str, Path], 
                         output_folder: Path) -> Path:
