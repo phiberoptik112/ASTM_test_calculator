@@ -35,6 +35,10 @@ class BaseTestReport:
         """Setup the document template with proper frames and margins"""
         try:
             print('-=-=-=-=- INSIDE DOCUMENT SETUP =-=-=-=-=-=-')
+            print(f"Test Type: {self.test_type}")
+            print(f"Output Folder: {self.reportOutputfolder}")
+            print(f"Room Properties: {vars(self.test_data.room_properties)}")  # Print all properties
+
             # Create output path
             output_path = Path(self.reportOutputfolder) / self.get_doc_name()
             print(f'Output path: {output_path}')
@@ -136,8 +140,43 @@ class BaseTestReport:
         canvas.restoreState()
 
 
-    def get_standards_data(self):
-        raise NotImplementedError
+    def get_standards_data(self,styles):
+        """Get standards data based on test type"""
+        common_standards = [
+            ['ASTM E336-20', 'Standard Test Method for Measurement of Airborne Sound Attenuation between Rooms in Buildings'],
+            ['ASTM E413-22', 'Classification for Rating Sound Insulation']
+        ]
+        # Test-specific standards
+        standards_by_type = {
+        TestType.AIIC: [
+            ['ASTM E1007-14', Paragraph('Standard Test Method for Field Measurement of Tapping Machine Impact Sound Transmission Through Floor-Ceiling Assemblies and Associated Support Structure',styles['Normal'])],
+            ['ASTM E413-16', Paragraph('Standard Classification for Rating Sound Insulation',styles['Normal'])],
+            ['ASTM E1007-14', Paragraph('Standard Test Method for Field Measurement of Tapping Machine Impact Sound Transmission Through Floor-Ceiling Assemblies and Associated Support Structure',styles['Normal'])],
+            ['ASTM E989-06(2012)', Paragraph('Standard Classification for Determination of Impact Insulation Class (IIC)',styles['Normal'])],
+            ['ASTM E2235-04(2012)', Paragraph('Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods',styles['Normal'])]
+        ],
+        TestType.ASTC: [
+            ['ASTM E336-16', Paragraph('Standard Test Method for Measurement of Airborne Sound Attenuation between Rooms in Buildings',styles['Normal'])],
+            ['ASTM E413-16', Paragraph('Classification for Rating Sound Insulation',styles['Normal'])],
+            ['ASTM E2235-04(2012)', Paragraph('Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods',styles['Normal'])]
+            *common_standards
+        ],
+        TestType.NIC: [
+            ['ASTM E336-16', Paragraph('Standard Test Method for Measurement of Airborne Sound Attenuation between Rooms in Buildings',styles['Normal'])],
+            ['ASTM E413-16', Paragraph('Classification for Rating Sound Insulation',styles['Normal'])],
+            ['ASTM E2235-04(2012)', Paragraph('Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods',styles['Normal'])]
+            *common_standards
+        ],
+        TestType.DTC: [
+            ['ASTM E336-20', 'Standard Test Method for Measurement of Airborne Sound Attenuation between Rooms in Buildings'],
+            *common_standards
+            ]
+        }
+    
+        try:
+            return standards_by_type[self.test_type]
+        except KeyError:
+            raise ValueError(f"Unsupported test type: {self.test_type}")
 
     def get_test_procedure(self):
         raise NotImplementedError
@@ -186,12 +225,28 @@ class BaseTestReport:
     
     def get_doc_name(self):
         print('Getting doc name')
-        props = self.test_data.room_properties
-        return f'{props.project_name} {self.test_type.value} Test Report_{props.test_label}.pdf'
+        props = vars(self.test_data.room_properties)  # Convert to dictionary
+        return f'{props["project_name"]} {self.test_type.value} Test Report_{props["test_label"]}.pdf'
 
     def save_report(self):
         self.doc.save()
-    
+    def create_test_environment_section(self):
+        # Heading 'TEST ENVIRONMENT'
+        props = self.test_data.room_properties
+        main_elements = []
+        main_elements.append(Paragraph("<u>TEST ENVIRONMENT:</u>", styleHeading))
+        main_elements.append(Paragraph('The source room was '+props.source_room_name+'. The space was'+props.source_room_finish+'. The floor was '+single_test_dataframe['room_properties']['srs_floor'][0]+'. The ceiling was '+single_test_dataframe['room_properties']['srs_ceiling'][0]+". The walls were"+single_test_dataframe['room_properties']['srs_walls'][0]+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+single_test_dataframe['room_properties']['source_room_vol'][0]+"cu. ft."))
+        main_elements.append(Spacer(1, 10))  # Adds some space 
+        ### Recieve room paragraph
+        main_elements.append(Paragraph('The receiver room was '+single_test_dataframe['room_properties']['Receiving_Room'][0]+'. The space was'+single_test_dataframe['room_properties']['receiver_room_finish'][0]+'. The floor was '+single_test_dataframe['room_properties']['rec_floor'][0]+'. The ceiling was '+single_test_dataframe['room_properties']['rec_ceiling'][0]+". The walls were"+single_test_dataframe['room_properties']['rec_Wall'][0]+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+single_test_dataframe['room_properties']['receive_room_vol'][0]+"cu. ft."))
+        main_elements.append(Spacer(1, 10))  # Adds some space 
+        main_elements.append(Paragraph('The test assembly measured approximately '+single_test_dataframe['room_properties']['partition_dim'][0]+", and had an area of approximately "+single_test_dataframe['room_properties']['partition_area'][0]+"sq. ft."))
+        main_elements.append(Spacer(1, 10))  # Adds some space 
+        # Heading 'TEST ENVIRONMENT'
+        main_elements.append(Paragraph("<u>TEST ASSEMBLY:</u>", styleHeading))
+        main_elements.append(Spacer(1, 10))  # Adds some space 
+        main_elements.append(Paragraph("The tested assembly was the"+single_test_dataframe['room_properties']['Test_Assembly_Type'][0]+"The assembly was not field verified, and was based on information provided by the client and drawings for the project. The client advised that no slab treatment or self-leveling was applied. Results may vary if slab treatment or self-leveling or any adhesive is used in other installations."))
+        return main_elements
 
     @classmethod
     def create_report(cls, test_data, output_folder: Path, test_type):
@@ -285,7 +340,7 @@ class BaseTestReport:
             main_elements.append(Paragraph('<u>STANDARDS:</u>', styleHeading))
             
             # Get and validate standards data
-            standards_data = self.get_standards_data()
+            standards_data = self.get_standards_data(styles)
             if not standards_data:
                 raise ValueError("Standards data is missing")
                 
@@ -305,16 +360,16 @@ class BaseTestReport:
             main_elements.append(Paragraph(conformance_statement))
 
             # Test environment
-            test_env = self.get_test_environment()
+            test_env = self.create_test_environment_section()
             if not test_env:
                 raise ValueError("Test environment information is missing")
             main_elements.append(Paragraph(test_env))
 
-            # Test assembly
-            test_assembly = self.get_test_assembly()
-            if not test_assembly:
-                raise ValueError("Test assembly information is missing")
-            main_elements.append(test_assembly)
+            # # Test assembly
+            # test_assembly = self.get_test_assembly()
+            # if not test_assembly:
+            #     raise ValueError("Test assembly information is missing")
+            # main_elements.append(test_assembly)
 
             return main_elements
 
