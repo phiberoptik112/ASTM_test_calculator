@@ -520,8 +520,6 @@ class FileLoaderApp(App):
             return
 
         try:
-            report_data_objects = []
-            
             for test_label, test_data_dict in self.test_data_collection.items():
                 if self.debug_check_box.active:
                     print(f'Generating reports for test: {test_label}')
@@ -530,42 +528,28 @@ class FileLoaderApp(App):
                     self.status_label.text = f'Status: Generating {test_type.value} report for {test_label}...'
                     
                     try:
-                        # Create appropriate report based on test type
-                        if test_type == TestType.ASTC:
-                            report = ASTCTestReport.create_report(
-                                test_data=data['test_data'],
-                                room_properties=data['room_properties'],
-                                output_folder=self.report_output_folder_path,
-                                test_type=test_type
-                            )
-                        elif test_type == TestType.AIIC:
-                            report = AIICTestReport.create_report(
-                                test_data=data['test_data'],
-                                room_properties=data['room_properties'],
-                                output_folder=self.report_output_folder_path,
-                                test_type=test_type
-                            )
-                        elif test_type == TestType.NIC:
-                            report = NICTestReport.create_report(
-                                test_data=data['test_data'],
-                                room_properties=data['room_properties'],
-                                output_folder=self.report_output_folder_path,
-                                test_type=test_type
-                            )
-                        elif test_type == TestType.DTC:
-                            report = DTCTestReport.create_report(
-                                test_data=data['test_data'],
-                                room_properties=data['room_properties'],
-                                output_folder=self.report_output_folder_path,
-                                test_type=test_type
-                            )
-                        
-                        # Save report and show debug info if enabled
-                        report.save_report()
                         if self.debug_check_box.active:
-                            self.show_test_properties_popup(report)
+                            print(f"Debug: Test data structure:")
+                            print(f"- Test type: {test_type}")
+                            print(f"- Test data type: {type(data['test_data'])}")
+                            print(f"- Attributes: {dir(data['test_data'])}")
+                            print(f"- Has room_properties: {'room_properties' in dir(data['test_data'])}")
+                            if hasattr(data['test_data'], 'room_properties'):
+                                print(f"- Room properties type: {type(data['test_data'].room_properties)}")
+                    # Create appropriate report based on test type
+                        report_class = {
+                            TestType.ASTC: ASTCTestReport,
+                            TestType.AIIC: AIICTestReport,
+                            TestType.NIC: NICTestReport,
+                            TestType.DTC: DTCTestReport
+                        }.get(test_type)
                         
-                        report_data_objects.append(report)
+                        if report_class:
+                            report = report_class.create_report(
+                                test_data=data['test_data'],
+                                output_folder=self.report_output_folder_path,
+                                test_type=test_type  # Pass the test_type here
+                            )
                         print(f'Generated {test_type.value} report for test {test_label}')
                     
                     except Exception as e:
@@ -573,7 +557,7 @@ class FileLoaderApp(App):
                         continue
 
             self.status_label.text = 'Status: All reports generated successfully'
-            return report_data_objects
+            return True
 
         except Exception as e:
             error_msg = f"Error generating reports: {str(e)}"

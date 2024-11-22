@@ -10,10 +10,15 @@ from config import *
 from data_processor import *
 
 class BaseTestReport:
-    def __init__(self, curr_test, test_data, reportOutputfolder):
-        self.curr_test = curr_test
+    def __init__(self, test_data, reportOutputfolder, test_type):
+        print(f"Debug: BaseTestReport initialization:")
+        print(f"- Test data type: {type(test_data)}")
+        print(f"- Test data attributes: {dir(test_data)}")
+        print(f"- Has room_properties: {hasattr(test_data, 'room_properties')}")
+
         self.test_data = test_data
         self.reportOutputfolder = reportOutputfolder
+        self.test_type = test_type
         self.doc = None
         self.styles = getSampleStyleSheet()
         self.custom_title_style = self.styles['Heading1']
@@ -176,17 +181,20 @@ class BaseTestReport:
             NICreporting_Note = '---'
         return NICreporting_Note
     
+    def get_doc_name(self):
+        raise NotImplementedError
+
     def save_report(self):
         self.doc.save()
     
+
     @classmethod
-    def create_report(cls, curr_test, test_data, reportOutputfolder: Path, test_type):
+    def create_report(cls, test_data, output_folder: Path, test_type):
         """Factory method to create and build the appropriate test report
         
         Args:
-            curr_test: Current test information
             test_data: TestData instance containing all test measurements and properties
-            reportOutputfolder: Path object for the output directory
+            output_folder: Path object for the output directory
             test_type: Type of test (AIIC, ASTC, NIC, or DTC)
             
         Returns:
@@ -197,7 +205,7 @@ class BaseTestReport:
             ValueError: If test type is unsupported or path is invalid
         """
         # Validate output directory
-        output_dir = Path(reportOutputfolder)
+        output_dir = Path(output_folder)
         if not output_dir.exists():
             output_dir.mkdir(parents=True, exist_ok=True)
             
@@ -213,8 +221,10 @@ class BaseTestReport:
             raise ValueError(f"Unsupported test type: {test_type}")
             
         try:
-            # Create report instance
-            report = report_class(curr_test, test_data, output_dir)
+            # Create report instance using test_data which contains room_properties
+            report = report_class(test_data = test_data, 
+                                  reportOutputfolder = output_dir, 
+                                  test_type = test_type)
             
             # Setup document
             doc = report.setup_document()
@@ -222,12 +232,16 @@ class BaseTestReport:
             # Generate content with error handling
             main_elements = []
             try:
+                print('Creating first page')
                 main_elements.extend(report.create_first_page())
                 main_elements.append(PageBreak())   
+                print('Creating second page')
                 main_elements.extend(report.create_second_page())
                 main_elements.append(PageBreak())
+                print('Creating third page')
                 main_elements.extend(report.create_third_page())
                 main_elements.append(PageBreak())
+                print('Creating fourth page')
                 main_elements.extend(report.create_fourth_page())
             except ReportGenerationError as e:
                 print(f"Error generating report pages: {str(e)}")
@@ -241,7 +255,7 @@ class BaseTestReport:
                 raise ReportGenerationError(f"Failed to save report to {output_path}")
                 
             print(f"Report saved successfully to: {output_path}")
-            return report
+            return True
             
         except Exception as e:
             print(f"Failed to create report: {str(e)}")
@@ -615,6 +629,11 @@ class ASTCTestReport(BaseTestReport):
         plt.grid()
 
 class NICTestReport(BaseTestReport):
+    def __init__(self, test_data, reportOutputfolder, test_type):
+        # Explicitly call parent's __init__
+        super().__init__(test_data, reportOutputfolder, test_type)
+        # Add any NIC-specific initialization here
+
     def get_doc_name(self):
         return f"{self.single_test_dataframe['room_properties']['Project_Name'][0]} NIC Test Report_{self.single_test_dataframe['room_properties']['Test_Label'][0]}.pdf"
 
