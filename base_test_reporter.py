@@ -639,18 +639,32 @@ class AIICTestReport(BaseTestReport):
         main_elements = []
         # get average of 4 tapper positions for recieve total OBA
         print('Getting average of 4 tapper positions for receive total OBA')
-        # Use the correct keys that match the AIICTestData structure
-        for i in range(1, 5):
-            pos_key = f'AIIC_pos{i}'  # Match the keys used in load_test_data
-            try:
-                pos_data = format_SLMdata(self.test_data.__dict__[pos_key])  # Access the attribute using the correct key
-                if pos_data is not None:
+        # Debug print to see what data we have
+        print("Available test data attributes:", dir(self.test_data))
+        print("Test data type:", type(self.test_data))
+
+        # Access the positions using the correct attribute names from AIICTestData
+        try:
+            positions = {
+                1: self.test_data.pos1,
+                2: self.test_data.pos2,
+                3: self.test_data.pos3,
+                4: self.test_data.pos4
+            }
+            
+            for i in range(1, 5):
+                print(f"Processing position {i}")
+                if positions[i] is not None:
+                    pos_data = format_SLMdata(positions[i])
+                    print(f"Position {i} data shape:", pos_data.shape if hasattr(pos_data, 'shape') else 'No shape')
                     average_pos.append(pos_data)
                 else:
-                    print(f"Warning: No data for position {i}")
-            except KeyError:
-                print(f"Error: Missing data for position {i}")
-                raise ValueError(f"Missing required AIIC position data: {pos_key}")
+                    print(f"Warning: Position {i} data is None")
+            
+        except AttributeError as e:
+            print(f"Error accessing test data: {e}")
+            print("Test data contents:", self.test_data.__dict__)
+            raise ValueError(f"Unable to access position data: {str(e)}")
         print('average_pos: ',average_pos)
         onethird_rec_Total = sum(average_pos) / len(average_pos)
         # this needs to be an average of the 4 tapper positions, stored in a dataframe of the average of the 4 dataframes octave band results. 
@@ -669,8 +683,9 @@ class AIICTestReport(BaseTestReport):
             recieve_roomvol=props['receive_vol'],
             NIC_vollimit=150
         )
-        
-        # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,rt_thirty,room_properties['Partition area'][0],room_properties['Recieve Vol'][0])
+        ###
+        # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,rt_thirty,room_properties['Partition area'][0],room_properties['Recieve Vol'][0])\
+        print('-=-=-=-=-=-=-= Calculating AIIC contour-=-=-=-=-=-=-=-=-')
         self.AIIC_contour_val, self.Contour_curve_result = calc_AIIC_val_claude(AIIC_Normalized_recieve)
         print('AIIC_contour_val: ',self.AIIC_contour_val)
         IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
@@ -693,12 +708,13 @@ class AIICTestReport(BaseTestReport):
         Test_result_table = pd.DataFrame(
             {
                 "Frequency": FREQUENCIES,
-                "Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)	": Nrec_ANISPL,
+                "Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)	": AIIC_Normalized_recieve,
                 "Average Receiver Background Level": onethird_bkgrd,
                 "Average RT60 (Seconds)": rt_thirty,
                 "Exceptions noted to ASTM E1007-14": AIIC_Exceptions
             }
         )
+        ### need to add a big box that displays the final number
         main_elements.append(Paragraph("The Apparent Impact Insulation Class (AIIC) was calculated. The AIIC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_text[0][0]))
 
         return main_elements, Test_result_table

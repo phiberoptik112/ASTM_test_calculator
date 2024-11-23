@@ -320,7 +320,7 @@ def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd
     print('srs overall: ', srs_overalloct)
     NR_val = srs_overalloct - ASTC_recieve_corr
     NR_val = pd.to_numeric(NR_val, errors='coerce')
-    print('NR_val: ', NR_val)
+    # print('NR_val: ', NR_val)
     ##### Writing in the NIC curve calculation #####
     ### THIS IS NOT WORKING _ TROUBLSHOOTING 10-7-24 ###
     diff_negative = 0
@@ -328,14 +328,14 @@ def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd
     pos_diffs = list()
     New_curve = list()
     NIC_val_list = NR_val[1:17]
-    print('NIC initial val list: ', NIC_val_list)
+    # print('NIC initial val list: ', NIC_val_list)
     while (diff_negative <= 8 and new_sum <= 32):
         for vals in STCCurve:
             New_curve.append(vals+NIC_start)
         NIC_curve = New_curve - NIC_val_list
         NIC_curve = np.round(NIC_curve)
         diff_negative = np.max(NIC_curve)
-        print('NIC curve: ',NIC_curve)
+        # print('NIC curve: ',NIC_curve)
         for val in NIC_curve:
             if val > 0:
                 pos_diffs.append(np.round(val))
@@ -349,20 +349,48 @@ def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd
             break
         pos_diffs = []
         New_curve = []
-        print('NIC curve: ',NIC_curve)
+        # print('NIC curve: ',NIC_curve)
         NIC_start = NIC_start + 1
         if NIC_start >80: break
     # Normalized_recieve = recieve_corr / srs_overalloct
-    sabines = pd.to_numeric(sabines, errors='coerce')
-    sabines = np.round(sabines)
-    if isinstance(sabines, pd.DataFrame):
-        sabines = sabines.values
+    # sabines = pd.to_numeric(sabines, errors='coerce')
+    # sabines = np.round(sabines)
+    # if isinstance(sabines, pd.DataFrame):
+    #     sabines = sabines.values
 
-    AIIC_Normalized_recieve = list()
-    AIIC_Normalized_recieve = AIIC_recieve_corr-10*(np.log10(108/sabines))
-    AIIC_Normalized_recieve = np.round(AIIC_Normalized_recieve)
+    # AIIC_Normalized_recieve = list()
+    # AIIC_Normalized_recieve = AIIC_recieve_corr-10*(np.log10(108/sabines))
+    # AIIC_Normalized_recieve = np.round(AIIC_Normalized_recieve)
 
-    print('Normalized_recieve: ',AIIC_Normalized_recieve)
+    # Convert to numpy arrays and ensure same length
+    AIIC_recieve_corr = np.array(AIIC_recieve_corr, dtype=np.float64)
+    sabines = np.array(sabines, dtype=np.float64)
+# Ensure we don't have any zeros in sabines to avoid log(0)
+    sabines = np.maximum(sabines, np.finfo(float).eps)  # Replace zeros with small value
+    print("Shapes before operation:")
+    print(f"AIIC_recieve_corr shape: {np.array(AIIC_recieve_corr).shape}")
+    print(f"sabines shape: {np.array(sabines).shape}")
+    # If we need to slice to match lengths (assuming we want the same frequency range)
+    if len(AIIC_recieve_corr) != len(sabines):
+        # Determine the correct range to use
+        min_length = min(len(AIIC_recieve_corr), len(sabines))
+        AIIC_recieve_corr = AIIC_recieve_corr[:min_length]
+        sabines = sabines[:min_length]
+    # If you need specific frequency bands (e.g., 125Hz to 4000Hz)
+    freq_range = slice(1, 17)  # Adjust indices based on your frequency range
+    AIIC_recieve_corr = np.array(AIIC_recieve_corr)[freq_range]
+    sabines = np.array(sabines)[freq_range]
+    # Perform calculation in steps
+    log_term = np.log10(108/sabines)
+    scaling = 10 * log_term
+    AIIC_Normalized_recieve = AIIC_recieve_corr - scaling
+    AIIC_Normalized_recieve = np.round(AIIC_Normalized_recieve) 
+
+    print(f"Final result shape: {AIIC_Normalized_recieve.shape}")
+
+    print("Final shapes:")
+    print(f"AIIC_Normalized_recieve shape: {AIIC_Normalized_recieve.shape}")
+    # print('Normalized_recieve: ',AIIC_Normalized_recieve)
     return NR_val, NIC_final_val, sabines,AIIC_recieve_corr, ASTC_recieve_corr, AIIC_Normalized_recieve
 
 ### this code revised 7/24/24 - functional and produces accurate ATL values
@@ -517,7 +545,8 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=True):
 
     return AIIC_contour_val, Contour_curve_result
 
-def calc_aiic_val(Normalized_recieve_IIC: pd.Series) -> Tuple[float, pd.Series]:
+## potentially remove, use claude's code instead above 
+#def calc_aiic_val(Normalized_recieve_IIC: pd.Series) -> Tuple[float, pd.Series]:
     pos_diffs = list()
     diff_negative_min = 0
     AIIC_start = 94
