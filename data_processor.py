@@ -205,7 +205,7 @@ def calculate_onethird_Logavg(average_pos):
 def calc_nr_new(srs_overalloct: pd.Series, rec_overalloct: pd.Series, 
                 bkgrnd_overalloct: pd.Series, rt_thirty: pd.Series, 
                 receive_roomvol: float, 
-                test_type: TestType) -> Tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
+                test_type: TestType) -> tuple:
     # Implement the NR calculation logic
     NIC_vollimit = 150  # cu. ft.
     if receive_roomvol > NIC_vollimit:

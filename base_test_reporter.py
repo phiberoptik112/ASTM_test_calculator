@@ -651,7 +651,7 @@ class AIICTestReport(BaseTestReport):
         onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)
         rt_thirty = self.test_data.rt['Unnamed: 10'][25:41]/1000
         print('Calculating NR, sabines, corrected_recieve,Nrec_ANISPL')
-        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_nr_new(onethird_srs, onethird_rec_Total, onethird_bkgrd, rt_thirty,props['receive_vol'],self.test_data.test_type)
+        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_nr_new(onethird_srs, onethird_rec_Total, onethird_bkgrd, rt_thirty,props['receive_vol'],test_type='AIIC')
         
         # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,rt_thirty,room_properties['Partition area'][0],room_properties['Recieve Vol'][0])
         self.AIIC_contour_val, self.Contour_curve_result = calc_AIIC_val_claude(Nrec_ANISPL)
@@ -747,7 +747,7 @@ class ASTCTestReport(BaseTestReport):
             onethird_bkgrd, 
             rt_thirty,
             receive_vol,
-            self.test_data.test_type
+            test_type='ASTC'
         )
 
         # Create ASTC reference curve
@@ -820,7 +820,7 @@ class NICTestReport(BaseTestReport):
         onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)
         rt_thirty = self.test_data.rt['Unnamed: 10'][25:41]/1000
         # Calculation of NR
-        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_nr_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,props['receive_vol'],testtype='NIC')
+        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_nr_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,props['receive_vol'],test_type='NIC')
         # Calculation of ATL
         ATL_val,corrected_STC_recieve = calc_atl_val(onethird_srs, onethird_rec, onethird_bkgrd,props['partition_area'],props['receive_vol'],sabines)
 
