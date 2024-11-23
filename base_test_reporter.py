@@ -634,15 +634,23 @@ class AIICTestReport(BaseTestReport):
         print('-=-=-=-=-=-=-= Getting AIIC test results-=-=-=-=-=-=-=-=-')
         props = vars(self.test_data.room_properties)
         onethird_srs = format_SLMdata(self.test_data.srs_data) 
+        onethird_rec = format_SLMdata(self.test_data.recive_data)
         average_pos = []
         main_elements = []
         # get average of 4 tapper positions for recieve total OBA
-        print('Getting average of 4 tapper positions for recieve total OBA')
-        #### THIS IS PROBELMATIC NEED TO DEBUG ### 
+        print('Getting average of 4 tapper positions for receive total OBA')
+        # Use the correct keys that match the AIICTestData structure
         for i in range(1, 5):
-            pos_input = f'pos{i}'
-            pos_data = format_SLMdata(self.test_data[pos_input]) ### need to verify if this is working correctly, should be pulling from all positions
-            average_pos.append(pos_data)
+            pos_key = f'AIIC_pos{i}'  # Match the keys used in load_test_data
+            try:
+                pos_data = format_SLMdata(self.test_data.__dict__[pos_key])  # Access the attribute using the correct key
+                if pos_data is not None:
+                    average_pos.append(pos_data)
+                else:
+                    print(f"Warning: No data for position {i}")
+            except KeyError:
+                print(f"Error: Missing data for position {i}")
+                raise ValueError(f"Missing required AIIC position data: {pos_key}")
         print('average_pos: ',average_pos)
         onethird_rec_Total = sum(average_pos) / len(average_pos)
         # this needs to be an average of the 4 tapper positions, stored in a dataframe of the average of the 4 dataframes octave band results. 
@@ -651,10 +659,19 @@ class AIICTestReport(BaseTestReport):
         onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)
         rt_thirty = self.test_data.rt['Unnamed: 10'][25:41]/1000
         print('Calculating NR, sabines, corrected_recieve,Nrec_ANISPL')
-        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_nr_new(onethird_srs, onethird_rec_Total, onethird_bkgrd, rt_thirty,props['receive_vol'],test_type='AIIC')
+
+        NR_val, NIC_final_val, sabines, AIIC_recieve_corr, ASTC_recieve_corr, AIIC_Normalized_recieve = calc_NR_new(
+            srs_overalloct=onethird_srs,
+            AIIC_rec_overalloct=onethird_rec_Total, 
+            ASTC_rec_overalloct=onethird_rec,
+            bkgrnd_overalloct=onethird_bkgrd,
+            sabines=rt_thirty,
+            recieve_roomvol=props['receive_vol'],
+            NIC_vollimit=150
+        )
         
         # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,rt_thirty,room_properties['Partition area'][0],room_properties['Recieve Vol'][0])
-        self.AIIC_contour_val, self.Contour_curve_result = calc_AIIC_val_claude(Nrec_ANISPL)
+        self.AIIC_contour_val, self.Contour_curve_result = calc_AIIC_val_claude(AIIC_Normalized_recieve)
         print('AIIC_contour_val: ',self.AIIC_contour_val)
         IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
         IIC_contour_final = list()
@@ -741,13 +758,14 @@ class ASTCTestReport(BaseTestReport):
             receive_vol
         )
 
-        calc_NR, sabines, corrected_recieve, Nrec_ANISPL = calc_nr_new(
-            onethird_srs, 
-            onethird_rec, 
-            onethird_bkgrd, 
-            rt_thirty,
-            receive_vol,
-            test_type='ASTC'
+        NR_val, NIC_final_val, sabines, AIIC_recieve_corr, ASTC_recieve_corr, AIIC_Normalized_recieve = calc_NR_new(
+            srs_overalloct=onethird_srs,
+            AIIC_rec_overalloct=None,  # Not needed for ASTC test
+            ASTC_rec_overalloct=onethird_rec,
+            bkgrnd_overalloct=onethird_bkgrd,
+            sabines=rt_thirty,
+            recieve_roomvol=props['receive_vol'],
+            NIC_vollimit=150
         )
 
         # Create ASTC reference curve
@@ -820,7 +838,15 @@ class NICTestReport(BaseTestReport):
         onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)
         rt_thirty = self.test_data.rt['Unnamed: 10'][25:41]/1000
         # Calculation of NR
-        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_nr_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,props['receive_vol'],test_type='NIC')
+        NR_val, NIC_final_val, sabines, AIIC_recieve_corr, ASTC_recieve_corr, AIIC_Normalized_recieve = calc_NR_new(
+            srs_overalloct=onethird_srs,
+            AIIC_rec_overalloct=None,  # Not needed for NIC test
+            ASTC_rec_overalloct=onethird_rec,
+            bkgrnd_overalloct=onethird_bkgrd,
+            sabines=rt_thirty,
+            recieve_roomvol=props['receive_vol'],
+            NIC_vollimit=150
+        )
         # Calculation of ATL
         ATL_val,corrected_STC_recieve = calc_atl_val(onethird_srs, onethird_rec, onethird_bkgrd,props['partition_area'],props['receive_vol'],sabines)
 
@@ -836,7 +862,7 @@ class NICTestReport(BaseTestReport):
                 "Source OBA": onethird_srs,
                 "Reciever OBA": onethird_rec,
                 "Background OBA": onethird_bkgrd,
-                "NR": calc_NR,
+                "NR": NR_val,
                 "Exceptions": NIC_exceptions
             }
         )
