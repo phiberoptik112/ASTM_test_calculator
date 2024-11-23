@@ -498,6 +498,11 @@ class FileLoaderApp(App):
                                 }
                             if self.debug_check_box.active:
                                 print(f'Successfully loaded {test_type.value} data')
+                                print(f'Current test data structure:')
+                                print(f"- Test type: {test_type}")
+                                print(f"- Test data type: {type(test_data)}")
+                                print(f"- Attributes: {dir(test_data)}")
+                                # print(f"- Has room_properties: {'room_properties' in dir(test_data)}")
                         except Exception as e:
                             print(f"Error loading {test_type.value} test: {str(e)}")
             

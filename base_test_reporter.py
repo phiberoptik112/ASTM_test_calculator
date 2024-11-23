@@ -5,8 +5,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate
 
-
-from config import *
+from config import standards_text, test_instrumentation_table, test_procedure_pg, ISR_ony_report, stockNIC_note, stockISR_notes, FREQUENCIES
 from data_processor import *
 
 class BaseTestReport:
@@ -22,7 +21,7 @@ class BaseTestReport:
         self.doc = None
         self.styles = getSampleStyleSheet()
         self.custom_title_style = self.styles['Heading1']
-        
+        # custom_title_style = styles['Heading1']
         # Define margins and heights
         self.left_margin = 0.75 * 72
         self.right_margin = 0.75 * 72
@@ -99,7 +98,7 @@ class BaseTestReport:
         leftside_data = [
             ["Report Date:", props['report_date']],
             ['Test Date:', props['test_date']],
-            ['DLAA Test No', props['test_number']]
+            ['DLAA Test No', props['test_label']]
         ]
         print('Building right side data')
         rightside_data = [
@@ -143,10 +142,7 @@ class BaseTestReport:
 
     def get_standards_data(self):
         """Get standards data based on test type"""
-        # common_standards = [
-        #     ['ASTM E336-20', 'Standard Test Method for Measurement of Airborne Sound Attenuation between Rooms in Buildings'],
-        #     ['ASTM E413-22', 'Classification for Rating Sound Insulation']
-        # ]
+        print('-=-=-=-=-=-=-= Getting standards table data -=-=-=-=-=-=-=')
         # Test-specific standards
         standards_by_type = {
         TestType.AIIC: [
@@ -171,7 +167,7 @@ class BaseTestReport:
             
             ]
         }
-    
+        print('>>>>>>>>> Standards table data retrieved <<<<<<<<<<')
         try:
             return standards_by_type[self.test_type]
         except KeyError:
@@ -179,12 +175,15 @@ class BaseTestReport:
 
     def get_test_procedure(self):
         main_elements = []
-        main_elements.append(Paragraph("<u>TEST PROCEDURE:</u>", self.styles['Heading']))
-        main_elements.append(Paragraph('Determination of space-average sound pressure levels was performed via the manually scanned microphones techique, described in ' + self.get_standards_data()[0][0] + ', Paragraph 11.4.3.3.'+ "The source room was selected in accordance with ASTM E336-11 Paragraph 9.2.5, which states that 'If a corridor must be used as one of the spaces for measurement of ATL or FTL, it shall be used as the source space.'"))
+        print('-=-=-=-==- Getting test procedure -=-=-=-=-')
+        main_elements.append(Paragraph("<u>TEST PROCEDURE:</u>", self.styleHeading))
+        main_elements.append(Paragraph('Determination of space-average sound pressure levels was performed via the manually scanned microphones techique, described in ' + standards_text[0][0] + ', Paragraph 11.4.3.3.'+ "The source room was selected in accordance with ASTM E336-11 Paragraph 9.2.5, which states that 'If a corridor must be used as one of the spaces for measurement of ATL or FTL, it shall be used as the source space.'"))
         main_elements.append(Spacer(1,10))
         main_elements.append(Paragraph("Flanking transmission was not evaluated."))
-        elements.append(Paragraph("To evaluate room absorption, 1 microphone was used to measure 4 decays at 4 locations around the receiving room for a total of 16 measurements, per"+standards_data[2][0]))
-
+        main_elements.append(Paragraph("To evaluate room absorption, 1 microphone was used to measure 4 decays at 4 locations around the receiving room for a total of 16 measurements, per"+standards_text[2][0]))
+        print('>>>>>>>>> Test procedure retrieved <<<<<<<<<<')
+        return main_elements
+        
     def get_test_instrumentation(self):
         common_equipment = [
             ['Sound Level Meter','Larson Davis','831','4328','10/24/2022','4/4/2024'],
@@ -196,9 +195,9 @@ class BaseTestReport:
         ]
         return common_equipment
 
-    def create_results_table(self, Test_result_table, styleHeading):
+    def create_results_table(self, Test_result_table):
         main_elements = []
-        main_elements.append(Paragraph("<u>STATEMENT OF TEST RESULTS:</u>", styleHeading))
+        main_elements.append(Paragraph("<u>STATEMENT OF TEST RESULTS:</u>", self.styleHeading))
         Test_result_table = Table(Test_result_table, hAlign='LEFT') ## hardcoded, change to table variable for selected test
         Test_result_table.setStyle(TableStyle([
             ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
@@ -207,28 +206,29 @@ class BaseTestReport:
             ('RIGHTPADDING', (0, 0), (-1, -1), 6),
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('ALIGN',(0,0), (-1,-1),'LEFT')
         ]))
-        return Test_result_table, main_elements
+        main_elements.append(Test_result_table)
+        return main_elements
 
-    def create_plot(self):
-        raise NotImplementedError
+    # def create_plot(self):
+    #     raise NotImplementedError
 
-    def get_report_title(self, custom_title_style):
-
+    def get_report_title(self):
+        print('Getting report title for specific test')
         title_by_type = {
             TestType.AIIC: [
-                Paragraph("<b>Field Impact Sound Transmission Test Report</b>", custom_title_style),
-                Paragraph("<b>Apparent Impact Insulation Class (AIIC)</b>", custom_title_style)
+                Paragraph("<b>Field Impact Sound Transmission Test Report</b>", self.custom_title_style),
+                Paragraph("<b>Apparent Impact Insulation Class (AIIC)</b>", self.custom_title_style)
             ],
             TestType.ASTC: [
-                Paragraph("<b>Field Sound Transmission Test Report</b>", custom_title_style),
-                Paragraph("<b>Apparent Sound Transmission Class (ASTC)</b>", custom_title_style)
+                Paragraph("<b>Field Sound Transmission Test Report</b>", self.custom_title_style),
+                Paragraph("<b>Apparent Sound Transmission Class (ASTC)</b>", self.custom_title_style)
             ],
             TestType.NIC: [
-                Paragraph("<b>Field Sound Transmission Test Report</b>", custom_title_style),
-                Paragraph("<b>Noise Isolation Class (NIC)</b>", custom_title_style)
+                Paragraph("<b>Field Sound Transmission Test Report</b>", self.custom_title_style),
+                Paragraph("<b>Noise Isolation Class (NIC)</b>", self.custom_title_style)
             ]
         }
         try:
@@ -253,24 +253,82 @@ class BaseTestReport:
 
     def save_report(self):
         self.doc.save()
-    def create_test_environment_section(self, styleHeading):
-        # Heading 'TEST ENVIRONMENT'
-        props = vars(self.test_data.room_properties)
-        main_elements = []
-        print('-=--==-=-=-=-=-=  Creating test environment section  =-=-=-=-=-=')
-        main_elements.append(Paragraph("<u>TEST ENVIRONMENT:</u>", styleHeading))
-        main_elements.append(Paragraph('The source room was '+props['source_room_name']+'. The space was'+props['source_room_finish']+'. The floor was '+props['srs_floor']+'. The ceiling was '+props['srs_ceiling']+". The walls were"+props['srs_walls']+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+props['source_room_vol']+"cu. ft."))
-        main_elements.append(Spacer(1, 10))  # Adds some space 
-        ### Recieve room paragraph
-        main_elements.append(Paragraph('The receiver room was '+props['Receiving_Room']+'. The space was'+props['receiver_room_finish']+'. The floor was '+props['rec_floor']+'. The ceiling was '+props['rec_ceiling']+". The walls were"+props['rec_Wall']+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+props['receive_room_vol']+"cu. ft."))
-        main_elements.append(Spacer(1, 10))  # Adds some space 
-        main_elements.append(Paragraph('The test assembly measured approximately '+props['partition_dim']+", and had an area of approximately "+props['partition_area']+"sq. ft."))
-        main_elements.append(Spacer(1, 10))  # Adds some space 
-        # Heading 'TEST ENVIRONMENT'
-        main_elements.append(Paragraph("<u>TEST ASSEMBLY:</u>", styleHeading))
-        main_elements.append(Spacer(1, 10))  # Adds some space 
-        main_elements.append(Paragraph("The tested assembly was the"+props['Test_Assembly_Type']+"The assembly was not field verified, and was based on information provided by the client and drawings for the project. The client advised that no slab treatment or self-leveling was applied. Results may vary if slab treatment or self-leveling or any adhesive is used in other installations."))
-        return main_elements
+    def create_test_environment_section(self):
+        try:
+            props = vars(self.test_data.room_properties)
+            main_elements = []
+            
+            # Debug print
+            print('Debug: Room properties:')
+            for key, value in props.items():
+                print(f"{key}: {type(value)} = {value}")
+
+            # Helper function to safely handle string conversion
+            def safe_str(value):
+                """Convert any value to an appropriate string representation"""
+                if isinstance(value, list):
+                    return ' '.join(map(str, value))
+                elif isinstance(value, float):
+                    return f"{value:.1f}"  # Format float to 1 decimal place
+                elif isinstance(value, (int, float)):
+                    return f"{value:,}"    # Add thousand separators
+                return str(value)
+
+            # Create paragraphs with safer string handling
+            source_room_desc = (
+                f"The source room was {safe_str(props['source_room_name'])}. "
+                f"The space was {safe_str(props['source_room_finish'])}. "
+                f"The floor was {safe_str(props['srs_floor'])}. "
+                f"The ceiling was {safe_str(props['srs_ceiling'])}. "
+                f"The walls were {safe_str(props['srs_walls'])}. "
+                "All doors and windows were closed during the testing period. "
+                f"The source room had a volume of approximately {safe_str(props['source_vol'])} cu. ft."
+            )
+
+            receive_room_desc = (
+                f"The receiver room was {safe_str(props['receive_room_name'])}. "
+                f"The space was {safe_str(props['receive_room_finish'])}. "
+                f"The floor was {safe_str(props['rec_floor'])}. "
+                f"The ceiling was {safe_str(props['rec_ceiling'])}. "
+                f"The walls were {safe_str(props['rec_walls'])}. "
+                "All doors and windows were closed during the testing period. "
+                f"The source room had a volume of approximately {safe_str(props['receive_vol'])} cu. ft."
+            )
+
+            assembly_desc = (
+                f"The test assembly measured approximately {safe_str(props['partition_dim'])}, "
+                f"and had an area of approximately {safe_str(props['partition_area'])} sq. ft."
+            )
+
+            test_assembly_desc = (
+                f"The tested assembly was the {safe_str(props['test_assembly_type'])} "
+                "The assembly was not field verified, and was based on information provided by the client "
+                "and drawings for the project. The client advised that no slab treatment or self-leveling "
+                "was applied. Results may vary if slab treatment or self-leveling or any adhesive is used "
+                "in other installations."
+            )
+
+            # Build the document elements
+            main_elements.extend([
+                Paragraph("<u>TEST ENVIRONMENT:</u>", self.styleHeading),
+                Paragraph(source_room_desc),
+                Spacer(1, 10),
+                Paragraph(receive_room_desc),
+                Spacer(1, 10),
+                Paragraph(assembly_desc),
+                Spacer(1, 10),
+                Paragraph("<u>TEST ASSEMBLY:</u>", self.styleHeading),
+                Spacer(1, 10),
+                Paragraph(test_assembly_desc)
+            ])
+
+            print('-=-=-=-=-=-=-= Test environment section created -=-=-=-=-=-=-=')
+            return main_elements
+
+        except Exception as e:
+            print(f"Error in create_test_environment_section: {str(e)}")
+            print(f"Properties causing error: {props}")
+            raise
 
     @classmethod
     def create_report(cls, test_data, output_folder: Path, test_type):
@@ -318,8 +376,8 @@ class BaseTestReport:
             main_elements = []
             try:
                     # Create styles
-                styles = getSampleStyleSheet()
-                custom_title_style = styles['Heading1']
+                # styles = getSampleStyleSheet()
+                
                 print('Creating first page')
                 main_elements.extend(report.create_first_page())
                 main_elements.append(PageBreak())   
@@ -348,17 +406,8 @@ class BaseTestReport:
         except Exception as e:
             print(f"Failed to create report: {str(e)}")
             raise ReportGenerationError(f"Report generation failed: {str(e)}")
-    def create_report_title(self):
-        elements = []
-        elements.append(Paragraph("<b>Field Impact Sound Transmission Test Report</b>", custom_title_style))
-        elements.append(Paragraph("<b>Apparent Impact Insulation Class (AIIC)</b>", custom_title_style))
-        # elif test_type == 'ASTC':
-        #     elements.append(Paragraph("<b>Field Sound Transmission Test Report</b>", custom_title_style))
-        #     elements.append(Paragraph("<b>Apparent Sound Transmission Class (ASTC)</b>", custom_title_style))
-        # elif test_type == 'NIC':
-        #     elements.append(Paragraph("<b>Field Sound Transmission Test Report</b>", custom_title_style))
-        #     elements.append(Paragraph("<b>Noise Isolation Class (NIC)</b>", custom_title_style))
-        return elements
+
+
     def create_first_page(self):
         """Creates the first page of the report with standards and conformance info.
         
@@ -373,9 +422,9 @@ class BaseTestReport:
             main_elements = []
             print('Creating standards section')
             # Standards section
-            styleHeading = ParagraphStyle('heading', parent=self.styles['Normal'], spaceAfter=10)
+            self.styleHeading = ParagraphStyle('heading', parent=self.styles['Normal'], spaceAfter=10)
 
-            main_elements.append(Paragraph('<u>STANDARDS:</u>', styleHeading))
+            main_elements.append(Paragraph('<u>STANDARDS:</u>', self.styleHeading))
             
             # Get and validate standards data
             standards_data = self.get_standards_data()
@@ -391,7 +440,7 @@ class BaseTestReport:
             main_elements.append(standards_table)
 
             # Statement of conformance
-            main_elements.append(Paragraph("<u>STATEMENT OF CONFORMANCE:</u>", styleHeading))
+            main_elements.append(Paragraph("<u>STATEMENT OF CONFORMANCE:</u>", self.styleHeading))
             conformance_statement = self.get_statement_of_conformance()
             if not conformance_statement:
                 raise ValueError("Conformance statement is missing")
@@ -399,16 +448,13 @@ class BaseTestReport:
 
             # Test environment
             test_env = self.create_test_environment_section()
+            print('>>>>>>>>> appending test environment <<<<<<<<<<')
             if not test_env:
                 raise ValueError("Test environment information is missing")
-            main_elements.append(Paragraph(test_env))
+            
+            main_elements.extend(test_env)
 
-            # # Test assembly
-            # test_assembly = self.get_test_assembly()
-            # if not test_assembly:
-            #     raise ValueError("Test assembly information is missing")
-            # main_elements.append(test_assembly)
-
+            print('>>>>>>>>> Returning first page elements <<<<<<<<<<')
             return main_elements
 
         except AttributeError as e:
@@ -431,12 +477,12 @@ class BaseTestReport:
             if not procedure:
                 raise ValueError("Test procedure is missing")
                 
-            main_elements.append(Paragraph("<u>TEST PROCEDURE:</u>", self.custom_title_style))
-            main_elements.append(Paragraph(procedure))
+            main_elements.extend(procedure)
             main_elements.append(Spacer(1, 10))
             
             # Test Instrumentation
-            main_elements.append(Paragraph("<u>TEST INSTRUMENTATION:</u>", self.custom_title_style))
+            print('Creating test instrumentation')
+            main_elements.append(Paragraph("<u>TEST INSTRUMENTATION:</u>", self.styleHeading))
             
             instrumentation = self.get_test_instrumentation()
             if not instrumentation:
@@ -540,8 +586,8 @@ class BaseTestReport:
 
 class AIICTestReport(BaseTestReport):
     def get_doc_name(self):
-        props = self.test_data.room_properties
-        return f"{props['Project_Name'][0]} AIIC Test Report_{props['Test_Label'][0]}.pdf"
+        props = vars(self.test_data.room_properties)
+        return f"{props['project_name']} AIIC Test Report_{props['test_label']}.pdf"
 
     def get_standards_data(self):
         return [
@@ -550,24 +596,25 @@ class AIICTestReport(BaseTestReport):
             ['ASTM E2235-04(2012)', 'Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods'],
             ['ASTM E989-06(2012)', 'Standard Classification for Determination of Impact Insulation Class (IIC)']
         ]
-    def get_statement_of_conformace(self):
+    def get_statement_of_conformance(self):
         return "Testing was conducted in accordance with ASTM E1007-14, ASTM E413-16, ASTM E2235-04(2012), and ASTM E989-06(2012), with exceptions noted below. All requrements for measuring abd reporting Absorption Normalized Impact Sound Pressure Level (ANISPL) and Apparent Impact Insulation Class (AIIC) were met."
     
-    def get_test_environment(self,styleHeading,):
+    def get_test_environment(self):
         main_elements = []
-        props = self.test_data.room_properties
-        main_elements.append(Paragraph("<u>TEST ENVIRONMENT:</u>", styleHeading))
-        main_elements.append(Paragraph('The source room was '+props['Source_Room'][0]+'. The space was'+props['source_room_finish'][0]+'. The floor was '+props['srs_floor'][0]+'. The ceiling was '+props['srs_ceiling'][0]+". The walls were"+props['srs_walls'][0]+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+props['source_room_vol'][0]+"cu. ft."))
+        props = vars(self.test_data.room_properties)
+        print('-=-=-=-=-=-=-= Getting AIIC test environment-=-=-=-=-=-=-=-=-')
+        main_elements.append(Paragraph("<u>TEST ENVIRONMENT:</u>", self.styleHeading))
+        main_elements.append(Paragraph('The source room was '+props['source_room_name']+'. The space was'+props['source_room_finish']+'. The floor was '+props['srs_floor']+'. The ceiling was '+props['srs_ceiling']+". The walls were"+props['srs_walls']+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+props['source_vol']+"cu. ft."))
         main_elements.append(Spacer(1, 10))  # Adds some space 
         ### Recieve room paragraph
-        main_elements.append(Paragraph('The receiver room was '+props['Receiving_Room'][0]+'. The space was'+props['receiver_room_finish'][0]+'. The floor was '+props['rec_floor'][0]+'. The ceiling was '+props['rec_ceiling'][0]+". The walls were"+props['rec_Wall'][0]+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+props['receive_room_vol'][0]+"cu. ft."))
+        main_elements.append(Paragraph('The receiver room was '+props['receive_room_name']+'. The space was'+props['receive_room_finish']+'. The floor was '+props['rec_floor']+'. The ceiling was '+props['rec_ceiling']+". The walls were"+props['rec_walls']+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+str(props['receive_vol'])+"cu. ft."))
         main_elements.append(Spacer(1, 10))  # Adds some space 
-        main_elements.append(Paragraph('The test assembly measured approximately '+props['partition_dim'][0]+", and had an area of approximately "+props['partition_area'][0]+"sq. ft."))
+        main_elements.append(Paragraph('The test assembly measured approximately '+props['partition_dim']+", and had an area of approximately "+str(props['partition_area'])+"sq. ft."))
         main_elements.append(Spacer(1, 10))  # Adds some space 
-        # Heading 'TEST ENVIRONMENT'
-        main_elements.append(Paragraph("<u>TEST ASSEMBLY:</u>", styleHeading))
+        # Heading 'TEST ASSEMBLY'
+        main_elements.append(Paragraph("<u>TEST ASSEMBLY:</u>", self.styleHeading))
         main_elements.append(Spacer(1, 10))  # Adds some space 
-        main_elements.append(Paragraph("The tested assembly was the"+props['Test_Assembly_Type'][0]+"The assembly was not field verified, and was based on information provided by the client and drawings for the project. The client advised that no slab treatment or self-leveling was applied. Results may vary if slab treatment or self-leveling or any adhesive is used in other installations."))
+        main_elements.append(Paragraph("The tested assembly was the"+props['test_assembly_type']+"The assembly was not field verified, and was based on information provided by the client and drawings for the project. The client advised that no slab treatment or self-leveling was applied. Results may vary if slab treatment or self-leveling or any adhesive is used in other installations."))
         # ##### END OF FIRST PAGE TEXT  - ########
         #   main_elements.append(PageBreak())
         return main_elements
@@ -584,37 +631,48 @@ class AIICTestReport(BaseTestReport):
     
     def get_test_results(self):
                 #dataframe for AIIC is in single_test_dataframe
+        print('-=-=-=-=-=-=-= Getting AIIC test results-=-=-=-=-=-=-=-=-')
+        props = vars(self.test_data.room_properties)
         onethird_srs = format_SLMdata(self.test_data.srs_data) 
         average_pos = []
         main_elements = []
         # get average of 4 tapper positions for recieve total OBA
+        print('Getting average of 4 tapper positions for recieve total OBA')
+        #### THIS IS PROBELMATIC NEED TO DEBUG ### 
         for i in range(1, 5):
-            pos_input = f'AIIC_pos{i}'
-            pos_data = format_SLMdata(self.test_data.recive_data[pos_input]) ### need to verify if this is working correctly, should be pulling from all positions
+            pos_input = f'pos{i}'
+            pos_data = format_SLMdata(self.test_data[pos_input]) ### need to verify if this is working correctly, should be pulling from all positions
             average_pos.append(pos_data)
-
+        print('average_pos: ',average_pos)
         onethird_rec_Total = sum(average_pos) / len(average_pos)
         # this needs to be an average of the 4 tapper positions, stored in a dataframe of the average of the 4 dataframes octave band results. 
 
 
         onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)
         rt_thirty = self.test_data.rt['Unnamed: 10'][25:41]/1000
-
-        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_nr_new(onethird_srs, onethird_rec_Total, onethird_bkgrd, rt_thirty,self.test_data.room_properties['receive_room_vol'][0],NIC_vollimit=883,testtype='AIIC')
+        print('Calculating NR, sabines, corrected_recieve,Nrec_ANISPL')
+        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_nr_new(onethird_srs, onethird_rec_Total, onethird_bkgrd, rt_thirty,props['receive_vol'],self.test_data.test_type)
         
         # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,rt_thirty,room_properties['Partition area'][0],room_properties['Recieve Vol'][0])
-        AIIC_contour_val, Contour_curve_result = calc_aiic_val(Nrec_ANISPL)
-
+        self.AIIC_contour_val, self.Contour_curve_result = calc_AIIC_val_claude(Nrec_ANISPL)
+        print('AIIC_contour_val: ',self.AIIC_contour_val)
         IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
         IIC_contour_final = list()
         # initial application of the IIC curve to the first AIIC start value 
         for vals in IIC_curve:
-            IIC_contour_final.append(vals+(110-AIIC_contour_val))
+            IIC_contour_final.append(vals+(110-self.AIIC_contour_val))
         # print(IIC_contour_final)
         #### Contour_final is the AIIC contour that needs to be plotted vs the ANISPL curve- we have everything to plot the graphs and the results table  #####
-        Ref_label = f'AIIC {AIIC_contour_val} Contour'
+        Ref_label = f'AIIC {self.AIIC_contour_val} Contour'
         Field_IIC_label = 'Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)'
         # frequencies =[125,160,200,250,315,400,500,630,800,1000,1250,1600,2000,2500,3150,4000]
+        AIIC_Exceptions = [] ### need to add exceptions to the table
+        rec_roomvol = props['receive_vol']
+        for vals in sabines:
+            if vals > 2*(rec_roomvol**2/3):
+                AIIC_Exceptions.append('0')
+            else:
+                AIIC_Exceptions.append('1')
         Test_result_table = pd.DataFrame(
             {
                 "Frequency": FREQUENCIES,
@@ -624,7 +682,7 @@ class AIICTestReport(BaseTestReport):
                 "Exceptions noted to ASTM E1007-14": AIIC_Exceptions
             }
         )
-        main_elements.append(Paragraph("The Apparent Impact Insulation Class (AIIC) was calculated. The AIIC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+self.get_standards_data()[0][0]))
+        main_elements.append(Paragraph("The Apparent Impact Insulation Class (AIIC) was calculated. The AIIC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_text[0][0]))
 
         return main_elements, Test_result_table
 
@@ -637,7 +695,7 @@ class AIICTestReport(BaseTestReport):
             "The AIIC rating is based on Apparent Transmission Loss (ATL), and includes "
             "the effects of noise flanking. The AIIC reference contour is shown on the "
             "next page, and has been fit to the Apparent Transmission Loss values, in "
-            f"accordance with the procedure of {self.standards_data[0][0]}"
+            f"accordance with the procedure of {standards_text[0][0]}"
         )
 
 class ASTCTestReport(BaseTestReport):
@@ -662,6 +720,7 @@ class ASTCTestReport(BaseTestReport):
     def get_test_results(self):
         # Format the raw data
         main_elements = []
+        print('-=-=-=-=-=-=-= Getting ASTC test results-=-=-=-=-=-=-=-=-')
         props = vars(self.test_data.room_properties)
         onethird_rec = format_SLMdata(self.test_data.recive_data)
         onethird_srs = format_SLMdata(self.test_data.srs_data)
@@ -688,8 +747,7 @@ class ASTCTestReport(BaseTestReport):
             onethird_bkgrd, 
             rt_thirty,
             receive_vol,
-            NIC_vollimit=883,
-            testtype='ASTC'
+            self.test_data.test_type
         )
 
         # Create ASTC reference curve
@@ -721,7 +779,7 @@ class ASTCTestReport(BaseTestReport):
             ('ALIGN',(0,0), (-1,-1),'LEFT')
         ]))
         main_elements.append(Test_result_table)
-        main_elements.append(Paragraph("The Apparent Sound Transmission Class (ASTC) was calculated. The ASTC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The ASTC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+self.get_standards_data()[0][0]))
+        main_elements.append(Paragraph("The Apparent Sound Transmission Class (ASTC) was calculated. The ASTC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The ASTC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_text[0][0]))
         return main_elements
     
     def get_results_plot(self, ATL_curve):
@@ -740,35 +798,38 @@ class NICTestReport(BaseTestReport):
 
     def get_doc_name(self):
         props = vars(self.test_data.room_properties)
-        return f"{props['Project_Name'][0]} NIC Test Report_{props['Test_Label'][0]}.pdf"
+        return f"{props['project_name']} NIC Test Report_{props['test_label']}.pdf"
 
-
+    def get_statement_of_conformance(self):
+        return "Testing was conducted in accordance with ASTM E336-20, ASTM E413-16, and ASTM E2235-04(2012), with exceptions noted below. All requrements for measuring abd reporting Airborne Sound Attenuation between Rooms in Buildings (ATL) and Noise Isolation Class (NIC) were met."
 
     # Implement other methods as needed
     def get_test_procedure(self):
-        pass
+        return super().get_test_procedure()
 
     def get_test_instrumentation(self):
-        pass
+        return super().get_test_instrumentation()
 
     def get_test_results(self):
         props = vars(self.test_data.room_properties)
+        print('-=-=-=-=-=-=-= Getting NIC test results-=-=-=-=-=-=-=-=-')
         ## obtain SLM data from overall dataframe
         ## need to convert all of this to use the dataclasses and the data_processor.py functions 
         onethird_rec = format_SLMdata(self.test_data.recive_data)
         onethird_srs = format_SLMdata(self.test_data.srs_data)
         onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)
         rt_thirty = self.test_data.rt['Unnamed: 10'][25:41]/1000
-        # Calculation of ATL
-        ATL_val,corrected_STC_recieve = calc_atl_val(onethird_srs, onethird_rec, onethird_bkgrd,props.partition_area,props.receive_room_vol,sabines)
         # Calculation of NR
-        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_nr_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,props.receive_room_vol,NIC_vollimit=883,testtype='NIC')
+        calc_NR, sabines, corrected_recieve,Nrec_ANISPL = calc_nr_new(onethird_srs, onethird_rec, onethird_bkgrd, rt_thirty,props['receive_vol'],testtype='NIC')
+        # Calculation of ATL
+        ATL_val,corrected_STC_recieve = calc_atl_val(onethird_srs, onethird_rec, onethird_bkgrd,props['partition_area'],props['receive_vol'],sabines)
+
         # creating reference curve for ASTC graph
         STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
         ASTC_contour_final = list()
         for vals in STCCurve:
             ASTC_contour_final.append(vals+(ATL_val))
-        
+        NIC_exceptions = '' ### need to add exceptions to the table
         Test_result_table = pd.DataFrame(
             {
                 "Frequency": FREQUENCIES,
@@ -789,9 +850,8 @@ class NICTestReport(BaseTestReport):
         plt.ylabel('Frequency (Hz)')
         plt.title('NIC Reference Contour')
         plt.grid()
+        return resultsplotfig
 
-    def get_report_title(self, custom_title_style):
-        return Paragraph("Noise Isolation Class (NIC) Test Report", custom_title_style)
 
 class DTCTestReport(BaseTestReport):
     pass

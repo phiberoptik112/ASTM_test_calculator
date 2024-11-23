@@ -204,7 +204,7 @@ def calculate_onethird_Logavg(average_pos):
 ### NEW REWORK OF NR CALC ### # functional as of 7/25/24 ### 
 def calc_nr_new(srs_overalloct: pd.Series, rec_overalloct: pd.Series, 
                 bkgrnd_overalloct: pd.Series, rt_thirty: pd.Series, 
-                receive_roomvol: float, nic_vollimit: float, 
+                receive_roomvol: float, 
                 test_type: TestType) -> Tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
     # Implement the NR calculation logic
     NIC_vollimit = 150  # cu. ft.
@@ -322,11 +322,90 @@ def calc_atl_val(srs_overalloct: pd.Series, rec_overalloct: pd.Series,
     # print('sabines: ',sabines)
     ATL_val = []
     for i, val in enumerate(srs_overalloct):
-        ATL_val.append(srs_overalloct[i]-recieve_corr[i]+10*(np.log10(parition_area/sabines.iloc[i])))
+        ATL_val.append(srs_overalloct[i]-recieve_corr[i]+10*(np.log10(partition_area/sabines.iloc[i])))
     # ATL_val = srs_overalloct - recieve_corr+10*(np.log(parition_area/sabines)) 
     ATL_val = np.round(ATL_val,1)
-    # print('ATL val: ',ATL_val)
+    print('ATL val: ',ATL_val)
     return ATL_val
+def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=True):
+    pos_diffs = list()
+    diff_negative_min = 0
+    AIIC_start = 94
+    AIIC_contour_val = 16
+    IIC_contour = list()
+    AIIC_curve = list()
+    new_sum = 0
+    diff_negative_max = 0
+    IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
+    max_iterations = 100  # Maximum number of iterations to prevent infinite loop
+    iteration_count = 0
+    # initial application of the IIC curve to the first AIIC start value 
+    for vals in IIC_curve:
+        IIC_contour.append(vals+AIIC_start)
+    Normalized_recieve_IIC = pd.to_numeric(Normalized_recieve_IIC, errors='coerce')
+    Normalized_recieve_IIC = np.array(Normalized_recieve_IIC)
+    Normalized_recieve_IIC = np.round(Normalized_recieve_IIC,1)
+    Normalized_recieve_IIC = Normalized_recieve_IIC[1:17]
+    print('Normalized recieve ANISPL: ', Normalized_recieve_IIC)
+    # Contour_curve_result = IIC_contour - Normalized_recieve_IIC
+    Contour_curve_result =  Normalized_recieve_IIC - IIC_contour
+    Contour_curve_result = np.round(Contour_curve_result,1)
+    
+    # print('Contour curve: ', Contour_curve_result)
+    while (diff_negative_max < 8 and new_sum < 32 and iteration_count < max_iterations):
+        if verbose:
+            print(f"Iteration {iteration_count}:")
+            print(f"  AIIC_contour_val: {AIIC_contour_val}")
+            print(f"  diff_negative_max: {diff_negative_max}")
+            print(f"  new_sum: {new_sum}")
+        print('Inside loop, current AIIC contour: ', AIIC_contour_val)
+        # print('Contour curve (IIC curve minus ANISPL): ', Contour_curve_result)
+        
+        diff_negative = Normalized_recieve_IIC - IIC_contour
+        # print('diff negative: ', diff_negative)
+        diff_negative_max = np.max(diff_negative)
+        diff_negative = pd.to_numeric(diff_negative, errors='coerce')
+        diff_negative = np.array(diff_negative)
+        # print('Max, single diff: ', diff_negative_max)
+        pos_diffs = [np.round(val,1) if val > 0 else 0 for val in diff_negative]
+        # print('positive diffs: ', pos_diffs)
+        new_sum = np.sum(pos_diffs)
+        # ipdb.set_trace()   ### debugging 
+        
+        # print('Sum Positive diffs: ', new_sum)
+        # print('Evaluating sums and differences vs 32, 8: ', new_sum, diff_negative_max)
+        
+        if new_sum > 32 or diff_negative_max > 8:
+            print('Difference condition met! AIIC value: ', AIIC_contour_val)
+            print('AIIC result curve: ', Contour_curve_result)
+            return AIIC_contour_val, Contour_curve_result
+        else:
+            print('difference condition not met, subtracting 1 from AIIC start and recalculating the IIC contour')
+            AIIC_start -= 1
+            print('new AIIC start: ', AIIC_start)
+            AIIC_contour_val += 1
+            print('AIIC contour value: ', AIIC_contour_val)
+            IIC_contour = [vals + AIIC_start for vals in IIC_curve]
+            print('IIC contour: ', IIC_contour)
+            
+            Contour_curve_result =  Normalized_recieve_IIC - IIC_contour
+            print('Contour curve result: ', Contour_curve_result)
+            
+            iteration_count += 1
+
+    if iteration_count == max_iterations:
+        print(f"Maximum iterations ({max_iterations}) reached without meeting conditions.")
+    else:
+        print("Loop completed without meeting conditions. Returning last calculated values.")
+    print(f"Loop exited. Final values:")
+    print(f"  diff_negative_max: {diff_negative_max}")
+    print(f"  new_sum: {new_sum}")
+    print(f"  iterations: {iteration_count}")
+    print('Contour curve (IIC curve minus ANISPL): ', Contour_curve_result)
+    print('IIC contour value: ', AIIC_contour_val)
+
+
+    return AIIC_contour_val, Contour_curve_result
 
 def calc_aiic_val(Normalized_recieve_IIC: pd.Series) -> Tuple[float, pd.Series]:
     pos_diffs = list()
@@ -402,7 +481,7 @@ def calc_astc_val(atl_val: pd.Series) -> float:
     New_curve =list()
     new_sum = 0
     ## Since ATL values only go from 125 to 4k, remove the end values from the curve
-    ATL_val_STC = ATL_val[1:17]
+    ATL_val_STC = atl_val[1:17]
     STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
     while (diff_negative <= 8 and new_sum <= 32):
         # print('starting loop')
