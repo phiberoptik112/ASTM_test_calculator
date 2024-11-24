@@ -62,6 +62,12 @@ from kivy.uix.label import Label
 from kivy.uix.popup import Popup
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.scrollview import ScrollView
+from kivy.core.window import Window
+from kivy.uix.image import Image as KivyImage
+from kivy.properties import ObjectProperty
+import fitz  # PyMuPDF for PDF preview
+import tempfile
+import os
 
 print("GUI import complete")
 
@@ -138,28 +144,70 @@ class FileLoaderApp(App):
         self.single_test_input_box = TextInput(multiline=False, hint_text='Test Number')
         layout.add_widget(self.single_test_input_box)
 
-        # Calculate Single Test Button
-        calculate_single_test_button = Button(text='Calculate Single Test', on_press=self.calculate_single_test)
-        layout.add_widget(calculate_single_test_button)
+        # Button Layout for test-related buttons
+        test_buttons_layout = BoxLayout(
+            orientation='horizontal',
+            spacing=10,
+            size_hint_y=None,
+            height=40
+        )
 
+        # Calculate Single Test Button
+        calculate_single_test_button = Button(
+            text='Calculate Single Test',
+            size_hint_x=0.33
+        )
+        calculate_single_test_button.bind(on_press=self.calculate_single_test)
+        
+        # View Test Data Button
+        view_test_data_button = Button(
+            text='View Test Data',
+            size_hint_x=0.33
+        )
+        view_test_data_button.bind(on_press=self.view_current_test_data)
+        
         # Output Reports Button
-        output_button = Button(text='Output All Reports', on_press=self.output_all_reports)
-        layout.add_widget(output_button)
+        output_button = Button(
+            text='Output All Reports',
+            size_hint_x=0.33
+        )
+        output_button.bind(on_press=self.output_all_reports)
+
+        # Add buttons to the horizontal layout
+        test_buttons_layout.add_widget(calculate_single_test_button)
+        test_buttons_layout.add_widget(view_test_data_button)
+        test_buttons_layout.add_widget(output_button)
+        
+        # Add the button layout to the main layout
+        layout.add_widget(test_buttons_layout)
 
         # Status Text Box
         self.status_label = Label(text='Status: Ready')
         layout.add_widget(self.status_label)
 
-        # Debug check box for testing
+        # Debug section layout
+        debug_layout = BoxLayout(
+            orientation='horizontal',
+            spacing=10,
+            size_hint_y=None,
+            height=40
+        )
+        
+        # Debug check box
         self.debug_check_box = CheckBox(active=True)
         self.debug_label = Label(text='Debug')
-        layout.add_widget(self.debug_check_box)
-        layout.add_widget(self.debug_label)
+        debug_layout.add_widget(self.debug_check_box)
+        debug_layout.add_widget(self.debug_label)
 
         # Add test input populate button if debug mode is checked
-        if self.debug_check_box.active:
-            test_input_button = Button(text='Test Input Populate', on_press=self.populate_test_inputs)
-            layout.add_widget(test_input_button)
+        test_input_button = Button(
+            text='Test Input Populate',
+            size_hint_x=0.5
+        )
+        test_input_button.bind(on_press=self.populate_test_inputs)
+        debug_layout.add_widget(test_input_button)
+
+        layout.add_widget(debug_layout)
 
         return layout
     def populate_test_inputs(self, instance):
@@ -541,7 +589,7 @@ class FileLoaderApp(App):
                             print(f"- Has room_properties: {'room_properties' in dir(data['test_data'])}")
                             if hasattr(data['test_data'], 'room_properties'):
                                 print(f"- Room properties type: {type(data['test_data'].room_properties)}")
-                    # Create appropriate report based on test type
+                    
                         report_class = {
                             TestType.ASTC: ASTCTestReport,
                             TestType.AIIC: AIICTestReport,
@@ -553,9 +601,19 @@ class FileLoaderApp(App):
                             report = report_class.create_report(
                                 test_data=data['test_data'],
                                 output_folder=self.report_output_folder_path,
-                                test_type=test_type  # Pass the test_type here
+                                test_type=test_type
                             )
-                        print(f'Generated {test_type.value} report for test {test_label}')
+                            
+                            # Get the PDF path
+                            pdf_path = os.path.join(
+                                self.report_output_folder_path,
+                                f"{test_label}_{test_type.value}_Report.pdf"
+                            )
+                            
+                            print(f'Generated {test_type.value} report for test {test_label}')
+                            
+                            # Show results popup with PDF path
+                            show_results_popup(test_label, data['test_data'], pdf_path)
                     
                     except Exception as e:
                         print(f"Error generating {test_type.value} report for {test_label}: {str(e)}")
@@ -711,7 +769,41 @@ class FileLoaderApp(App):
             self.status_label.text = f'Status: Error - {error_msg}'
             print(error_msg)
 
-
+    def view_current_test_data(self, instance):
+        """Show the test data for the currently selected test"""
+        try:
+            # Get test label from input box
+            test_label = self.single_test_input_box.text
+            
+            if not test_label:
+                self.status_label.text = 'Status: Please enter a test label'
+                return
+                
+            if not self.test_data_collection:
+                self.status_label.text = 'Status: No test data loaded. Please load data first.'
+                return
+                
+            if test_label not in self.test_data_collection:
+                self.status_label.text = f'Status: Test {test_label} not found in loaded data'
+                return
+                
+            # Get test data for the specified label
+            test_data_dict = self.test_data_collection[test_label]
+            
+            # Show popup for each test type in the test data
+            for test_type, data in test_data_dict.items():
+                pdf_path = os.path.join(
+                    self.report_output_folder_path,
+                    f"{test_label}_{test_type.value}_Report.pdf"
+                )
+                show_results_popup(test_label, data['test_data'], pdf_path)
+                
+            self.status_label.text = f'Status: Showing data for test {test_label}'
+            
+        except Exception as e:
+            error_msg = f"Error viewing test data: {str(e)}"
+            print(error_msg)
+            self.status_label.text = f'Status: Error - {error_msg}'
 
     @classmethod
     def assign_room_properties(self, curr_test: pd.Series):
@@ -756,33 +848,37 @@ def display_report_window(report_paths, testplan, test_results):
     )
     popup.open()
 
-class ResultWindow(GridLayout):
-    def __init__(self, test_label, test_data, **kwargs):
+class PDFPreviewWindow(GridLayout):
+    def __init__(self, pdf_path, **kwargs):
         super().__init__(**kwargs)
         self.cols = 1
         self.padding = 10
         self.spacing = 10
-
-        # Title
-        self.add_widget(Label(text=f'Test Results: {test_label}', size_hint_y=None, height=40))
         
-        # Scrollable content
-        scroll = ScrollView(size_hint=(1, None), size=(400, 300))
+        # Create scrollable view
+        scroll = ScrollView(size_hint=(1, 0.9))
         content = GridLayout(cols=1, spacing=10, size_hint_y=None)
         content.bind(minimum_height=content.setter('height'))
         
-        # Add test data
-        content.add_widget(Label(
-            text=f"Test Label: {test_label}\n"
-                 f"Room Properties:\n"
-                 f"Site Name: {test_data.room_properties.site_name}\n"
-                 f"Source Room: {test_data.room_properties.source_room}\n"
-                 f"Receive Room: {test_data.room_properties.receive_room}\n"
-                 f"Test Date: {test_data.room_properties.test_date}",
-            size_hint_y=None,
-            height=200,
-            text_size=(380, None)
-        ))
+        try:
+            # Open PDF and convert first page to image
+            doc = fitz.open(pdf_path)
+            for page_num in range(min(len(doc), 4)):  # Preview up to 4 pages
+                page = doc[page_num]
+                pix = page.get_pixmap(matrix=fitz.Matrix(0.5, 0.5))  # Scale down to 50%
+                
+                # Save to temporary image file
+                tmp_img = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+                pix.save(tmp_img.name)
+                
+                # Add image to layout
+                img = KivyImage(source=tmp_img.name, size_hint_y=None)
+                img.height = Window.height * 0.8  # Scale to 80% of window height
+                content.add_widget(img)
+                
+            doc.close()
+        except Exception as e:
+            content.add_widget(Label(text=f"Error loading PDF: {str(e)}"))
         
         scroll.add_widget(content)
         self.add_widget(scroll)
@@ -790,21 +886,200 @@ class ResultWindow(GridLayout):
         # Close button
         close_btn = Button(
             text='Close',
-            size_hint_y=None,
-            height=40
+            size_hint_y=0.1
         )
         close_btn.bind(on_press=self.dismiss)
         self.add_widget(close_btn)
     
     def dismiss(self, instance):
-        # Find the parent popup and dismiss it
         parent = instance
         while not isinstance(parent, Popup):
             parent = parent.parent
         parent.dismiss()
 
-def show_results_popup(test_label, test_data):
-    content = ResultWindow(test_label, test_data)
+class ResultWindow(GridLayout):
+    def __init__(self, test_label, test_data, pdf_path=None, **kwargs):
+        super().__init__(**kwargs)
+        self.cols = 1
+        self.padding = 10
+        self.spacing = 10
+
+        # Title
+        self.add_widget(Label(
+            text=f'Test Results: {test_label}',
+            size_hint_y=None,
+            height=40,
+            bold=True
+        ))
+        
+        # Scrollable content
+        scroll = ScrollView(size_hint=(1, None), size=(400, 300))
+        content = GridLayout(cols=1, spacing=10, size_hint_y=None)
+        content.bind(minimum_height=content.setter('height'))
+        
+        # Add test type and basic info
+        content.add_widget(Label(
+            text=f"\nTest Type: {test_data.__class__.__name__}",
+            size_hint_y=None,
+            height=30,
+            bold=True
+        ))
+
+        # Display SLM data based on test type
+        if hasattr(test_data, 'srs_data'):
+            content.add_widget(Label(
+                text="\nSource Room Measurements:",
+                size_hint_y=None,
+                height=30,
+                bold=True
+            ))
+            # Format and display source room data
+            srs_data = format_SLMdata(test_data.srs_data)
+            content.add_widget(Label(
+                text=str(srs_data),
+                size_hint_y=None,
+                height=100,
+                text_size=(380, None)
+            ))
+
+        if hasattr(test_data, 'recive_data'):
+            content.add_widget(Label(
+                text="\nReceiver Room Measurements:",
+                size_hint_y=None,
+                height=30,
+                bold=True
+            ))
+            # Format and display receiver room data
+            rec_data = format_SLMdata(test_data.recive_data)
+            content.add_widget(Label(
+                text=str(rec_data),
+                size_hint_y=None,
+                height=100,
+                text_size=(380, None)
+            ))
+
+        # For AIIC tests, show tapping positions
+        if hasattr(test_data, 'pos1'):
+            content.add_widget(Label(
+                text="\nTapping Machine Positions:",
+                size_hint_y=None,
+                height=30,
+                bold=True
+            ))
+            for i in range(1, 5):
+                pos_data = getattr(test_data, f'pos{i}', None)
+                if pos_data is not None:
+                    formatted_pos = format_SLMdata(pos_data)
+                    content.add_widget(Label(
+                        text=f"Position {i}:\n{str(formatted_pos)}",
+                        size_hint_y=None,
+                        height=100,
+                        text_size=(380, None)
+                    ))
+
+        # Show background noise data
+        if hasattr(test_data, 'bkgrnd_data'):
+            content.add_widget(Label(
+                text="\nBackground Noise Measurements:",
+                size_hint_y=None,
+                height=30,
+                bold=True
+            ))
+            bkg_data = format_SLMdata(test_data.bkgrnd_data)
+            content.add_widget(Label(
+                text=str(bkg_data),
+                size_hint_y=None,
+                height=100,
+                text_size=(380, None)
+            ))
+
+        # Show RT data
+        if hasattr(test_data, 'rt'):
+            content.add_widget(Label(
+                text="\nReverberation Time Data:",
+                size_hint_y=None,
+                height=30,
+                bold=True
+            ))
+            rt_data = test_data.rt['Unnamed: 10'][25:41]/1000  # Convert to seconds
+            content.add_widget(Label(
+                text=str(rt_data),
+                size_hint_y=None,
+                height=100,
+                text_size=(380, None)
+            ))
+        
+        # Add room properties if available
+        if hasattr(test_data, 'room_properties'):
+            props = test_data.room_properties
+            content.add_widget(Label(
+                text="\nRoom Properties:",
+                size_hint_y=None,
+                height=30,
+                bold=True
+            ))
+            for prop_name, prop_value in vars(props).items():
+                content.add_widget(Label(
+                    text=f"{prop_name}: {str(prop_value)}",
+                    size_hint_y=None,
+                    height=30,
+                    text_size=(380, None)
+                ))
+        
+        scroll.add_widget(content)
+        self.add_widget(scroll)
+        
+        # Button layout
+        button_layout = BoxLayout(
+            orientation='horizontal',
+            size_hint_y=None,
+            height=40,
+            spacing=10
+        )
+        
+        # Close button
+        close_btn = Button(
+            text='Close',
+            size_hint_x=0.5
+        )
+        close_btn.bind(on_press=self.dismiss)
+        
+        # Preview PDF button
+        preview_btn = Button(
+            text='Preview PDF',
+            size_hint_x=0.5
+        )
+        preview_btn.bind(on_press=lambda x: self.show_pdf_preview(pdf_path))
+        
+        button_layout.add_widget(close_btn)
+        button_layout.add_widget(preview_btn)
+        self.add_widget(button_layout)
+    
+    def dismiss(self, instance):
+        parent = instance
+        while not isinstance(parent, Popup):
+            parent = parent.parent
+        parent.dismiss()
+    
+    def show_pdf_preview(self, pdf_path):
+        if pdf_path and os.path.exists(pdf_path):
+            content = PDFPreviewWindow(pdf_path)
+            preview_popup = Popup(
+                title='PDF Preview',
+                content=content,
+                size_hint=(0.9, 0.9)
+            )
+            preview_popup.open()
+        else:
+            error_popup = Popup(
+                title='Error',
+                content=Label(text='PDF file not found'),
+                size_hint=(0.5, 0.3)
+            )
+            error_popup.open()
+
+def show_results_popup(test_label, test_data, pdf_path=None):
+    content = ResultWindow(test_label, test_data, pdf_path)
     popup = Popup(
         title=f'Test Results: {test_label}',
         content=content,
