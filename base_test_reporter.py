@@ -329,7 +329,10 @@ class BaseTestReport:
             print(f"Error in create_test_environment_section: {str(e)}")
             print(f"Properties causing error: {props}")
             raise
-
+    
+    def get_signatures(self):
+        pass
+    
     @classmethod
     def create_report(cls, test_data, output_folder: Path, test_type):
         """Factory method to create and build the appropriate test report
@@ -509,14 +512,7 @@ class BaseTestReport:
             raise ReportGenerationError(f"Error generating second page: {str(e)}")
 
     def create_third_page(self):
-        """Creates the third page with test results table and summary.
-        
-        Returns:
-            list: List of report elements for the third page
-            
-        Raises:
-            ReportGenerationError: If there is an error generating the page content
-        """
+        """Creates the third page with test results table and summary."""
         try:
             main_elements = []
             
@@ -525,63 +521,46 @@ class BaseTestReport:
             
             # Get and format test results table
             try:
-                test_results = self.get_test_results()
-                results_table = Table(test_results, hAlign='LEFT')
-                results_table.setStyle(TableStyle([
-                    ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
-                    ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
-                    ('LEFTPADDING', (0, 0), (-1, -1), 6),
-                    ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-                    ('TOPPADDING', (0, 0), (-1, -1), 6),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                    ('ALIGN',(0,0), (-1,-1),'LEFT')
-                ]))
-                main_elements.append(results_table)
+                # get_test_results returns a list of elements
+                test_results_elements = self.get_test_results()
+                print(f"Number of test result elements: {len(test_results_elements)}")
+                
+                # Extend main_elements with all elements from get_test_results
+                main_elements.extend(test_results_elements)
+                
             except Exception as e:
+                print(f"Error details: {str(e)}")
+                print(f"Test results type: {type(test_results_elements) if 'test_results_elements' in locals() else 'Not created'}")
                 raise ReportGenerationError(f"Error creating test results table: {str(e)}")
 
             # Add table notes
             try:
-                main_elements.append(self.get_testres_table_notes())
+                print('=-=-=-=-=-=-= Appending test results table notes -=-=-=-=-=-=-=-')
+                main_elements.append(Spacer(1,10))
+                main_elements.append(Paragraph(self.get_test_results_paragraph()))
+                main_elements.append(self.get_test_results_table_notes())
             except Exception as e:
                 raise ReportGenerationError(f"Error adding table notes: {str(e)}")
-
-            # Add test type label
-            test_type_labels = {
-                TestType.AIIC: "AIIC",
-                TestType.ASTC: "ASTC", 
-                TestType.NIC: "NIC",
-                TestType.DTC: "DTC"
-            }
-            test_label = test_type_labels.get(self.curr_test.test_type, "Unknown")
-            main_elements.append(Paragraph(f"<u>{test_label}:</u>", self.custom_title_style))
-            
             # Add spacing and test results paragraph
             main_elements.append(Spacer(1,10))
-            main_elements.append(self.get_test_results_paragraph())
+            # main_elements.append(self.get_test_results_paragraph())
             main_elements.append(PageBreak())
             
             return main_elements
             
         except Exception as e:
+            print(f"Full error in create_third_page: {str(e)}")
             raise ReportGenerationError(f"Error generating third page: {str(e)}")
         
     def create_fourth_page(self):
         main_elements = []
         main_elements.append(self.create_plot())
-        test_type_labels = {
-            TestType.AIIC: "AIIC",
-            TestType.ASTC: "ASTC",
-            TestType.NIC: "NIC",
-            TestType.DTC: "DTC"
-        }
-        test_label = test_type_labels.get(self.curr_test.test_type, "Unknown")
-        main_elements.append(Paragraph(f"<u>{test_label}:</u>", self.custom_title_style))
+
+        ## need to append a large text box with teh appropriate single number result from the test calc
         # #### sane here -single number result from the test calc
         main_elements.append(Spacer(1,10))
         main_elements.append(self.get_signatures())
-        # main_elements.append(PageBreak())
+        
         return main_elements
 
 class AIICTestReport(BaseTestReport):
@@ -687,12 +666,17 @@ class AIICTestReport(BaseTestReport):
         # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,rt_thirty,room_properties['Partition area'][0],room_properties['Recieve Vol'][0])\
         print('-=-=-=-=-=-=-= Calculating AIIC contour-=-=-=-=-=-=-=-=-')
         self.AIIC_contour_val, self.Contour_curve_result = calc_AIIC_val_claude(AIIC_Normalized_recieve)
+        print('-=-=-=-=-=-=-= Calculating ISR contour-=-=-=-=-=-=-=-=-')
+        self.ISR_contour_val, self.ISR_contour_result = calc_AIIC_val_claude(ASTC_recieve_corr)
+
         print('AIIC_contour_val: ',self.AIIC_contour_val)
         IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
         IIC_contour_final = list()
+        ISR_contour_final = list()
         # initial application of the IIC curve to the first AIIC start value 
         for vals in IIC_curve:
             IIC_contour_final.append(vals+(110-self.AIIC_contour_val))
+            ISR_contour_final.append(vals+(110-self.ISR_contour_val))
         print('IIC_contour_final: ',IIC_contour_final)
         #### Contour_final is the AIIC contour that needs to be plotted vs the ANISPL curve- we have everything to plot the graphs and the results table  #####
         Ref_label = f'AIIC {self.AIIC_contour_val} Contour'
@@ -705,16 +689,7 @@ class AIICTestReport(BaseTestReport):
                 AIIC_Exceptions.append('0')
             else:
                 AIIC_Exceptions.append('1')
-                
-        # print('AIIC_Exceptions: ',len(AIIC_Exceptions))
-        # table_AIIC_Exceptions = AIIC_Exceptions[2:14] # values from 125-3150 (not including 4khz)
-        # print('AIIC_Normalized_recieve: ',len(AIIC_Normalized_recieve))
-        # table_AIIC_Normalized_recieve = AIIC_Normalized_recieve[0:15] # values from 125-3150 (not including 4khz)
-        # print('onethird_bkgrd: ',len(onethird_bkgrd))
-        # table_onethird_bkgrnd = onethird_bkgrd[1:15] # values from 125-3150 (not including 4khz)
-        # print('rt_thirty: ',len(rt_thirty))
-        # table_rt_thirty = rt_thirty[2:14] # values from 125-3150 (not including 4khz)
-        # print('FREQUENCIES: ',len(FREQUENCIES))
+
 
         # Define the target frequency range (125Hz to 3150Hz)
         FREQ_START, FREQ_END = 125, 3150
@@ -761,43 +736,109 @@ class AIICTestReport(BaseTestReport):
         table_onethird_bkgrd = processed_arrays["Background Levels"]
         table_rt_thirty = processed_arrays["RT30 Values"]
 
-        # Get frequencies for the table
         # Convert FREQUENCIES to pandas Series for frequency selection
         freq_series = pd.Series(FREQUENCIES)
         mask = (freq_series >= FREQ_START) & (freq_series <= FREQ_END)
         table_freqs = freq_series[mask].tolist()
 
-        print(f"\nTable frequencies: {table_freqs}")
+        print("\n=== Table Data Validation ===")
+        print(f"Frequencies: {len(table_freqs)} - {table_freqs}")
+        print(f"ANISPL: {len(table_AIIC_Normalized_recieve)}")
+        print(f"Background: {len(table_onethird_bkgrd)}")
+        print(f"RT60: {len(table_rt_thirty)}")
+        print(f"Exceptions: {len(table_AIIC_Exceptions)}")
+        print("\n=== Full Table Data ===")
+        print(f"Frequencies: {table_freqs}")
+        print(f"ANISPL values: {table_AIIC_Normalized_recieve}")
+        print(f"Background levels: {table_onethird_bkgrd}")
+        print(f"RT60 values: {table_rt_thirty}")
+        print(f"Exceptions: {table_AIIC_Exceptions}")
 
-        Test_result_table = pd.DataFrame(
-            {
-                "Frequency": table_freqs,
-                "Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)	": table_AIIC_Normalized_recieve,
-                "Average Receiver Background Level": table_onethird_bkgrd,
-                "Average RT60 (Seconds)": table_rt_thirty,
-                "Exceptions noted to ASTM E1007-14": table_AIIC_Exceptions
-            }
-        )
-        Test_result_table = Table(Test_result_table, hAlign='LEFT') 
-        Test_result_table.setStyle(TableStyle([
-            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
-            ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
-        ]))
-        main_elements.append(Test_result_table)
-        ### need to add a big box that displays the final number
+        print("\n=== Creating Table ===")
+        try:
+            # Convert pandas Series to plain arrays and ensure numeric values
+            table_onethird_bkgrd = table_onethird_bkgrd.astype(float).values if isinstance(table_onethird_bkgrd, pd.Series) else table_onethird_bkgrd
+            table_rt_thirty = table_rt_thirty.astype(float).values if isinstance(table_rt_thirty, pd.Series) else table_rt_thirty
+            
+            print("Data types after conversion:")
+            print(f"Background levels type: {type(table_onethird_bkgrd)}")
+            print(f"RT60 values type: {type(table_rt_thirty)}")
+            
+            # Create table data as a list of lists, including headers
+            table_data = [
+                # Headers
+                ["Frequency", 
+                 "Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)", 
+                 "Average Receiver Background Level",
+                 "Average RT60 (Seconds)",
+                 "Exceptions noted to ASTM E1007-14"]
+            ]
+
+            # Add data rows with explicit error handling
+            for i in range(len(table_freqs)):
+                try:
+                    row = [
+                        f"{float(table_freqs[i]):.0f}",
+                        f"{float(table_AIIC_Normalized_recieve[i]):.1f}",
+                        f"{float(table_onethird_bkgrd[i]):.1f}",
+                        f"{float(table_rt_thirty[i]):.3f}",
+                        str(table_AIIC_Exceptions[i])
+                    ]
+                    table_data.append(row)
+                    print(f"Successfully added row {i+1}: {row}")
+                except Exception as e:
+                    print(f"Error creating row {i}: {str(e)}")
+                    print(f"Values: freq={table_freqs[i]}, "
+                          f"ANISPL={table_AIIC_Normalized_recieve[i]}, "
+                          f"bkgrd={table_onethird_bkgrd[i]}, "
+                          f"rt60={table_rt_thirty[i]}, "
+                          f"except={table_AIIC_Exceptions[i]}")
+                    raise
+
+            print(f"\nCreated table with {len(table_data)} rows")
+            print("Header row:", table_data[0])
+            print("First data row:", table_data[1])
+
+            # Create ReportLab table with explicit column widths
+            col_widths = [60, 120, 100, 80, 100]
+            Test_result_table = Table(table_data, colWidths=col_widths, hAlign='LEFT')
+            
+            # Add styling
+            Test_result_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
+                ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('PADDING', (0, 0), (-1, -1), 6),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ]))
+
+            main_elements.append(Test_result_table)
+            print("Table successfully created and added to main_elements")
+
+        except Exception as e:
+            print(f"Error creating table: {str(e)}")
+            print(f"Table data length: {len(table_data) if 'table_data' in locals() else 'Not created'}")
+            print(f"Main elements length: {len(main_elements)}")
+            raise
+
+        # Continue with the rest of get_test_results()
+        main_elements.append(Spacer(1, 20))
         main_elements.append(Paragraph("The Apparent Impact Insulation Class (AIIC) was calculated. The AIIC rating is based on Absorption Normalized Impact Sound Pressure Level (ANISPL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Absorption Normalized Impact Sound Pressure Level values, in accordance with the procedure of "+standards_text[0][0]))
         print('=-=-=-=-=finishing and returning test results table and paragraph-=-=-=---=-')
         return main_elements
 
-    def get_testres_table_notes(self):
+    def get_test_results_table_notes(self):
         return "*This test does fully conform to the requir"
     def get_test_results_paragraph(self): 
         return (
             f"The Apparent Impact Insulation Class (AIIC) of {self.AIIC_contour_val} "
-            f"and an Impact Sound Rating (ISR) of {self.ISR_val} was calculated. "
-            "The AIIC rating is based on Apparent Transmission Loss (ATL), and includes "
+            f"and an Impact Sound Rating (ISR) of {self.ISR_contour_val} was calculated. "
+            "The AIIC rating is based on Absorption Normalized Impact Sound Pressure Level (ANISPL), and includes "
             "the effects of noise flanking. The AIIC reference contour is shown on the "
-            "next page, and has been fit to the Apparent Transmission Loss values, in "
+            "next page, and has been fit to the Absorption Normalized Impact Sound Pressure Level values, in "
             f"accordance with the procedure of {standards_text[0][0]}"
         )
 
@@ -883,8 +924,15 @@ class ASTCTestReport(BaseTestReport):
             ('ALIGN',(0,0), (-1,-1),'LEFT')
         ]))
         main_elements.append(Test_result_table)
-        main_elements.append(Paragraph("The Apparent Sound Transmission Class (ASTC) was calculated. The ASTC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The ASTC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_text[0][0]))
+        main_elements.append(Spacer(1,10))
         return main_elements
+    
+    def get_test_results_paragraph(self):
+        return (
+            f"The Apparent Sound Transmission Class (ASTC) was calculated. The ASTC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The ASTC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_text[0][0]
+        )
+    def get_test_results_table_notes(self):
+        return "*This test does fully conform to the requirements of ASTM E336-20, ASTM E413-16, and ASTM E2235-04(2012), with exceptions noted below."
     
     def get_results_plot(self, ATL_curve):
         plot_title = 'ASTC Reference Contour'

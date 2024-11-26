@@ -550,6 +550,12 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=True):
 
     return AIIC_contour_val, Contour_curve_result
 
+# def calc_ISR_val(srs_overalloct: pd.Series, rec_overalloct: pd.Series, 
+#                  bkgrnd_overalloct: pd.Series, rt_thirty: pd.Series, 
+#                  partition_area: float, receive_roomvol: float) -> pd.Series:
+#     pass
+
+
 ## potentially remove, use claude's code instead above 
 #def calc_aiic_val(Normalized_recieve_IIC: pd.Series) -> Tuple[float, pd.Series]:
     pos_diffs = list()
