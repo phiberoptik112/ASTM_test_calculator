@@ -474,7 +474,9 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=True):
     AIIC_curve = list()
     new_sum = 0
     diff_negative_max = 0
-    IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
+    # IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
+    # shorening curve for properly representing the frq bands used, not using 63hz, 4 and 5khz
+    IIC_curve = [2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12]
     max_iterations = 100  # Maximum number of iterations to prevent infinite loop
     iteration_count = 0
     # initial application of the IIC curve to the first AIIC start value 
@@ -483,9 +485,12 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=True):
     Normalized_recieve_IIC = pd.to_numeric(Normalized_recieve_IIC, errors='coerce')
     Normalized_recieve_IIC = np.array(Normalized_recieve_IIC)
     Normalized_recieve_IIC = np.round(Normalized_recieve_IIC,1)
-    Normalized_recieve_IIC = Normalized_recieve_IIC[1:17]
-    print('Normalized recieve ANISPL: ', Normalized_recieve_IIC)
+    Normalized_recieve_IIC = Normalized_recieve_IIC[1:14] # values from 125-3150 (not including 4khz)
+    # print('Normalized recieve ANISPL: ', Normalized_recieve_IIC)
+    # print('length of normalized recieve: ',len(Normalized_recieve_IIC))
+    # print('length of IIC contour: ',len(IIC_contour))
     # Contour_curve_result = IIC_contour - Normalized_recieve_IIC
+    # print('IIC_contour: ',IIC_contour)
     Contour_curve_result =  Normalized_recieve_IIC - IIC_contour
     Contour_curve_result = np.round(Contour_curve_result,1)
     
@@ -497,14 +502,14 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=True):
             print(f"  diff_negative_max: {diff_negative_max}")
             print(f"  new_sum: {new_sum}")
         print('Inside loop, current AIIC contour: ', AIIC_contour_val)
-        # print('Contour curve (IIC curve minus ANISPL): ', Contour_curve_result)
+        print('Contour curve (IIC curve minus ANISPL): ', Contour_curve_result)
         
         diff_negative = Normalized_recieve_IIC - IIC_contour
-        # print('diff negative: ', diff_negative)
+        print('diff negative: ', diff_negative)
         diff_negative_max = np.max(diff_negative)
         diff_negative = pd.to_numeric(diff_negative, errors='coerce')
         diff_negative = np.array(diff_negative)
-        # print('Max, single diff: ', diff_negative_max)
+        print('Max, single diff: ', diff_negative_max)
         pos_diffs = [np.round(val,1) if val > 0 else 0 for val in diff_negative]
         # print('positive diffs: ', pos_diffs)
         new_sum = np.sum(pos_diffs)

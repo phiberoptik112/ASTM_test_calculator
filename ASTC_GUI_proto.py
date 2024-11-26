@@ -92,14 +92,13 @@ class FileLoaderApp(App):
         self.test_data_processor = None
         self.total_test_data = pd.DataFrame()
     def build(self):
-        # Initialize path variables as instance variables
-        self.test_plan_path = ''
-        self.slm_data_d_path = ''
-        self.slm_data_e_path = ''
-        self.report_output_folder_path = ''
-        self.single_test_input_box = ''
+        # Add debug print at the start of build
+        if hasattr(self, 'debug_check_box') and self.debug_check_box.active:
+            print("Starting build method")
+
         # Layout
         layout = BoxLayout(orientation='vertical', spacing=10, padding=10)
+        
         # put use description on the top of the window. 
         # ie - need to have excel closed before running
         # format of folders to output to - change this eventually for the program to
@@ -139,9 +138,21 @@ class FileLoaderApp(App):
         load_button = Button(text='Load Data', on_press=self.load_data)
         layout.add_widget(load_button)
 
+        # Add debug prints around single test input box creation
+        if hasattr(self, 'debug_check_box') and self.debug_check_box.active:
+            print("Creating single test input box")
+            
         # Text entry box for calculating single test results
         layout.add_widget(Label(text='Single Test Results:'))
-        self.single_test_input_box = TextInput(multiline=False, hint_text='Test Number')
+        self.single_test_input_box = TextInput(
+            multiline=False,
+            hint_text='Test Number',
+            size_hint_y=None,
+            height=40
+        )
+        if hasattr(self, 'debug_check_box') and self.debug_check_box.active:
+            print(f"Single test input box created: {type(self.single_test_input_box)}")
+            
         layout.add_widget(self.single_test_input_box)
 
         # Button Layout for test-related buttons
@@ -300,20 +311,15 @@ class FileLoaderApp(App):
         if isinstance(instance, TextInput):
             # Update instance variables with the entered text
             if instance is self.test_plan_path:
-                self.test_plan_path = sanitize_filepath(instance.text)
-                instance.text = self.test_plan_path
+                self.test_plan_path.text = sanitize_filepath(instance.text)
             elif instance is self.output_folder_path:
-                self.output_folder_path = sanitize_filepath(instance.text)
-                instance.text = self.report_template_path
-            elif instance is self.third_text_input:
-                self.slm_data_d_path = sanitize_filepath(instance.text)
-                instance.text = self.slm_data_d_path
-            elif instance is self.fourth_text_input:
-                self.slm_data_e_path = sanitize_filepath(instance.text)
-                instance.text = self.slm_data_e_path
+                self.output_folder_path.text = sanitize_filepath(instance.text)
+            elif instance is self.slm_data_d_path:
+                self.slm_data_d_path.text = sanitize_filepath(instance.text)
+            elif instance is self.slm_data_e_path:
+                self.slm_data_e_path.text = sanitize_filepath(instance.text)
             elif instance is self.single_test_input_box:
-                self.single_test_input_box = sanitize_filepath(instance.text)
-                instance.text = self.single_test_input_box
+                self.single_test_input_box.text = sanitize_filepath(instance.text)
             
     ## not using right now 
     def show_test_list_popup(self, test_list):
@@ -772,14 +778,31 @@ class FileLoaderApp(App):
     def view_current_test_data(self, instance):
         """Show the test data for the currently selected test"""
         try:
+            # Add more detailed debugging
+            if self.debug_check_box.active:
+                print("Debug info for view_current_test_data:")
+                print(f"self.single_test_input_box exists: {hasattr(self, 'single_test_input_box')}")
+                if hasattr(self, 'single_test_input_box'):
+                    print(f"Type of single_test_input_box: {type(self.single_test_input_box)}")
+                    print(f"Dir of single_test_input_box: {dir(self.single_test_input_box)}")
+
+            if not hasattr(self, 'single_test_input_box'):
+                raise ValueError("Test input box does not exist")
+                
+            if not isinstance(self.single_test_input_box, TextInput):
+                raise ValueError(f"Test input box is wrong type: {type(self.single_test_input_box)}")
+                
             # Get test label from input box
-            test_label = self.single_test_input_box.text
+            test_label = self.single_test_input_box.text.strip()
+            
+            if self.debug_check_box.active:
+                print(f"Test label retrieved: {test_label}")
             
             if not test_label:
                 self.status_label.text = 'Status: Please enter a test label'
                 return
                 
-            if not self.test_data_collection:
+            if not hasattr(self, 'test_data_collection') or not self.test_data_collection:
                 self.status_label.text = 'Status: No test data loaded. Please load data first.'
                 return
                 
@@ -790,12 +813,24 @@ class FileLoaderApp(App):
             # Get test data for the specified label
             test_data_dict = self.test_data_collection[test_label]
             
+            if self.debug_check_box.active:
+                print(f"Found test data for {test_label}:")
+                print(f"Test types: {list(test_data_dict.keys())}")
+            
             # Show popup for each test type in the test data
             for test_type, data in test_data_dict.items():
+                if self.debug_check_box.active:
+                    print(f"Showing data for test type: {test_type}")
+                    
                 pdf_path = os.path.join(
                     self.report_output_folder_path,
                     f"{test_label}_{test_type.value}_Report.pdf"
                 )
+                
+                if self.debug_check_box.active:
+                    print(f"Looking for PDF at: {pdf_path}")
+                    print(f"Test data contents: {data['test_data']}")
+                
                 show_results_popup(test_label, data['test_data'], pdf_path)
                 
             self.status_label.text = f'Status: Showing data for test {test_label}'
@@ -803,6 +838,10 @@ class FileLoaderApp(App):
         except Exception as e:
             error_msg = f"Error viewing test data: {str(e)}"
             print(error_msg)
+            if self.debug_check_box.active:
+                print(f"Full error details: {e}")
+                import traceback
+                traceback.print_exc()
             self.status_label.text = f'Status: Error - {error_msg}'
 
     @classmethod

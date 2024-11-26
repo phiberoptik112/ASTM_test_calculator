@@ -693,7 +693,7 @@ class AIICTestReport(BaseTestReport):
         # initial application of the IIC curve to the first AIIC start value 
         for vals in IIC_curve:
             IIC_contour_final.append(vals+(110-self.AIIC_contour_val))
-        # print(IIC_contour_final)
+        print('IIC_contour_final: ',IIC_contour_final)
         #### Contour_final is the AIIC contour that needs to be plotted vs the ANISPL curve- we have everything to plot the graphs and the results table  #####
         Ref_label = f'AIIC {self.AIIC_contour_val} Contour'
         Field_IIC_label = 'Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)'
@@ -705,19 +705,36 @@ class AIICTestReport(BaseTestReport):
                 AIIC_Exceptions.append('0')
             else:
                 AIIC_Exceptions.append('1')
+        print('AIIC_Exceptions: ',len(AIIC_Exceptions))
+        table_AIIC_Exceptions = AIIC_Exceptions[2:14] # values from 125-3150 (not including 4khz)
+        print('AIIC_Normalized_recieve: ',len(AIIC_Normalized_recieve))
+        table_AIIC_Normalized_recieve = AIIC_Normalized_recieve[0:15] # values from 125-3150 (not including 4khz)
+        print('onethird_bkgrd: ',len(onethird_bkgrd))
+        table_onethird_bkgrnd = onethird_bkgrd[1:15] # values from 125-3150 (not including 4khz)
+        print('rt_thirty: ',len(rt_thirty))
+        table_rt_thirty = rt_thirty[2:14] # values from 125-3150 (not including 4khz)
+        print('FREQUENCIES: ',len(FREQUENCIES))
+        table_freqs = FREQUENCIES[:15] # values from 125-3150 (not including 4khz)
+        print('table_freqs: ',table_freqs)
         Test_result_table = pd.DataFrame(
             {
-                "Frequency": FREQUENCIES,
-                "Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)	": AIIC_Normalized_recieve,
-                "Average Receiver Background Level": onethird_bkgrd,
-                "Average RT60 (Seconds)": rt_thirty,
-                "Exceptions noted to ASTM E1007-14": AIIC_Exceptions
+                "Frequency": table_freqs,
+                "Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)	": table_AIIC_Normalized_recieve,
+                "Average Receiver Background Level": table_onethird_bkgrnd,
+                "Average RT60 (Seconds)": table_rt_thirty,
+                "Exceptions noted to ASTM E1007-14": table_AIIC_Exceptions
             }
         )
+        Test_result_table = Table(Test_result_table, hAlign='LEFT') ## hardcoded, change to table variable for selected test
+        Test_result_table.setStyle(TableStyle([
+            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
+            ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
+        ]))
+        main_elements.append(Test_result_table)
         ### need to add a big box that displays the final number
         main_elements.append(Paragraph("The Apparent Impact Insulation Class (AIIC) was calculated. The AIIC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_text[0][0]))
 
-        return main_elements, Test_result_table
+        return main_elements
 
     def get_testres_table_notes(self):
         return "*This test does fully conform to the requir"
@@ -797,7 +814,7 @@ class ASTCTestReport(BaseTestReport):
             "L2, Average Corrected Receiver Room Level (dB)": corrected_STC_recieve,
             "Average Receiver Background Level (dB)": onethird_bkgrd,
             "Average RT60 (Seconds)": rt_thirty,
-            "Noise Reduction, NR (dB)": calc_NR,
+            "Noise Reduction, NR (dB)": NR_val,
             "Apparent Transmission Loss, ATL (dB)": ATL_val,
             "Exceptions": ASTC_exceptions
         })
@@ -864,7 +881,14 @@ class NICTestReport(BaseTestReport):
             NIC_vollimit=150
         )
         # Calculation of ATL
-        ATL_val,corrected_STC_recieve = calc_atl_val(onethird_srs, onethird_rec, onethird_bkgrd,props['partition_area'],props['receive_vol'],sabines)
+        ATL_val,corrected_STC_recieve = calc_atl_val(
+            onethird_srs, 
+            onethird_rec, 
+            onethird_bkgrd,
+            props['partition_area'],
+            props['receive_vol'],
+            sabines
+        )
 
         # creating reference curve for ASTC graph
         STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
