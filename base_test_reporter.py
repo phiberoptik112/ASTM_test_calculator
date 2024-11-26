@@ -705,35 +705,88 @@ class AIICTestReport(BaseTestReport):
                 AIIC_Exceptions.append('0')
             else:
                 AIIC_Exceptions.append('1')
-        print('AIIC_Exceptions: ',len(AIIC_Exceptions))
-        table_AIIC_Exceptions = AIIC_Exceptions[2:14] # values from 125-3150 (not including 4khz)
-        print('AIIC_Normalized_recieve: ',len(AIIC_Normalized_recieve))
-        table_AIIC_Normalized_recieve = AIIC_Normalized_recieve[0:15] # values from 125-3150 (not including 4khz)
-        print('onethird_bkgrd: ',len(onethird_bkgrd))
-        table_onethird_bkgrnd = onethird_bkgrd[1:15] # values from 125-3150 (not including 4khz)
-        print('rt_thirty: ',len(rt_thirty))
-        table_rt_thirty = rt_thirty[2:14] # values from 125-3150 (not including 4khz)
-        print('FREQUENCIES: ',len(FREQUENCIES))
-        table_freqs = FREQUENCIES[:15] # values from 125-3150 (not including 4khz)
-        print('table_freqs: ',table_freqs)
+                
+        # print('AIIC_Exceptions: ',len(AIIC_Exceptions))
+        # table_AIIC_Exceptions = AIIC_Exceptions[2:14] # values from 125-3150 (not including 4khz)
+        # print('AIIC_Normalized_recieve: ',len(AIIC_Normalized_recieve))
+        # table_AIIC_Normalized_recieve = AIIC_Normalized_recieve[0:15] # values from 125-3150 (not including 4khz)
+        # print('onethird_bkgrd: ',len(onethird_bkgrd))
+        # table_onethird_bkgrnd = onethird_bkgrd[1:15] # values from 125-3150 (not including 4khz)
+        # print('rt_thirty: ',len(rt_thirty))
+        # table_rt_thirty = rt_thirty[2:14] # values from 125-3150 (not including 4khz)
+        # print('FREQUENCIES: ',len(FREQUENCIES))
+
+        # Define the target frequency range (125Hz to 3150Hz)
+        FREQ_START, FREQ_END = 125, 3150
+
+        print("\n=== Processing Data Arrays for Results Table ===")
+
+        def validate_array(name: str, data: np.ndarray, freq_slice: slice) -> np.ndarray:
+            """Validate and slice array to match target frequency range."""
+            print(f"\n{name}:")
+            print(f"Original length: {len(data)}")
+            sliced_data = data[freq_slice]
+            print(f"Sliced length: {len(sliced_data)}")
+            freq_range = FREQUENCIES[freq_slice]
+            print(f"Frequency range: {freq_range[0]}Hz to {freq_range[-1]}Hz")
+            return sliced_data
+
+        # Process each array with appropriate slice for 125-3150Hz range
+        arrays = {
+            "AIIC Exceptions": (AIIC_Exceptions, slice(0, 15)),
+            "Normalized Receive": (AIIC_Normalized_recieve, slice(0, 15)),
+            "Background Levels": (onethird_bkgrd, slice(1, 16)),
+            "RT30 Values": (rt_thirty, slice(1, 16))
+        }
+
+        # Validate and slice all arrays
+        processed_arrays = {}
+        for name, (data, freq_slice) in arrays.items():
+            processed_arrays[name] = validate_array(name, data, freq_slice)
+
+        # Verify all arrays have matching lengths
+        lengths = {name: len(arr) for name, arr in processed_arrays.items()}
+        print("\n=== Length Validation ===")
+        print("Array lengths:", lengths)
+
+        if len(set(lengths.values())) != 1:
+            raise ValueError(
+                f"Mismatched array lengths detected: {lengths}\n"
+                f"All arrays must cover {FREQ_START}Hz to {FREQ_END}Hz"
+            )
+
+        # Assign processed arrays back to table variables
+        table_AIIC_Exceptions = processed_arrays["AIIC Exceptions"]
+        table_AIIC_Normalized_recieve = processed_arrays["Normalized Receive"]
+        table_onethird_bkgrd = processed_arrays["Background Levels"]
+        table_rt_thirty = processed_arrays["RT30 Values"]
+
+        # Get frequencies for the table
+        # Convert FREQUENCIES to pandas Series for frequency selection
+        freq_series = pd.Series(FREQUENCIES)
+        mask = (freq_series >= FREQ_START) & (freq_series <= FREQ_END)
+        table_freqs = freq_series[mask].tolist()
+
+        print(f"\nTable frequencies: {table_freqs}")
+
         Test_result_table = pd.DataFrame(
             {
                 "Frequency": table_freqs,
                 "Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)	": table_AIIC_Normalized_recieve,
-                "Average Receiver Background Level": table_onethird_bkgrnd,
+                "Average Receiver Background Level": table_onethird_bkgrd,
                 "Average RT60 (Seconds)": table_rt_thirty,
                 "Exceptions noted to ASTM E1007-14": table_AIIC_Exceptions
             }
         )
-        Test_result_table = Table(Test_result_table, hAlign='LEFT') ## hardcoded, change to table variable for selected test
+        Test_result_table = Table(Test_result_table, hAlign='LEFT') 
         Test_result_table.setStyle(TableStyle([
             ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
             ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
         ]))
         main_elements.append(Test_result_table)
         ### need to add a big box that displays the final number
-        main_elements.append(Paragraph("The Apparent Impact Insulation Class (AIIC) was calculated. The AIIC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_text[0][0]))
-
+        main_elements.append(Paragraph("The Apparent Impact Insulation Class (AIIC) was calculated. The AIIC rating is based on Absorption Normalized Impact Sound Pressure Level (ANISPL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Absorption Normalized Impact Sound Pressure Level values, in accordance with the procedure of "+standards_text[0][0]))
+        print('=-=-=-=-=finishing and returning test results table and paragraph-=-=-=---=-')
         return main_elements
 
     def get_testres_table_notes(self):
