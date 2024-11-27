@@ -710,22 +710,23 @@ def plot_curves(frequencies: List[float], y_label: str, ref_curve: pd.Series,
     # Create ReportLab ImageReader object
     return ImageReader(img_buffer)
 
-def process_single_test(test_plan_entry: pd.Series, slm_data_paths: Dict[str, Path], 
-                        output_folder: Path) -> Path:
-    room_props = RoomProperties(**test_plan_entry.to_dict())
+## old code, remove?
+# def process_single_test(test_plan_entry: pd.Series, slm_data_paths: Dict[str, Path], 
+#                         output_folder: Path) -> Path:
+#     room_props = RoomProperties(**test_plan_entry.to_dict())
     
-    srs_data = load_slm_data(slm_data_paths['source'], 'OBA')
-    rec_data = load_slm_data(slm_data_paths['receive'], 'OBA')
-    bkgrnd_data = load_slm_data(slm_data_paths['background'], 'OBA')
-    rt_data = load_slm_data(slm_data_paths['rt'], 'Summary')
+#     srs_data = load_slm_data(slm_data_paths['source'], 'OBA')
+#     rec_data = load_slm_data(slm_data_paths['receive'], 'OBA')
+#     bkgrnd_data = load_slm_data(slm_data_paths['background'], 'OBA')
+#     rt_data = load_slm_data(slm_data_paths['rt'], 'Summary')
     
-    test_data = TestData(srs_data, rec_data, bkgrnd_data, rt_data, room_props)
+#     test_data = TestData(srs_data, rec_data, bkgrnd_data, rt_data, room_props)
     
-    test_type = TestType(test_plan_entry['TestType'])
+#     test_type = TestType(test_plan_entry['TestType'])
     
-    report_path = create_report(test_data, output_folder, test_type)
+#     report_path = create_report(test_data, output_folder, test_type)
     
-    return report_path
+#     return report_path
 
 # Additional utility functions
 def sanitize_filepath(filepath: str) -> str:

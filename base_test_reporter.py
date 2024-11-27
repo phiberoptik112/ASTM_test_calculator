@@ -212,8 +212,6 @@ class BaseTestReport:
         main_elements.append(Test_result_table)
         return main_elements
 
-    # def create_plot(self):
-    #     raise NotImplementedError
 
     def get_report_title(self):
         print('Getting report title for specific test')
@@ -554,7 +552,10 @@ class BaseTestReport:
         
     def create_fourth_page(self):
         main_elements = []
-        main_elements.append(self.create_plot())
+        print('=-=-=-=-=-=-= Creating results plot -=-=-=-=-=-=-=-')
+        ## i have to get the different elements of each test type to create the plot
+
+        main_elements.extend(self.get_results_plot())
 
         ## need to append a large text box with teh appropriate single number result from the test calc
         # #### sane here -single number result from the test calc
@@ -649,46 +650,47 @@ class AIICTestReport(BaseTestReport):
         # this needs to be an average of the 4 tapper positions, stored in a dataframe of the average of the 4 dataframes octave band results. 
 
 
-        onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)
-        rt_thirty = self.test_data.rt['Unnamed: 10'][25:41]/1000
+        self.onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)
+        self.rt_thirty = self.test_data.rt['Unnamed: 10'][25:41]/1000
         print('Calculating NR, sabines, corrected_recieve,Nrec_ANISPL')
 
-        NR_val, NIC_final_val, sabines, AIIC_recieve_corr, ASTC_recieve_corr, AIIC_Normalized_recieve = calc_NR_new(
+        NR_val, NIC_final_val, self.sabines, self.AIIC_recieve_corr, self.ASTC_recieve_corr, self.AIIC_Normalized_recieve = calc_NR_new(
             srs_overalloct=onethird_srs,
             AIIC_rec_overalloct=onethird_rec_Total, 
             ASTC_rec_overalloct=onethird_rec,
-            bkgrnd_overalloct=onethird_bkgrd,
-            sabines=rt_thirty,
+            bkgrnd_overalloct=self.onethird_bkgrd,
+            sabines=self.rt_thirty,
             recieve_roomvol=props['receive_vol'],
             NIC_vollimit=150
         )
         ###
         # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,rt_thirty,room_properties['Partition area'][0],room_properties['Recieve Vol'][0])\
         print('-=-=-=-=-=-=-= Calculating AIIC contour-=-=-=-=-=-=-=-=-')
-        self.AIIC_contour_val, self.Contour_curve_result = calc_AIIC_val_claude(AIIC_Normalized_recieve)
+        self.AIIC_contour_val, self.Contour_curve_result = calc_AIIC_val_claude(self.AIIC_Normalized_recieve)
         print('-=-=-=-=-=-=-= Calculating ISR contour-=-=-=-=-=-=-=-=-')
-        self.ISR_contour_val, self.ISR_contour_result = calc_AIIC_val_claude(ASTC_recieve_corr)
+        self.ISR_contour_val, self.ISR_contour_result = calc_AIIC_val_claude(self.ASTC_recieve_corr)
 
         print('AIIC_contour_val: ',self.AIIC_contour_val)
-        IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
-        IIC_contour_final = list()
-        ISR_contour_final = list()
+        # IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
+        IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15]
+        self.IIC_contour_final = list()
+        self.ISR_contour_final = list()
         # initial application of the IIC curve to the first AIIC start value 
         for vals in IIC_curve:
-            IIC_contour_final.append(vals+(110-self.AIIC_contour_val))
-            ISR_contour_final.append(vals+(110-self.ISR_contour_val))
-        print('IIC_contour_final: ',IIC_contour_final)
+            self.IIC_contour_final.append(vals+(110-self.AIIC_contour_val))
+            self.ISR_contour_final.append(vals+(110-self.ISR_contour_val))
+            print('IIC_contour_final: ',self.IIC_contour_final)
         #### Contour_final is the AIIC contour that needs to be plotted vs the ANISPL curve- we have everything to plot the graphs and the results table  #####
         Ref_label = f'AIIC {self.AIIC_contour_val} Contour'
         Field_IIC_label = 'Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)'
         # frequencies =[125,160,200,250,315,400,500,630,800,1000,1250,1600,2000,2500,3150,4000]
-        AIIC_Exceptions = [] ### need to add exceptions to the table
+        self.AIIC_Exceptions = [] ### need to add exceptions to the table
         rec_roomvol = props['receive_vol']
-        for vals in sabines:
+        for vals in self.sabines:
             if vals > 2*(rec_roomvol**2/3):
-                AIIC_Exceptions.append('0')
+                self.AIIC_Exceptions.append('0')
             else:
-                AIIC_Exceptions.append('1')
+                self.AIIC_Exceptions.append('1')
 
 
         # Define the target frequency range (125Hz to 3150Hz)
@@ -708,10 +710,10 @@ class AIICTestReport(BaseTestReport):
 
         # Process each array with appropriate slice for 125-3150Hz range
         arrays = {
-            "AIIC Exceptions": (AIIC_Exceptions, slice(0, 15)),
-            "Normalized Receive": (AIIC_Normalized_recieve, slice(0, 15)),
-            "Background Levels": (onethird_bkgrd, slice(1, 16)),
-            "RT30 Values": (rt_thirty, slice(1, 16))
+            "AIIC Exceptions": (self.AIIC_Exceptions, slice(0, 15)),
+            "Normalized Receive": (self.AIIC_Normalized_recieve, slice(0, 15)),
+            "Background Levels": (self.onethird_bkgrd, slice(1, 16)),
+            "RT30 Values": (self.rt_thirty, slice(1, 16))
         }
 
         # Validate and slice all arrays
@@ -732,7 +734,7 @@ class AIICTestReport(BaseTestReport):
 
         # Assign processed arrays back to table variables
         table_AIIC_Exceptions = processed_arrays["AIIC Exceptions"]
-        table_AIIC_Normalized_recieve = processed_arrays["Normalized Receive"]
+        self.table_AIIC_Normalized_recieve = processed_arrays["Normalized Receive"]
         table_onethird_bkgrd = processed_arrays["Background Levels"]
         table_rt_thirty = processed_arrays["RT30 Values"]
 
@@ -743,13 +745,13 @@ class AIICTestReport(BaseTestReport):
 
         print("\n=== Table Data Validation ===")
         print(f"Frequencies: {len(table_freqs)} - {table_freqs}")
-        print(f"ANISPL: {len(table_AIIC_Normalized_recieve)}")
+        print(f"ANISPL: {len(self.table_AIIC_Normalized_recieve)}")
         print(f"Background: {len(table_onethird_bkgrd)}")
         print(f"RT60: {len(table_rt_thirty)}")
         print(f"Exceptions: {len(table_AIIC_Exceptions)}")
         print("\n=== Full Table Data ===")
         print(f"Frequencies: {table_freqs}")
-        print(f"ANISPL values: {table_AIIC_Normalized_recieve}")
+        print(f"ANISPL values: {self.table_AIIC_Normalized_recieve}")
         print(f"Background levels: {table_onethird_bkgrd}")
         print(f"RT60 values: {table_rt_thirty}")
         print(f"Exceptions: {table_AIIC_Exceptions}")
@@ -779,7 +781,7 @@ class AIICTestReport(BaseTestReport):
                 try:
                     row = [
                         f"{float(table_freqs[i]):.0f}",
-                        f"{float(table_AIIC_Normalized_recieve[i]):.1f}",
+                        f"{float(self.table_AIIC_Normalized_recieve[i]):.1f}",
                         f"{float(table_onethird_bkgrd[i]):.1f}",
                         f"{float(table_rt_thirty[i]):.3f}",
                         str(table_AIIC_Exceptions[i])
@@ -789,7 +791,7 @@ class AIICTestReport(BaseTestReport):
                 except Exception as e:
                     print(f"Error creating row {i}: {str(e)}")
                     print(f"Values: freq={table_freqs[i]}, "
-                          f"ANISPL={table_AIIC_Normalized_recieve[i]}, "
+                          f"ANISPL={self.table_AIIC_Normalized_recieve[i]}, "
                           f"bkgrd={table_onethird_bkgrd[i]}, "
                           f"rt60={table_rt_thirty[i]}, "
                           f"except={table_AIIC_Exceptions[i]}")
@@ -831,7 +833,7 @@ class AIICTestReport(BaseTestReport):
         return main_elements
 
     def get_test_results_table_notes(self):
-        return "*This test does fully conform to the requir"
+        return "*This test does fully conform to the requirments... ect NEED TO COMPLETE "
     def get_test_results_paragraph(self): 
         return (
             f"The Apparent Impact Insulation Class (AIIC) of {self.AIIC_contour_val} "
@@ -841,6 +843,20 @@ class AIICTestReport(BaseTestReport):
             "next page, and has been fit to the Absorption Normalized Impact Sound Pressure Level values, in "
             f"accordance with the procedure of {standards_text[0][0]}"
         )
+    def get_results_plot(self):
+        main_elements = []
+        # Define the target frequency range (125Hz to 3150Hz)
+        FREQ_START, FREQ_END = 125, 3150
+        freq_series = pd.Series(FREQUENCIES)
+        mask = (freq_series >= FREQ_START) & (freq_series <= FREQ_END)
+        table_freqs = freq_series[mask].tolist()
+        print(f'table_freqs: {table_freqs}')
+        Ref_label = f'AIIC {self.AIIC_contour_val} Contour'
+        IIC_yAxis = 'Sound Pressure Level (dB)'
+        Field_IIC_label = 'Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)'
+        plot_fig = plot_curves(table_freqs,IIC_yAxis,self.IIC_contour_final,self.table_AIIC_Normalized_recieve,Ref_label, Field_IIC_label)
+        main_elements.append(plot_fig)
+        return main_elements
 
 class ASTCTestReport(BaseTestReport):
     # Implement ASTC-specific methods
