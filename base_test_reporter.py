@@ -92,32 +92,72 @@ class BaseTestReport:
         elements = []
         print('Building header elements')
         props = vars(self.test_data.room_properties)
-        elements.append(Paragraph(self.get_report_title(self.custom_title_style), self.custom_title_style))
+        elements.extend(self.get_report_title())
         elements.append(Spacer(1, 10))
         print('Building left side data')
+        
+        # Convert all data to strings and wrap in Paragraphs where needed
         leftside_data = [
-            ["Report Date:", props['report_date']],
-            ['Test Date:', props['test_date']],
-            ['DLAA Test No', props['test_label']]
+            ["Report Date:", Paragraph(str(props['report_date']), self.styles['Normal'])],
+            ['Test Date:', Paragraph(str(props['test_date']), self.styles['Normal'])],
+            ['DLAA Test No', Paragraph(str(props['test_label']), self.styles['Normal'])]
         ]
+        
         print('Building right side data')
         rightside_data = [
-            ["Source Room:", props['source_room_name']],
-            ["Receiver Room:", props['recieve_room_name']],
-            ["Test Assembly:", props['tested_assembly']]
+            ["Source Room:", Paragraph(str(props['source_room']), self.styles['Normal'])],
+            ["Receiver Room:", Paragraph(str(props['receive_room']), self.styles['Normal'])],
+            ["Test Assembly:", Paragraph(str(props['tested_assembly']), self.styles['Normal'])]
         ]
 
-        table_left = Table(leftside_data)
-        table_right = Table(rightside_data)
-        table_left.setStyle(TableStyle([('GRID', (0, 0), (-1, -1), 1, colors.white)]))
-        table_right.setStyle(TableStyle([('GRID', (0, 0), (-1, -1), 1, colors.white)]))
+        # Create tables with proper styling
+        table_left = Table(leftside_data, colWidths=[100, 200])  # Adjust widths as needed
+        table_right = Table(rightside_data, colWidths=[100, 200])  # Adjust widths as needed
+        
+        table_left.setStyle(TableStyle([
+            ('GRID', (0, 0), (-1, -1), 1, colors.white),
+            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica')
+        ]))
+        
+        table_right.setStyle(TableStyle([
+            ('GRID', (0, 0), (-1, -1), 1, colors.white),
+            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTNAME', (1, 0), (1, -1), 'Helvetica')
+        ]))
 
-        table_combined_lr = Table([[table_left, table_right]], colWidths=[self.doc.width / 2.0] * 2)
-        elements.append(KeepInFrame(maxWidth=self.doc.width, maxHeight=self.header_height, content=[table_combined_lr], hAlign='LEFT'))
+        # Combine tables
+        table_combined_lr = Table(
+            [[table_left, table_right]], 
+            colWidths=[self.doc.width/2.0]*2,
+            hAlign='LEFT'
+        )
+        
+        # Add combined table to elements
+        elements.append(KeepInFrame(
+            maxWidth=self.doc.width, 
+            maxHeight=self.header_height, 
+            content=[table_combined_lr], 
+            hAlign='LEFT'
+        ))
+        
         elements.append(Spacer(1, 10))
-        elements.append(Paragraph('Test site: ' + props['site_name'], self.styles['Normal']))
+        
+        # Add site and client info as Paragraphs
+        elements.append(Paragraph(
+            'Test site: ' + str(props['site_name']), 
+            self.styles['Normal']
+        ))
         elements.append(Spacer(1, 5))
-        elements.append(Paragraph('Client: ' + props['client_name'], self.styles['Normal']))
+        elements.append(Paragraph(
+            'Client: ' + str(props['client_name']), 
+            self.styles['Normal']
+        ))
+        
         return elements
 
     def header_footer(self, canvas, doc):
@@ -154,12 +194,12 @@ class BaseTestReport:
         ],
         TestType.ASTC: [
             ['ASTM E336-16', Paragraph('Standard Test Method for Measurement of Airborne Sound Attenuation between Rooms in Buildings',self.styles['Normal'])],
-            ['ASTM E413-16', Paragraph('Classification for Rating Sound Insulation',self.styles['Normal'])],
+            ['ASTM E413-16', Paragraph('Standard Classification for Rating Sound Insulation',self.styles['Normal'])],
             ['ASTM E2235-04(2012)', Paragraph('Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods',self.styles['Normal'])]
         ],
         TestType.NIC: [
             ['ASTM E336-16', Paragraph('Standard Test Method for Measurement of Airborne Sound Attenuation between Rooms in Buildings',self.styles['Normal'])],
-            ['ASTM E413-16', Paragraph('Classification for Rating Sound Insulation',self.styles['Normal'])],
+            ['ASTM E413-16', Paragraph('Standard Classification for Rating Sound Insulation',self.styles['Normal'])],
             ['ASTM E2235-04(2012)', Paragraph('Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods',self.styles['Normal'])]
         ],
         TestType.DTC: [
@@ -213,20 +253,21 @@ class BaseTestReport:
         return main_elements
 
 
-    def get_report_title(self):
+    def get_report_title(self, style=None):
         print('Getting report title for specific test')
+        style = style or self.custom_title_style
         title_by_type = {
             TestType.AIIC: [
-                Paragraph("<b>Field Impact Sound Transmission Test Report</b>", self.custom_title_style),
-                Paragraph("<b>Apparent Impact Insulation Class (AIIC)</b>", self.custom_title_style)
+                Paragraph("<b>Field Impact Sound Transmission Test Report</b>", style),
+                Paragraph("<b>Apparent Impact Insulation Class (AIIC)</b>", style)
             ],
             TestType.ASTC: [
-                Paragraph("<b>Field Sound Transmission Test Report</b>", self.custom_title_style),
-                Paragraph("<b>Apparent Sound Transmission Class (ASTC)</b>", self.custom_title_style)
+                Paragraph("<b>Field Sound Transmission Test Report</b>", style),
+                Paragraph("<b>Apparent Sound Transmission Class (ASTC)</b>", style)
             ],
             TestType.NIC: [
-                Paragraph("<b>Field Sound Transmission Test Report</b>", self.custom_title_style),
-                Paragraph("<b>Noise Isolation Class (NIC)</b>", self.custom_title_style)
+                Paragraph("<b>Field Sound Transmission Test Report</b>", style),
+                Paragraph("<b>Noise Isolation Class (NIC)</b>", style)
             ]
         }
         try:
@@ -339,20 +380,7 @@ class BaseTestReport:
     
     @classmethod
     def create_report(cls, test_data, output_folder: Path, test_type):
-        """Factory method to create and build the appropriate test report
-        
-        Args:
-            test_data: TestData instance containing all test measurements and properties
-            output_folder: Path object for the output directory
-            test_type: Type of test (AIIC, ASTC, NIC, or DTC)
-            
-        Returns:
-            BaseTestReport: The generated report instance
-            
-        Raises:
-            ReportGenerationError: If report creation or saving fails
-            ValueError: If test type is unsupported or path is invalid
-        """
+        """Factory method to create and build the appropriate test report"""
         # Validate output directory
         output_dir = Path(output_folder)
         if not output_dir.exists():
@@ -368,48 +396,74 @@ class BaseTestReport:
         report_class = report_classes.get(test_type)
         if not report_class:
             raise ValueError(f"Unsupported test type: {test_type}")
-            
+        
         try:
-            # Create report instance using test_data which contains room_properties
             print('--=-=-=-=-= Creating Report Class and setting up document -=-=-=-=-=-=-')
-            report = report_class(test_data = test_data, 
-                                  reportOutputfolder = output_dir, 
-                                  test_type = test_type)
+            report = report_class(test_data=test_data, 
+                                reportOutputfolder=output_dir, 
+                                test_type=test_type)
             
             # Setup document
             doc = report.setup_document()
             print('Document setup complete')
+            
             # Generate content with error handling
             main_elements = []
             try:
-                    # Create styles
-                # styles = getSampleStyleSheet()
-                
-                print('Creating first page')
-                main_elements.extend(report.create_first_page())
-                main_elements.append(PageBreak())   
-                print('Creating second page')
-                main_elements.extend(report.create_second_page())
-                main_elements.append(PageBreak())
-                print('Creating third page')
-                main_elements.extend(report.create_third_page())
-                main_elements.append(PageBreak())
-                print('Creating fourth page')
-                main_elements.extend(report.create_fourth_page())
-            except ReportGenerationError as e:
+                # Ensure all elements are proper Flowable objects
+                for page_method in [report.create_first_page, 
+                                  report.create_second_page,
+                                  report.create_third_page,
+                                  report.create_fourth_page]:
+                    print(f'Creating {page_method.__name__}')
+                    page_elements = page_method()
+                    
+                    # Validate elements
+                    if not isinstance(page_elements, (list, tuple)):
+                        raise ReportGenerationError(f"{page_method.__name__} did not return a list of elements")
+                    
+                    # Filter out any non-Flowable elements
+                    from reportlab.platypus.flowables import Flowable
+                    valid_elements = []
+                    for element in page_elements:
+                        if isinstance(element, (Flowable, str)):
+                            if isinstance(element, str):
+                                # Convert strings to Paragraphs
+                                element = Paragraph(element, report.styles['Normal'])
+                            valid_elements.append(element)
+                        else:
+                            print(f"Warning: Skipping invalid element type {type(element)} in {page_method.__name__}")
+                    
+                    main_elements.extend(valid_elements)
+                    main_elements.append(PageBreak())
+                    
+            except Exception as e:
                 print(f"Error generating report pages: {str(e)}")
-                raise
+                raise ReportGenerationError(f"Error in page generation: {str(e)}")
             
-            # Build and save document
-            output_path = output_dir / report.get_doc_name()
-            doc.build(main_elements, filename=str(output_path))
-            
-            if not output_path.exists():
-                raise ReportGenerationError(f"Failed to save report to {output_path}")
+            try:
+                # Build and save document
+                output_path = output_dir / report.get_doc_name()
+                print(f"Building document with {len(main_elements)} elements")
                 
-            print(f"Report saved successfully to: {output_path}")
-            return True
-            
+                # Remove the last PageBreak if it exists
+                if main_elements and isinstance(main_elements[-1], PageBreak):
+                    main_elements.pop()
+                    
+                doc.build(main_elements)
+                
+                if not output_path.exists():
+                    raise ReportGenerationError(f"Failed to save report to {output_path}")
+                
+                print(f"Report saved successfully to: {output_path}")
+                return True
+                
+            except Exception as e:
+                print(f"Error during document build: {str(e)}")
+                print(f"Number of elements: {len(main_elements)}")
+                print(f"Types of elements: {[type(elem) for elem in main_elements[:5]]}...")  # Print first 5 element types
+                raise ReportGenerationError(f"Document build failed: {str(e)}")
+                
         except Exception as e:
             print(f"Failed to create report: {str(e)}")
             raise ReportGenerationError(f"Report generation failed: {str(e)}")

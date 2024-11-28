@@ -506,8 +506,8 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=True):
         if verbose:
             print(f"Iteration {iteration_count}:")
             print(f"  AIIC_contour_val: {AIIC_contour_val}")
-            print(f"  diff_negative_max: {diff_negative_max}")
-            print(f"  new_sum: {new_sum}")
+            # print(f"  diff_negative_max: {diff_negative_max}")
+            # print(f"  new_sum: {new_sum}")
         print('Inside loop, current AIIC contour: ', AIIC_contour_val)
         # print('Contour curve (IIC curve minus ANISPL): ', Contour_curve_result)
         
@@ -548,11 +548,11 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=True):
     else:
         print("Loop completed without meeting conditions. Returning last calculated values.")
     print(f"Loop exited. Final values:")
-    print(f"  diff_negative_max: {diff_negative_max}")
-    print(f"  new_sum: {new_sum}")
+    # print(f"  diff_negative_max: {diff_negative_max}")
+    # print(f"  new_sum: {new_sum}")
     print(f"  iterations: {iteration_count}")
     print('Contour curve (IIC curve minus ANISPL): ', Contour_curve_result)
-    print('IIC contour value: ', AIIC_contour_val)
+    # print('IIC contour value: ', AIIC_contour_val)
 
 
     return AIIC_contour_val, Contour_curve_result
