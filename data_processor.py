@@ -269,19 +269,24 @@ def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd
     ASTC_recieve_corr = []
     AIIC_Normalized_recieve = None
     NIC_start = 16
-    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]  # Reduced to 15 elements
+    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]  # 15 elements
 
     try:
-        # Convert and slice all inputs to 15 elements (125Hz-4000Hz)
-        bkgrnd_overalloct = pd.to_numeric(bkgrnd_overalloct).to_numpy()[1:16] if isinstance(bkgrnd_overalloct, pd.Series) else np.array(bkgrnd_overalloct)[1:16]
-        rt_thirty = rt_thirty[1:16] if isinstance(rt_thirty, pd.Series) else np.array(rt_thirty)[1:16]
-        srs_overalloct = pd.to_numeric(srs_overalloct).to_numpy()[1:16] if isinstance(srs_overalloct, pd.Series) else np.array(srs_overalloct)[1:16]
+        # Convert inputs to numpy arrays without additional slicing
+        bkgrnd_overalloct = pd.to_numeric(bkgrnd_overalloct).to_numpy() if isinstance(bkgrnd_overalloct, pd.Series) else np.array(bkgrnd_overalloct)
+        rt_thirty = rt_thirty.to_numpy() if isinstance(rt_thirty, pd.Series) else np.array(rt_thirty)
+        srs_overalloct = pd.to_numeric(srs_overalloct).to_numpy() if isinstance(srs_overalloct, pd.Series) else np.array(srs_overalloct)
+        
+        # Verify array lengths
+        expected_length = 15
+        if not all(len(arr) == expected_length for arr in [bkgrnd_overalloct, rt_thirty, srs_overalloct]):
+            raise ValueError(f"Input arrays must have length {expected_length}")
         
         # Calculate sabines
         sabines = 0.049 * (recieve_roomvol/rt_thirty)
-        sabines = np.round(np.int32(sabines))
+        sabines = np.round(sabines).astype(np.int32)
 
-        print("\nInput shapes after slicing:")
+        print("\nInput shapes:")
         print(f"Background: {bkgrnd_overalloct.shape}")
         print(f"RT thirty: {rt_thirty.shape}")
         print(f"Source: {srs_overalloct.shape}")
@@ -289,9 +294,10 @@ def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd
         # Process AIIC data if provided
         if AIIC_rec_overalloct is not None:
             try:
-                AIIC_rec_overalloct = pd.to_numeric(AIIC_rec_overalloct).to_numpy()[1:16] if isinstance(AIIC_rec_overalloct, pd.Series) else np.array(AIIC_rec_overalloct)[1:16]
+                AIIC_rec_overalloct = pd.to_numeric(AIIC_rec_overalloct).to_numpy() if isinstance(AIIC_rec_overalloct, pd.Series) else np.array(AIIC_rec_overalloct)
                 AIIC_recieve_vsBkgrnd = AIIC_rec_overalloct - bkgrnd_overalloct
                 
+                AIIC_recieve_corr = []
                 for i, val in enumerate(AIIC_recieve_vsBkgrnd):
                     if val < 5:
                         AIIC_recieve_corr.append(AIIC_rec_overalloct[i]-2)
@@ -318,9 +324,10 @@ def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd
         # Process ASTC data if provided
         if ASTC_rec_overalloct is not None:
             try:
-                ASTC_rec_overalloct = pd.to_numeric(ASTC_rec_overalloct).to_numpy()[1:16] if isinstance(ASTC_rec_overalloct, pd.Series) else np.array(ASTC_rec_overalloct)[1:16]
+                ASTC_rec_overalloct = pd.to_numeric(ASTC_rec_overalloct).to_numpy() if isinstance(ASTC_rec_overalloct, pd.Series) else np.array(ASTC_rec_overalloct)
                 ASTC_recieve_vsBkgrnd = ASTC_rec_overalloct - bkgrnd_overalloct
                 
+                ASTC_recieve_corr = []
                 for i, val in enumerate(ASTC_recieve_vsBkgrnd):
                     if val < 5:
                         ASTC_recieve_corr.append(ASTC_rec_overalloct[i]-2)
@@ -341,7 +348,7 @@ def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd
                 NR_val = pd.to_numeric(NR_val, errors='coerce')
                 
                 # NIC curve calculation
-                NIC_val_list = NR_val.copy()  # No need to slice further
+                NIC_val_list = NR_val.copy()
                 NIC_final_val = calculate_nic_curve(NIC_val_list, STCCurve, NIC_start)
             except Exception as e:
                 print(f"Error in ASTC processing: {str(e)}")

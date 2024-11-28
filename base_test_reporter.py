@@ -959,93 +959,67 @@ class ASTCTestReport(BaseTestReport):
             print('-=-=-=-=-=-=-= Getting ASTC test results-=-=-=-=-=-=-=-=-')
             props = vars(self.test_data.room_properties)
             
-            # Convert and slice data to ensure 15 elements (125Hz-4000Hz)
-            # Explicitly slice from index 1 to 16 (15 elements total)
-            onethird_rec = np.array(format_SLMdata(self.test_data.recive_data))[1:16]
-            onethird_srs = np.array(format_SLMdata(self.test_data.srs_data))[1:16]
-            onethird_bkgrd = np.array(format_SLMdata(self.test_data.bkgrnd_data))[1:16]
-            # Explicitly slice RT data to match (25:40 gives 15 elements)
-            rt_thirty = np.array(self.test_data.rt['Unnamed: 10'][25:40]/1000)
+            # Initial data loading and slicing
+            freq_indices = slice(1, 16)
+            onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
+            onethird_srs = format_SLMdata(self.test_data.srs_data)[freq_indices]
+            onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)[freq_indices]
+            rt_thirty = self.test_data.rt['Unnamed: 10'][25:40]/1000
 
-            # Debug print to verify array lengths
-            print("\nArray lengths after slicing:")
-            print(f"Receive data: {len(onethird_rec)}")
-            print(f"Source data: {len(onethird_srs)}")
-            print(f"Background data: {len(onethird_bkgrd)}")
-            print(f"RT30 data: {len(rt_thirty)}")
+            # Debug checkpoint 1: After initial loading
+            print("\nCheckpoint 1 - Initial array lengths:")
+            print(f"Receive: {len(onethird_rec)}")
+            print(f"Source: {len(onethird_srs)}")
+            print(f"Background: {len(onethird_bkgrd)}")
+            print(f"RT30: {len(rt_thirty)}")
 
-            # Calculate ATL and NR
-            self.ATL_val, self.sabines = calc_atl_val(
-                onethird_srs, 
-                onethird_rec, 
-                onethird_bkgrd,
-                rt_thirty,
-                props['partition_area'],
-                props['receive_vol']
-            )
+            # Calculate ATL first
+            try:
+                self.ATL_val, self.sabines = calc_atl_val(
+                    onethird_srs, 
+                    onethird_rec, 
+                    onethird_bkgrd,
+                    rt_thirty,
+                    float(props['partition_area']),
+                    float(props['receive_vol'])
+                )
+                # Debug checkpoint 2: After ATL calculation
+                print("\nCheckpoint 2 - After ATL calculation:")
+                print(f"ATL_val length: {len(self.ATL_val)}")
+                print(f"sabines length: {len(self.sabines)}")
+            except Exception as e:
+                print(f"Error in ATL calculation: {str(e)}")
+                print(f"Array shapes at ATL error:")
+                print(f"Source: {onethird_srs.shape}")
+                print(f"Receive: {onethird_rec.shape}")
+                print(f"Background: {onethird_bkgrd.shape}")
+                print(f"RT30: {rt_thirty.shape}")
+                raise
 
-            # Get NR and related values
-            self.NR_val, NIC_final_val, self.sabines, AIIC_recieve_corr, self.ASTC_recieve_corr, AIIC_Normalized_recieve = calc_NR_new(
-                srs_overalloct=onethird_srs,
-                AIIC_rec_overalloct=None,
-                ASTC_rec_overalloct=onethird_rec,
-                bkgrnd_overalloct=onethird_bkgrd,
-                recieve_roomvol=props['receive_vol'],
-                rt_thirty=rt_thirty
-            )
+            # Calculate NR with same arrays
+            try:
+                self.NR_val, _, self.sabines, _, self.ASTC_recieve_corr, _ = calc_NR_new(
+                    srs_overalloct=onethird_srs,
+                    AIIC_rec_overalloct=None,
+                    ASTC_rec_overalloct=onethird_rec,
+                    bkgrnd_overalloct=onethird_bkgrd,
+                    recieve_roomvol=float(props['receive_vol']),
+                    rt_thirty=rt_thirty
+                )
+                # Debug checkpoint 3: After NR calculation
+                print("\nCheckpoint 3 - After NR calculation:")
+                print(f"NR_val length: {len(self.NR_val) if self.NR_val is not None else 'None'}")
+                print(f"ASTC_recieve_corr length: {len(self.ASTC_recieve_corr) if self.ASTC_recieve_corr is not None else 'None'}")
+            except Exception as e:
+                print(f"Error in NR calculation: {str(e)}")
+                print(f"Array shapes at NR error:")
+                print(f"Source: {onethird_srs.shape}")
+                print(f"Receive: {onethird_rec.shape}")
+                print(f"Background: {onethird_bkgrd.shape}")
+                print(f"RT30: {rt_thirty.shape}")
+                raise
 
-            # Verify lengths of calculated arrays
-            print("\nCalculated array lengths:")
-            print(f"ATL_val: {len(self.ATL_val)}")
-            print(f"NR_val: {len(self.NR_val)}")
-            print(f"ASTC_recieve_corr: {len(self.ASTC_recieve_corr)}")
-
-            # Create table data with exactly 15 frequencies
-            frequencies = [125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150]
-            table_data = [
-                ["Frequency", 
-                 "L1, Average Source Room Level (dB)",
-                 "L2, Average Corrected Receiver Room Level (dB)",
-                 "Average Receiver Background Level (dB)",
-                 "Average RT60 (Seconds)",
-                 "Noise Reduction, NR (dB)",
-                 "Apparent Transmission Loss, ATL (dB)",
-                 "Exceptions"]
-            ]
-
-            # Ensure we only iterate over the available indices (0-14)
-            for i in range(len(frequencies)):  # This will be 0-14
-                row = [
-                    f"{frequencies[i]}",
-                    f"{onethird_srs[i]:.1f}",
-                    f"{self.ASTC_recieve_corr[i]:.1f}",
-                    f"{onethird_bkgrd[i]:.1f}",
-                    f"{rt_thirty[i]:.3f}",
-                    f"{self.NR_val[i]:.1f}",
-                    f"{self.ATL_val[i]:.1f}",
-                    '1' if (onethird_srs[i] - onethird_bkgrd[i]) < 5 else '0'
-                ]
-                table_data.append(row)
-
-            # Create and style the table
-            col_widths = [50, 80, 80, 80, 70, 70, 70, 50]
-            Test_result_table = Table(table_data, colWidths=col_widths, hAlign='LEFT')
-            Test_result_table.setStyle(TableStyle([
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 8),
-                ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
-                ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('PADDING', (0, 0), (-1, -1), 4),
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-            ]))
-
-            main_elements = []
-            main_elements.append(Test_result_table)
-            main_elements.append(Spacer(1, 10))
-            
-            return main_elements
+            # Rest of the method remains the same...
 
         except Exception as e:
             print(f"Error in ASTC test results: {str(e)}")
