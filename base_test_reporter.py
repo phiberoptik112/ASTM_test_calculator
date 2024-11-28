@@ -658,14 +658,32 @@ class AIICTestReport(BaseTestReport):
         self.rt_thirty = self.test_data.rt['Unnamed: 10'][25:41]/1000
         print('Calculating NR, sabines, corrected_recieve,Nrec_ANISPL')
 
-        NR_val, NIC_final_val, self.sabines, self.AIIC_recieve_corr, self.ASTC_recieve_corr, self.AIIC_Normalized_recieve = calc_NR_new(
-            srs_overalloct=onethird_srs,
-            AIIC_rec_overalloct=onethird_rec_Total, 
-            ASTC_rec_overalloct=onethird_rec,
-            bkgrnd_overalloct=self.onethird_bkgrd,
-            recieve_roomvol=props['receive_vol'],
-            rt_thirty=self.rt_thirty
-        )
+        try:
+            # ... previous code ...
+            
+            NR_val, NIC_final_val, sabines, AIIC_recieve_corr, ASTC_recieve_corr, AIIC_Normalized_recieve = calc_NR_new(
+                srs_overalloct=onethird_srs,
+                AIIC_rec_overalloct=onethird_rec_Total, 
+                ASTC_rec_overalloct=onethird_rec,
+                bkgrnd_overalloct=self.onethird_bkgrd,
+                recieve_roomvol=props['receive_vol'],
+                rt_thirty=self.rt_thirty
+            )
+            
+            # Store the values
+            self.NR_val = NR_val
+            self.sabines = sabines
+            self.AIIC_recieve_corr = AIIC_recieve_corr
+            self.ASTC_recieve_corr = ASTC_recieve_corr
+            self.AIIC_Normalized_recieve = AIIC_Normalized_recieve
+            
+        except Exception as e:
+            print(f"Error in ASTC test results: {str(e)}")
+            print(f"Error type: {type(e)}")
+            import traceback
+            print(f" Traceback:\n{traceback.format_exc()}")
+            raise
+
         ###
         # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,rt_thirty,room_properties['Partition area'][0],room_properties['Recieve Vol'][0])\
         print('-=-=-=-=-=-=-= Calculating AIIC contour-=-=-=-=-=-=-=-=-')
@@ -883,56 +901,53 @@ class ASTCTestReport(BaseTestReport):
     def get_statement_of_conformance(self):
         return "Testing was conducted in accordance with ASTM E336-20, ASTM E413-16, and ASTM E2235-04(2012), with exceptions noted below. All requrements for measuring abd reporting Airborne Sound Attenuation between Rooms in Buildings (ATL) and Apparent Sound Transmission Class (ASTC) were met."
     def get_test_results(self):
-        # Format the raw data
-        main_elements = []
-        print('-=-=-=-=-=-=-= Getting ASTC test results-=-=-=-=-=-=-=-=-')
-        props = vars(self.test_data.room_properties)
-        
-        # Convert data to numpy arrays to avoid pandas indexing issues
-        onethird_rec = np.array(format_SLMdata(self.test_data.recive_data))
-        onethird_srs = np.array(format_SLMdata(self.test_data.srs_data))
-        onethird_bkgrd = np.array(format_SLMdata(self.test_data.bkgrnd_data))
-        rt_thirty = np.array(self.test_data.rt['Unnamed: 10'][25:41]/1000)
-
-        # Get room properties
-        partition_area = float(props['partition_area'])
-        receive_vol = float(props['receive_vol'])
-
-        print("Data shapes after conversion:")
-        print(f"Receive data: {onethird_rec.shape}")
-        print(f"Source data: {onethird_srs.shape}")
-        print(f"Background data: {onethird_bkgrd.shape}")
-        print(f"RT30 data: {rt_thirty.shape}")
-
         try:
+            print('-=-=-=-=-=-=-= Getting ASTC test results-=-=-=-=-=-=-=-=-')
+            props = vars(self.test_data.room_properties)
+            
+            # Convert and slice data to ensure 15 elements (125Hz-4000Hz)
+            # Explicitly slice from index 1 to 16 (15 elements total)
+            onethird_rec = np.array(format_SLMdata(self.test_data.recive_data))[1:16]
+            onethird_srs = np.array(format_SLMdata(self.test_data.srs_data))[1:16]
+            onethird_bkgrd = np.array(format_SLMdata(self.test_data.bkgrnd_data))[1:16]
+            # Explicitly slice RT data to match (25:40 gives 15 elements)
+            rt_thirty = np.array(self.test_data.rt['Unnamed: 10'][25:40]/1000)
+
+            # Debug print to verify array lengths
+            print("\nArray lengths after slicing:")
+            print(f"Receive data: {len(onethird_rec)}")
+            print(f"Source data: {len(onethird_srs)}")
+            print(f"Background data: {len(onethird_bkgrd)}")
+            print(f"RT30 data: {len(rt_thirty)}")
+
             # Calculate ATL and NR
             self.ATL_val, self.sabines = calc_atl_val(
                 onethird_srs, 
                 onethird_rec, 
                 onethird_bkgrd,
                 rt_thirty,
-                partition_area,
-                receive_vol
+                props['partition_area'],
+                props['receive_vol']
             )
 
-            self.NR_val, NIC_final_val, AIIC_recieve_corr, self.ASTC_recieve_corr, AIIC_Normalized_recieve = calc_NR_new(
+            # Get NR and related values
+            self.NR_val, NIC_final_val, self.sabines, AIIC_recieve_corr, self.ASTC_recieve_corr, AIIC_Normalized_recieve = calc_NR_new(
                 srs_overalloct=onethird_srs,
-                AIIC_rec_overalloct=None,  # Not needed for ASTC test
+                AIIC_rec_overalloct=None,
                 ASTC_rec_overalloct=onethird_rec,
                 bkgrnd_overalloct=onethird_bkgrd,
-                recieve_roomvol=receive_vol,
+                recieve_roomvol=props['receive_vol'],
                 rt_thirty=rt_thirty
             )
 
-            # Create ASTC reference curve
-            STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
-            self.ASTC_contour_final = [val + self.ATL_val for val in STCCurve]
-            print('ASTC_contour: ', self.ASTC_contour_final)
+            # Verify lengths of calculated arrays
+            print("\nCalculated array lengths:")
+            print(f"ATL_val: {len(self.ATL_val)}")
+            print(f"NR_val: {len(self.NR_val)}")
+            print(f"ASTC_recieve_corr: {len(self.ASTC_recieve_corr)}")
 
-            # Check if difference between source and background levels is less than 5 dB
-            ASTC_exceptions = ['1' if (src - bg) < 5 else '0' for src, bg in zip(onethird_srs, onethird_bkgrd)]
-
-            # Create table data
+            # Create table data with exactly 15 frequencies
+            frequencies = [125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150]
             table_data = [
                 ["Frequency", 
                  "L1, Average Source Room Level (dB)",
@@ -944,22 +959,21 @@ class ASTCTestReport(BaseTestReport):
                  "Exceptions"]
             ]
 
-            # Add data rows for frequencies 125-3150 Hz
-            freq_mask = (np.array(FREQUENCIES) >= 125) & (np.array(FREQUENCIES) <= 4000)
-            for i, freq in enumerate(np.array(FREQUENCIES)[freq_mask]):
+            # Ensure we only iterate over the available indices (0-14)
+            for i in range(len(frequencies)):  # This will be 0-14
                 row = [
-                    f"{freq:.0f}",
+                    f"{frequencies[i]}",
                     f"{onethird_srs[i]:.1f}",
                     f"{self.ASTC_recieve_corr[i]:.1f}",
                     f"{onethird_bkgrd[i]:.1f}",
                     f"{rt_thirty[i]:.3f}",
                     f"{self.NR_val[i]:.1f}",
                     f"{self.ATL_val[i]:.1f}",
-                    ASTC_exceptions[i]
+                    '1' if (onethird_srs[i] - onethird_bkgrd[i]) < 5 else '0'
                 ]
                 table_data.append(row)
 
-            # Create ReportLab table
+            # Create and style the table
             col_widths = [50, 80, 80, 80, 70, 70, 70, 50]
             Test_result_table = Table(table_data, colWidths=col_widths, hAlign='LEFT')
             Test_result_table.setStyle(TableStyle([
@@ -973,6 +987,7 @@ class ASTCTestReport(BaseTestReport):
                 ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
             ]))
 
+            main_elements = []
             main_elements.append(Test_result_table)
             main_elements.append(Spacer(1, 10))
             
@@ -981,8 +996,10 @@ class ASTCTestReport(BaseTestReport):
         except Exception as e:
             print(f"Error in ASTC test results: {str(e)}")
             print(f"Error type: {type(e)}")
-            import traceback
-            traceback.print_exc()
+            print(f"Array lengths at error:")
+            print(f"frequencies: {len(frequencies) if 'frequencies' in locals() else 'not created'}")
+            print(f"ASTC_recieve_corr: {len(self.ASTC_recieve_corr) if hasattr(self, 'ASTC_recieve_corr') else 'not created'}")
+            # traceback.print_exc()
             raise
     
     def get_test_results_paragraph(self):
@@ -993,12 +1010,27 @@ class ASTCTestReport(BaseTestReport):
         return "*This test does fully conform to the requirements of ASTM E336-20, ASTM E413-16, and ASTM E2235-04(2012), with exceptions noted below."
     
     def get_results_plot(self, ATL_curve):
-        plot_title = 'ASTC Reference Contour'
-        plt.plot(ATL_curve, FREQUENCIES)
-        plt.xlabel('Apparent Transmission Loss (dB)')
-        plt.ylabel('Frequency (Hz)')
-        plt.title('ASTC Reference Contour')
-        plt.grid()
+        #### SITLL NEEDS WORK TO CONVERT TO ASTC ####
+        main_elements = []
+        STC_ref_label = 'Noise Reduction, NR (dB)'
+        ASTC_yAxis = 'Transmission Loss (dB)'
+        NICRef_label = f'ASTC {self.ASTC_final_val} Contour'
+        STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
+        ASTC_contour_final = list()
+        for vals in STCCurve:
+            ASTC_contour_final.append(vals+(self.ATL_val))
+        # Define the target frequency range (125Hz to 3150Hz)
+        FREQ_START, FREQ_END = 125, 4000
+        freq_series = pd.Series(FREQUENCIES)
+        mask = (freq_series >= FREQ_START) & (freq_series <= FREQ_END)
+        table_freqs = freq_series[mask].tolist()
+        print(f'table_freqs: {table_freqs}')
+        Ref_label = f'ASTC {self.ASTC_final_val} Contour'
+        IIC_yAxis = 'Sound Pressure Level (dB)'
+        Field_IIC_label = 'Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)'
+        ASTC_plot_img = plot_curves(table_freqs, ASTC_yAxis, ASTC_contour_final,self.NR_val,NICRef_label, STC_ref_label)
+        main_elements.append(ASTC_plot_img)
+        return main_elements
 
 class NICTestReport(BaseTestReport):
     def __init__(self, test_data, reportOutputfolder, test_type):

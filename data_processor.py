@@ -262,146 +262,126 @@ def calculate_onethird_Logavg(average_pos):
 #     return NR_val, sabines, recieve_corr, Normalized_recieve
 
 def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd_overalloct, recieve_roomvol, rt_thirty):
-    NIC_vollimit = 150  # cu. ft.
+    # Initialize return values
+    NR_val = None
+    NIC_final_val = None
+    AIIC_recieve_corr = []
+    ASTC_recieve_corr = []
+    AIIC_Normalized_recieve = None
     NIC_start = 16
-    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
-    if recieve_roomvol > NIC_vollimit:
-        print('Using NIC calc, room volume too large')
-    sabines = 0.049*(recieve_roomvol/rt_thirty)  # this produces accurate sabines values
-    # recieve_corr = list()
-    sabines = np.int32(sabines) 
-    sabines = np.round(sabines)
+    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]  # Reduced to 15 elements
 
+    try:
+        # Convert and slice all inputs to 15 elements (125Hz-4000Hz)
+        bkgrnd_overalloct = pd.to_numeric(bkgrnd_overalloct).to_numpy()[1:16] if isinstance(bkgrnd_overalloct, pd.Series) else np.array(bkgrnd_overalloct)[1:16]
+        rt_thirty = rt_thirty[1:16] if isinstance(rt_thirty, pd.Series) else np.array(rt_thirty)[1:16]
+        srs_overalloct = pd.to_numeric(srs_overalloct).to_numpy()[1:16] if isinstance(srs_overalloct, pd.Series) else np.array(srs_overalloct)[1:16]
+        
+        # Calculate sabines
+        sabines = 0.049 * (recieve_roomvol/rt_thirty)
+        sabines = np.round(np.int32(sabines))
 
-    ASTC_recieve_corr = list()
-    AIIC_recieve_corr = list()
+        print("\nInput shapes after slicing:")
+        print(f"Background: {bkgrnd_overalloct.shape}")
+        print(f"RT thirty: {rt_thirty.shape}")
+        print(f"Source: {srs_overalloct.shape}")
 
-    # Ensure inputs are numpy arrays
-    AIIC_rec_overalloct = pd.to_numeric(AIIC_rec_overalloct).to_numpy() if isinstance(AIIC_rec_overalloct, pd.Series) else np.array(AIIC_rec_overalloct)
-    ASTC_rec_overalloct = pd.to_numeric(ASTC_rec_overalloct).to_numpy() if isinstance(ASTC_rec_overalloct, pd.Series) else np.array(ASTC_rec_overalloct)
-    bkgrnd_overalloct = pd.to_numeric(bkgrnd_overalloct).to_numpy() if isinstance(bkgrnd_overalloct, pd.Series) else np.array(bkgrnd_overalloct)
+        # Process AIIC data if provided
+        if AIIC_rec_overalloct is not None:
+            try:
+                AIIC_rec_overalloct = pd.to_numeric(AIIC_rec_overalloct).to_numpy()[1:16] if isinstance(AIIC_rec_overalloct, pd.Series) else np.array(AIIC_rec_overalloct)[1:16]
+                AIIC_recieve_vsBkgrnd = AIIC_rec_overalloct - bkgrnd_overalloct
+                
+                for i, val in enumerate(AIIC_recieve_vsBkgrnd):
+                    if val < 5:
+                        AIIC_recieve_corr.append(AIIC_rec_overalloct[i]-2)
+                    else:
+                        input_aiic = 10**(AIIC_rec_overalloct[i]/10)
+                        background = 10**(bkgrnd_overalloct[i]/10)
+                        input_vs_bkgrnd = input_aiic - background
+                        if input_vs_bkgrnd < 0:
+                            input_vs_bkgrnd = abs(input_vs_bkgrnd)
+                        AIIC_recieve_corr.append(10*np.log10(input_vs_bkgrnd))
+                
+                AIIC_recieve_corr = np.round(np.array(AIIC_recieve_corr, dtype=np.float64), 1)
+                
+                # Calculate AIIC_Normalized_recieve
+                log_term = np.log10(108/sabines)
+                scaling = 10 * log_term
+                AIIC_Normalized_recieve = AIIC_recieve_corr - scaling
+                AIIC_Normalized_recieve = np.round(AIIC_Normalized_recieve)
+            except Exception as e:
+                print(f"Error in AIIC processing: {str(e)}")
+                AIIC_recieve_corr = np.array([])
+                AIIC_Normalized_recieve = None
 
-    print("Data shapes after conversion:")
-    print(f"AIIC receive: {AIIC_rec_overalloct.shape if hasattr(AIIC_rec_overalloct, 'shape') else 'scalar'}")
-    print(f"ASTC receive: {ASTC_rec_overalloct.shape if hasattr(ASTC_rec_overalloct, 'shape') else 'scalar'}")
-    print(f"Background: {bkgrnd_overalloct.shape if hasattr(bkgrnd_overalloct, 'shape') else 'scalar'}")
+        # Process ASTC data if provided
+        if ASTC_rec_overalloct is not None:
+            try:
+                ASTC_rec_overalloct = pd.to_numeric(ASTC_rec_overalloct).to_numpy()[1:16] if isinstance(ASTC_rec_overalloct, pd.Series) else np.array(ASTC_rec_overalloct)[1:16]
+                ASTC_recieve_vsBkgrnd = ASTC_rec_overalloct - bkgrnd_overalloct
+                
+                for i, val in enumerate(ASTC_recieve_vsBkgrnd):
+                    if val < 5:
+                        ASTC_recieve_corr.append(ASTC_rec_overalloct[i]-2)
+                    elif val < 10:
+                        input_astc = 10**(ASTC_rec_overalloct[i]/10)
+                        background = 10**(bkgrnd_overalloct[i]/10)
+                        input_vs_bkgrnd = input_astc - background
+                        if input_vs_bkgrnd < 0:
+                            input_vs_bkgrnd = abs(input_vs_bkgrnd)
+                        ASTC_recieve_corr.append(10*np.log10(input_vs_bkgrnd))
+                    else:
+                        ASTC_recieve_corr.append(ASTC_rec_overalloct[i])
+                
+                ASTC_recieve_corr = np.round(np.array(ASTC_recieve_corr, dtype=np.float64), 1)
+                
+                # Calculate NR and NIC values
+                NR_val = srs_overalloct - ASTC_recieve_corr
+                NR_val = pd.to_numeric(NR_val, errors='coerce')
+                
+                # NIC curve calculation
+                NIC_val_list = NR_val.copy()  # No need to slice further
+                NIC_final_val = calculate_nic_curve(NIC_val_list, STCCurve, NIC_start)
+            except Exception as e:
+                print(f"Error in ASTC processing: {str(e)}")
+                ASTC_recieve_corr = np.array([])
+                NR_val = None
+                NIC_final_val = None
 
-    AIIC_recieve_vsBkgrnd = AIIC_rec_overalloct - bkgrnd_overalloct
-    ASTC_recieve_vsBkgrnd = ASTC_rec_overalloct - bkgrnd_overalloct
-    print('AIIC recieve: ',AIIC_rec_overalloct)
-    print('STC Recieve: ', ASTC_rec_overalloct)
-    print('background: ',bkgrnd_overalloct)
-    AIIC_recieve_vsBkgrnd = np.round(AIIC_recieve_vsBkgrnd,1)
+        print("\nFinal shapes:")
+        print(f"NR_val: {getattr(NR_val, 'shape', 'None')}")
+        print(f"AIIC_recieve_corr: {AIIC_recieve_corr.shape if len(AIIC_recieve_corr) > 0 else 'Empty'}")
+        print(f"ASTC_recieve_corr: {ASTC_recieve_corr.shape if len(ASTC_recieve_corr) > 0 else 'Empty'}")
+        print(f"AIIC_Normalized_recieve: {getattr(AIIC_Normalized_recieve, 'shape', 'None')}")
 
-    ASTC_recieve_vsBkgrnd = np.round(ASTC_recieve_vsBkgrnd,1)
-    # print('ASTC recieve vs background:',ASTC_recieve_vsBkgrnd)
+    except Exception as e:
+        print(f"Error in calc_NR_new: {str(e)}")
+        raise
 
-    for i, val in enumerate(AIIC_recieve_vsBkgrnd):
-        if val < 5:
-            AIIC_recieve_corr.append(AIIC_rec_overalloct[i]-2)
-        else:
-            input_aiic = 10**(AIIC_rec_overalloct[i]/10)
-            background = 10**(bkgrnd_overalloct[i]/10)
-            input_vs_bkgrnd = input_aiic - background
-            if input_vs_bkgrnd < 0:
-                input_vs_bkgrnd = input_vs_bkgrnd * -1
-            AIIC_recieve_corr.append(10*np.log10(input_vs_bkgrnd))
-    print('-=-=-=--==-=-=-=-=- Moving to ASTC calc=-=-=-=--=-=-=-=-=-=-=-')   
-    for i, val in enumerate(ASTC_recieve_vsBkgrnd):
-        if val < 5:
-            ASTC_recieve_corr.append(ASTC_rec_overalloct[i]-2)
-        elif val < 10:
-            print('val: ', val)
-            input_astc = 10**(ASTC_rec_overalloct[i]/10)
-            background = 10**(bkgrnd_overalloct[i]/10)
-            input_vs_bkgrnd = input_astc - background
-            if input_vs_bkgrnd < 0:
-                input_vs_bkgrnd = input_vs_bkgrnd * -1
-            ASTC_recieve_corr.append(10*np.log10(input_vs_bkgrnd))
-        else:
-            ASTC_recieve_corr.append(ASTC_rec_overalloct[i])
-    print('ASTC recieve: ', ASTC_recieve_corr)
-        # print('-=-=-=-=-')
-        # print('recieve_corr: ',recieve_corr)
-    AIIC_recieve_corr = np.round(AIIC_recieve_corr,1)
-    ASTC_recieve_corr = np.round(ASTC_recieve_corr,1)
-    # print('corrected recieve ISPL: ', AIIC_recieve_corr)
-    print('corrected recieve ASTC: ', ASTC_recieve_corr)
-    print('srs overall: ', srs_overalloct)
-    NR_val = srs_overalloct - ASTC_recieve_corr
-    NR_val = pd.to_numeric(NR_val, errors='coerce')
-    print('NR_val: ', NR_val)
-    ##### Writing in the NIC curve calculation #####
-    ### THIS IS NOT WORKING _ TROUBLSHOOTING 10-7-24 ###
+    return NR_val, NIC_final_val, sabines, AIIC_recieve_corr, ASTC_recieve_corr, AIIC_Normalized_recieve
+
+def calculate_nic_curve(NIC_val_list, STCCurve, NIC_start):
+    """Helper function to calculate NIC curve"""
     diff_negative = 0
     new_sum = 0
-    pos_diffs = list()
-    New_curve = list()
-    NIC_val_list = NR_val[1:17]
-    # print('NIC initial val list: ', NIC_val_list)
     while (diff_negative <= 8 and new_sum <= 32):
-        for vals in STCCurve:
-            New_curve.append(vals+NIC_start)
+        New_curve = [val + NIC_start for val in STCCurve]
         NIC_curve = New_curve - NIC_val_list
         NIC_curve = np.round(NIC_curve)
         diff_negative = np.max(NIC_curve)
-        # print('NIC curve: ',NIC_curve)
-        for val in NIC_curve:
-            if val > 0:
-                pos_diffs.append(np.round(val))
-            else:
-                pos_diffs.append(0)
+        
+        pos_diffs = [np.round(val) if val > 0 else 0 for val in NIC_curve]
         new_sum = np.sum(pos_diffs)
+        
         if new_sum > 32 or diff_negative > 8:
-            print('Curve fit too high! NIC fit: ', NIC_start-1)
-            NIC_final_val = NIC_start-1
-            # return NIC_final_val
-            break
-        pos_diffs = []
-        New_curve = []
-        # print('NIC curve: ',NIC_curve)
-        NIC_start = NIC_start + 1
-        if NIC_start >80: break
-    # Normalized_recieve = recieve_corr / srs_overalloct
-    # sabines = pd.to_numeric(sabines, errors='coerce')
-    # sabines = np.round(sabines)
-    # if isinstance(sabines, pd.DataFrame):
-    #     sabines = sabines.values
-
-    # AIIC_Normalized_recieve = list()
-    # AIIC_Normalized_recieve = AIIC_recieve_corr-10*(np.log10(108/sabines))
-    # AIIC_Normalized_recieve = np.round(AIIC_Normalized_recieve)
-
-    # Convert to numpy arrays and ensure same length
-    AIIC_recieve_corr = np.array(AIIC_recieve_corr, dtype=np.float64)
-
-# Ensure we don't have any zeros in sabines to avoid log(0)
-    sabines = np.maximum(sabines, np.finfo(float).eps)  # Replace zeros with small value
-    print("Shapes before operation:")
-    print(f"AIIC_recieve_corr shape: {np.array(AIIC_recieve_corr).shape}")
-    print(f"sabines shape: {np.array(sabines).shape}")
-    # If we need to slice to match lengths (assuming we want the same frequency range)
-    if len(AIIC_recieve_corr) != len(sabines):
-        # Determine the correct range to use
-        min_length = min(len(AIIC_recieve_corr), len(sabines))
-        AIIC_recieve_corr = AIIC_recieve_corr[:min_length]
-        sabines = sabines[:min_length]
-    # If you need specific frequency bands (e.g., 125Hz to 4000Hz)
-    freq_range = slice(1, 17)  # Adjust indices based on your frequency range
-    AIIC_recieve_corr = np.array(AIIC_recieve_corr)[freq_range]
-    sabines = np.array(sabines)[freq_range]
-    # Perform calculation in steps
-    log_term = np.log10(108/sabines)
-    scaling = 10 * log_term
-    AIIC_Normalized_recieve = AIIC_recieve_corr - scaling
-    AIIC_Normalized_recieve = np.round(AIIC_Normalized_recieve) 
-
-    print(f"Final result shape: {AIIC_Normalized_recieve.shape}")
-
-    print("Final shapes:")
-    print(f"AIIC_Normalized_recieve shape: {AIIC_Normalized_recieve.shape}")
-    # print('Normalized_recieve: ',AIIC_Normalized_recieve)
-    return NR_val, NIC_final_val, sabines, AIIC_recieve_corr, ASTC_recieve_corr, AIIC_Normalized_recieve
+            return NIC_start - 1
+            
+        NIC_start += 1
+        if NIC_start > 80:
+            return 80
+    
+    return NIC_start - 1
 
 ### this code revised 7/24/24 - functional and produces accurate ATL values
 
@@ -529,7 +509,7 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=True):
             print(f"  diff_negative_max: {diff_negative_max}")
             print(f"  new_sum: {new_sum}")
         print('Inside loop, current AIIC contour: ', AIIC_contour_val)
-        print('Contour curve (IIC curve minus ANISPL): ', Contour_curve_result)
+        # print('Contour curve (IIC curve minus ANISPL): ', Contour_curve_result)
         
         diff_negative = Normalized_recieve_IIC - IIC_contour
         # print('diff negative: ', diff_negative)
