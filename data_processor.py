@@ -284,7 +284,7 @@ def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd
         
         # Calculate sabines
         sabines = 0.049 * (recieve_roomvol/rt_thirty)
-        sabines = np.round(sabines).astype(np.int32)
+        # sabines = np.round(sabines).astype(np.int32)
 
         print("\nInput shapes:")
         print(f"Background: {bkgrnd_overalloct.shape}")
@@ -309,7 +309,7 @@ def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd
                             input_vs_bkgrnd = abs(input_vs_bkgrnd)
                         AIIC_recieve_corr.append(10*np.log10(input_vs_bkgrnd))
                 
-                AIIC_recieve_corr = np.round(np.array(AIIC_recieve_corr, dtype=np.float64), 1)
+                # AIIC_recieve_corr = np.round(np.array(AIIC_recieve_corr, dtype=np.float64), 1)
                 
                 # Calculate AIIC_Normalized_recieve
                 log_term = np.log10(108/sabines)
@@ -324,35 +324,40 @@ def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd
         # Process ASTC data if provided
         if ASTC_rec_overalloct is not None:
             try:
-                ASTC_rec_overalloct = pd.to_numeric(ASTC_rec_overalloct).to_numpy() if isinstance(ASTC_rec_overalloct, pd.Series) else np.array(ASTC_rec_overalloct)
+                # Convert to numpy array and ensure float64 type
+                ASTC_rec_overalloct = pd.to_numeric(ASTC_rec_overalloct).to_numpy(dtype=np.float64) if isinstance(ASTC_rec_overalloct, pd.Series) else np.array(ASTC_rec_overalloct, dtype=np.float64)
                 ASTC_recieve_vsBkgrnd = ASTC_rec_overalloct - bkgrnd_overalloct
                 
                 ASTC_recieve_corr = []
                 for i, val in enumerate(ASTC_recieve_vsBkgrnd):
                     if val < 5:
-                        ASTC_recieve_corr.append(ASTC_rec_overalloct[i]-2)
+                        ASTC_recieve_corr.append(float(ASTC_rec_overalloct[i])-2)
                     elif val < 10:
-                        input_astc = 10**(ASTC_rec_overalloct[i]/10)
-                        background = 10**(bkgrnd_overalloct[i]/10)
+                        input_astc = 10**(float(ASTC_rec_overalloct[i])/10)
+                        background = 10**(float(bkgrnd_overalloct[i])/10)
                         input_vs_bkgrnd = input_astc - background
                         if input_vs_bkgrnd < 0:
                             input_vs_bkgrnd = abs(input_vs_bkgrnd)
                         ASTC_recieve_corr.append(10*np.log10(input_vs_bkgrnd))
                     else:
-                        ASTC_recieve_corr.append(ASTC_rec_overalloct[i])
+                        ASTC_recieve_corr.append(float(ASTC_rec_overalloct[i]))
                 
-                ASTC_recieve_corr = np.round(np.array(ASTC_recieve_corr, dtype=np.float64), 1)
+                # Convert to numpy array before rounding
+                ASTC_recieve_corr = np.array(ASTC_recieve_corr, dtype=np.float64)
+                # ASTC_recieve_corr = np.round(ASTC_recieve_corr, decimals=1)
                 
                 # Calculate NR and NIC values
-                NR_val = srs_overalloct - ASTC_recieve_corr
-                NR_val = pd.to_numeric(NR_val, errors='coerce')
+                NR_val = np.array(srs_overalloct, dtype=np.float64) - ASTC_recieve_corr
+                NR_val = np.round(NR_val, decimals=1)  # Use numpy round instead of pd.to_numeric
                 
                 # NIC curve calculation
                 NIC_val_list = NR_val.copy()
                 NIC_final_val = calculate_nic_curve(NIC_val_list, STCCurve, NIC_start)
             except Exception as e:
                 print(f"Error in ASTC processing: {str(e)}")
-                ASTC_recieve_corr = np.array([])
+                print(f"ASTC_recieve_corr type: {type(ASTC_recieve_corr)}")
+                print(f"NR_val type: {type(NR_val) if 'NR_val' in locals() else 'Not created'}")
+                ASTC_recieve_corr = np.array([], dtype=np.float64)
                 NR_val = None
                 NIC_final_val = None
 

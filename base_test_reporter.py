@@ -668,21 +668,20 @@ class AIICTestReport(BaseTestReport):
         return equipment + aiic_equipment
     
     def get_test_results(self):
-                #dataframe for AIIC is in single_test_dataframe
         print('-=-=-=-=-=-=-= Getting AIIC test results-=-=-=-=-=-=-=-=-')
         props = vars(self.test_data.room_properties)
-        onethird_srs = format_SLMdata(self.test_data.srs_data) 
-        onethird_rec = format_SLMdata(self.test_data.recive_data)
-        average_pos = []
         main_elements = []
-        # get average of 4 tapper positions for recieve total OBA
-        print('Getting average of 4 tapper positions for receive total OBA')
-        # Debug print to see what data we have
-        print("Available test data attributes:", dir(self.test_data))
-        print("Test data type:", type(self.test_data))
 
-        # Access the positions using the correct attribute names from AIICTestData
         try:
+            # Initial data loading with explicit slicing
+            freq_indices = slice(1, 16)  # Consistent with ASTC report
+            onethird_srs = format_SLMdata(self.test_data.srs_data)[freq_indices]
+            onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
+            self.onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)[freq_indices]
+            self.rt_thirty = self.test_data.rt['Unnamed: 10'][25:40]/1000  # Changed from 25:41 to 25:40
+
+            # Process tapping positions
+            average_pos = []
             positions = {
                 1: self.test_data.pos1,
                 2: self.test_data.pos2,
@@ -691,232 +690,71 @@ class AIICTestReport(BaseTestReport):
             }
             
             for i in range(1, 5):
-                print(f"Processing position {i}")
                 if positions[i] is not None:
-                    pos_data = format_SLMdata(positions[i])
-                    print(f"Position {i} data shape:", pos_data.shape if hasattr(pos_data, 'shape') else 'No shape')
+                    pos_data = format_SLMdata(positions[i])[freq_indices]  # Apply consistent slicing
                     average_pos.append(pos_data)
                 else:
                     print(f"Warning: Position {i} data is None")
             
-        except AttributeError as e:
-            print(f"Error accessing test data: {e}")
-            print("Test data contents:", self.test_data.__dict__)
-            raise ValueError(f"Unable to access position data: {str(e)}")
-        print('average_pos: ',average_pos)
-        onethird_rec_Total = sum(average_pos) / len(average_pos)
-        # this needs to be an average of the 4 tapper positions, stored in a dataframe of the average of the 4 dataframes octave band results. 
-
-
-        self.onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)
-        self.rt_thirty = self.test_data.rt['Unnamed: 10'][25:41]/1000
-        print('Calculating NR, sabines, corrected_recieve,Nrec_ANISPL')
-
-        try:
-            # ... previous code ...
+            if not average_pos:
+                raise ValueError("No valid position data found")
             
-            NR_val, NIC_final_val, sabines, AIIC_recieve_corr, ASTC_recieve_corr, AIIC_Normalized_recieve = calc_NR_new(
+            onethird_rec_Total = np.mean(average_pos, axis=0)  # Use numpy mean for better array handling
+
+            # Calculate NR and related values
+            NR_val, NIC_final_val, self.sabines, AIIC_recieve_corr, ASTC_recieve_corr, AIIC_Normalized_recieve = calc_NR_new(
                 srs_overalloct=onethird_srs,
-                AIIC_rec_overalloct=onethird_rec_Total, 
+                AIIC_rec_overalloct=onethird_rec_Total,
                 ASTC_rec_overalloct=onethird_rec,
                 bkgrnd_overalloct=self.onethird_bkgrd,
-                recieve_roomvol=props['receive_vol'],
+                recieve_roomvol=float(props['receive_vol']),
                 rt_thirty=self.rt_thirty
             )
-            
-            # Store the values
+
+            # Store results
             self.NR_val = NR_val
-            self.sabines = sabines
             self.AIIC_recieve_corr = AIIC_recieve_corr
             self.ASTC_recieve_corr = ASTC_recieve_corr
             self.AIIC_Normalized_recieve = AIIC_Normalized_recieve
-            
-        except Exception as e:
-            print(f"Error in ASTC test results: {str(e)}")
-            print(f"Error type: {type(e)}")
-            import traceback
-            print(f" Traceback:\n{traceback.format_exc()}")
-            raise
 
-        ###
-        # ATL_val = calc_ATL_val(onethird_srs, onethird_rec, onethird_bkgrd,rt_thirty,room_properties['Partition area'][0],room_properties['Recieve Vol'][0])\
-        print('-=-=-=-=-=-=-= Calculating AIIC contour-=-=-=-=-=-=-=-=-')
-        self.AIIC_contour_val, self.Contour_curve_result = calc_AIIC_val_claude(self.AIIC_Normalized_recieve)
-        print('-=-=-=-=-=-=-= Calculating ISR contour-=-=-=-=-=-=-=-=-')
-        self.ISR_contour_val, self.ISR_contour_result = calc_AIIC_val_claude(self.ASTC_recieve_corr)
+            # Calculate contours
+            self.AIIC_contour_val, self.Contour_curve_result = calc_AIIC_val_claude(self.AIIC_Normalized_recieve)
+            self.ISR_contour_val, self.ISR_contour_result = calc_AIIC_val_claude(self.ASTC_recieve_corr)
 
-        print('AIIC_contour_val: ',self.AIIC_contour_val)
-        # IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
-        IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15]
-        self.IIC_contour_final = list()
-        self.ISR_contour_final = list()
-        # initial application of the IIC curve to the first AIIC start value 
-        for vals in IIC_curve:
-            self.IIC_contour_final.append(vals+(110-self.AIIC_contour_val))
-            self.ISR_contour_final.append(vals+(110-self.ISR_contour_val))
-            print('IIC_contour_final: ',self.IIC_contour_final)
-        #### Contour_final is the AIIC contour that needs to be plotted vs the ANISPL curve- we have everything to plot the graphs and the results table  #####
-        Ref_label = f'AIIC {self.AIIC_contour_val} Contour'
-        Field_IIC_label = 'Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)'
-        # frequencies =[125,160,200,250,315,400,500,630,800,1000,1250,1600,2000,2500,3150,4000]
-        self.AIIC_Exceptions = [] ### need to add exceptions to the table
-        rec_roomvol = props['receive_vol']
-        for vals in self.sabines:
-            if vals > 2*(rec_roomvol**2/3):
-                self.AIIC_Exceptions.append('0')
-            else:
-                self.AIIC_Exceptions.append('1')
+            # Process exceptions
+            self.AIIC_Exceptions = []
+            rec_roomvol = float(props['receive_vol'])
+            for val in self.sabines:
+                self.AIIC_Exceptions.append('0' if val > 2*(rec_roomvol**(2/3)) else '1')
 
-
-        # Define the target frequency range (125Hz to 3150Hz)
-        FREQ_START, FREQ_END = 125, 3150
-
-        print("\n=== Processing Data Arrays for Results Table ===")
-
-        def validate_array(name: str, data: np.ndarray, freq_slice: slice) -> np.ndarray:
-            """Validate and slice array to match target frequency range."""
-            print(f"\n{name}:")
-            print(f"Original length: {len(data)}")
-            sliced_data = data[freq_slice]
-            print(f"Sliced length: {len(sliced_data)}")
-            freq_range = FREQUENCIES[freq_slice]
-            print(f"Frequency range: {freq_range[0]}Hz to {freq_range[-1]}Hz")
-            return sliced_data
-
-        # Process each array with appropriate slice for 125-3150Hz range
-        arrays = {
-            "AIIC Exceptions": (self.AIIC_Exceptions, slice(0, 15)),
-            "Normalized Receive": (self.AIIC_Normalized_recieve, slice(0, 15)),
-            "Background Levels": (self.onethird_bkgrd, slice(1, 16)),
-            "RT30 Values": (self.rt_thirty, slice(1, 16))
-        }
-
-        # Validate and slice all arrays
-        processed_arrays = {}
-        for name, (data, freq_slice) in arrays.items():
-            processed_arrays[name] = validate_array(name, data, freq_slice)
-
-        # Verify all arrays have matching lengths
-        lengths = {name: len(arr) for name, arr in processed_arrays.items()}
-        print("\n=== Length Validation ===")
-        print("Array lengths:", lengths)
-
-        if len(set(lengths.values())) != 1:
-            raise ValueError(
-                f"Mismatched array lengths detected: {lengths}\n"
-                f"All arrays must cover {FREQ_START}Hz to {FREQ_END}Hz"
+            # Create and validate table data
+            table_data = self.create_test_results_table(
+                self.AIIC_Normalized_recieve,
+                self.onethird_bkgrd,
+                self.rt_thirty,
+                self.AIIC_Exceptions
             )
 
-        # Assign processed arrays back to table variables
-        table_AIIC_Exceptions = processed_arrays["AIIC Exceptions"]
-        self.table_AIIC_Normalized_recieve = processed_arrays["Normalized Receive"]
-        table_onethird_bkgrd = processed_arrays["Background Levels"]
-        table_rt_thirty = processed_arrays["RT30 Values"]
-
-        # Convert FREQUENCIES to pandas Series for frequency selection
-        freq_series = pd.Series(FREQUENCIES)
-        mask = (freq_series >= FREQ_START) & (freq_series <= FREQ_END)
-        table_freqs = freq_series[mask].tolist()
-
-        print("\n=== Table Data Validation ===")
-        print(f"Frequencies: {len(table_freqs)} - {table_freqs}")
-        print(f"ANISPL: {len(self.table_AIIC_Normalized_recieve)}")
-        print(f"Background: {len(table_onethird_bkgrd)}")
-        print(f"RT60: {len(table_rt_thirty)}")
-        print(f"Exceptions: {len(table_AIIC_Exceptions)}")
-        print("\n=== Full Table Data ===")
-        print(f"Frequencies: {table_freqs}")
-        print(f"ANISPL values: {self.table_AIIC_Normalized_recieve}")
-        print(f"Background levels: {table_onethird_bkgrd}")
-        print(f"RT60 values: {table_rt_thirty}")
-        print(f"Exceptions: {table_AIIC_Exceptions}")
-
-        print("\n=== Creating Table ===")
-        try:
-            # Convert pandas Series to plain arrays and ensure numeric values
-            table_onethird_bkgrd = table_onethird_bkgrd.astype(float).values if isinstance(table_onethird_bkgrd, pd.Series) else table_onethird_bkgrd
-            table_rt_thirty = table_rt_thirty.astype(float).values if isinstance(table_rt_thirty, pd.Series) else table_rt_thirty
-            
-            print("Data types after conversion:")
-            print(f"Background levels type: {type(table_onethird_bkgrd)}")
-            print(f"RT60 values type: {type(table_rt_thirty)}")
-            
-            # Create table data as a list of lists, including headers
-            table_data = [
-                # Headers
-                ["Frequency", 
-                 "Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)", 
-                 "Average Receiver Background Level",
-                 "Average RT60 (Seconds)",
-                 "Exceptions noted to ASTM E1007-14"]
-            ]
-
-            # Add data rows with explicit error handling
-            for i in range(len(table_freqs)):
-                try:
-                    row = [
-                        f"{float(table_freqs[i]):.0f}",
-                        f"{float(self.table_AIIC_Normalized_recieve[i]):.1f}",
-                        f"{float(table_onethird_bkgrd[i]):.1f}",
-                        f"{float(table_rt_thirty[i]):.3f}",
-                        str(table_AIIC_Exceptions[i])
-                    ]
-                    table_data.append(row)
-                    print(f"Successfully added row {i+1}: {row}")
-                except Exception as e:
-                    print(f"Error creating row {i}: {str(e)}")
-                    print(f"Values: freq={table_freqs[i]}, "
-                          f"ANISPL={self.table_AIIC_Normalized_recieve[i]}, "
-                          f"bkgrd={table_onethird_bkgrd[i]}, "
-                          f"rt60={table_rt_thirty[i]}, "
-                          f"except={table_AIIC_Exceptions[i]}")
-                    raise
-
-            print(f"\nCreated table with {len(table_data)} rows")
-            print("Header row:", table_data[0])
-            print("First data row:", table_data[1])
-
-            # Create ReportLab table with explicit column widths
-            col_widths = [60, 120, 100, 80, 100]
-            Test_result_table = Table(table_data, colWidths=col_widths, hAlign='LEFT')
-            
-            # Add styling
-            Test_result_table.setStyle(TableStyle([
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 10),
-                ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
-                ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('PADDING', (0, 0), (-1, -1), 6),
-                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-            ]))
+            # Create and style the table
+            Test_result_table = self.create_formatted_table(table_data)
 
             main_elements.append(Test_result_table)
-            print("Table successfully created and added to main_elements")
+            main_elements.append(Spacer(1, 20))
+
+            return main_elements
 
         except Exception as e:
-            print(f"Error creating table: {str(e)}")
-            print(f"Table data length: {len(table_data) if 'table_data' in locals() else 'Not created'}")
-            print(f"Main elements length: {len(main_elements)}")
+            print(f"Error in AIIC test results: {str(e)}")
+            print(f"Error type: {type(e)}")
+            import traceback
+            print(f"Traceback:\n{traceback.format_exc()}")
             raise
-
-        # Continue with the rest of get_test_results()
-        main_elements.append(Spacer(1, 20))
-        main_elements.append(Paragraph("The Apparent Impact Insulation Class (AIIC) was calculated. The AIIC rating is based on Absorption Normalized Impact Sound Pressure Level (ANISPL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Absorption Normalized Impact Sound Pressure Level values, in accordance with the procedure of "+standards_text[0][0]))
-        print('=-=-=-=-=finishing and returning test results table and paragraph-=-=-=---=-')
-        return main_elements
 
     def get_test_results_table_notes(self):
         return "*This test does fully conform to the requirments... ect NEED TO COMPLETE "
     def get_test_results_paragraph(self): 
         return (
-            f"The Apparent Impact Insulation Class (AIIC) of {self.AIIC_contour_val} "
-            f"and an Impact Sound Rating (ISR) of {self.ISR_contour_val} was calculated. "
-            "The AIIC rating is based on Absorption Normalized Impact Sound Pressure Level (ANISPL), and includes "
-            "the effects of noise flanking. The AIIC reference contour is shown on the "
-            "next page, and has been fit to the Absorption Normalized Impact Sound Pressure Level values, in "
-            f"accordance with the procedure of {standards_text[0][0]}"
+            f"The Apparent Impact Insulation Class (AIIC) was calculated. The AIIC rating is based on Absorption Normalized Impact Sound Pressure Level (ANISPL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Absorption Normalized Impact Sound Pressure Level values, in accordance with the procedure of "+standards_text[0][0]
         )
     def get_results_plot(self):
         main_elements = []
@@ -958,7 +796,7 @@ class ASTCTestReport(BaseTestReport):
         try:
             print('-=-=-=-=-=-=-= Getting ASTC test results-=-=-=-=-=-=-=-=-')
             props = vars(self.test_data.room_properties)
-            
+            main_elements = []
             # Initial data loading and slicing
             freq_indices = slice(1, 16)
             onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
@@ -1010,6 +848,46 @@ class ASTCTestReport(BaseTestReport):
                 print("\nCheckpoint 3 - After NR calculation:")
                 print(f"NR_val length: {len(self.NR_val) if self.NR_val is not None else 'None'}")
                 print(f"ASTC_recieve_corr length: {len(self.ASTC_recieve_corr) if self.ASTC_recieve_corr is not None else 'None'}")
+
+                # Calculate ASTC
+
+                if self.NR_val is not None and self.ASTC_recieve_corr is not None:
+                    # Create table data
+                    table_data = [
+                        ['Frequency (Hz)', 'NR (dB)', 'Background (dB)', 'RT60 (s)', 'Sabines']
+                    ]
+                    
+                    frequencies = [125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150]
+                    for i in range(len(frequencies)):
+                        try:
+                            row = [
+                                f"{frequencies[i]}",
+                                f"{float(self.NR_val[i]):.1f}",
+                                f"{float(onethird_bkgrd[i]):.1f}",
+                                f"{float(rt_thirty[i]):.3f}",
+                                f"{int(self.sabines[i])}"
+                            ]
+                            table_data.append(row)
+                        except Exception as e:
+                            print(f"Error creating row {i}: {str(e)}")
+                            continue
+
+                    # Create and style the table
+                    Test_result_table = Table(table_data, colWidths=[60, 60, 80, 60, 60], hAlign='LEFT')
+                    Test_result_table.setStyle(TableStyle([
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, -1), 10),
+                        ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
+                        ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('PADDING', (0, 0), (-1, -1), 6),
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                    ]))
+                    main_elements.append(Test_result_table)
+                    main_elements.append(Spacer(1, 20))
+
+                return main_elements
             except Exception as e:
                 print(f"Error in NR calculation: {str(e)}")
                 print(f"Array shapes at NR error:")
@@ -1025,7 +903,7 @@ class ASTCTestReport(BaseTestReport):
             print(f"Error in ASTC test results: {str(e)}")
             print(f"Error type: {type(e)}")
             print(f"Array lengths at error:")
-            print(f"frequencies: {len(frequencies) if 'frequencies' in locals() else 'not created'}")
+
             print(f"ASTC_recieve_corr: {len(self.ASTC_recieve_corr) if hasattr(self, 'ASTC_recieve_corr') else 'not created'}")
             # traceback.print_exc()
             raise
@@ -1037,7 +915,7 @@ class ASTCTestReport(BaseTestReport):
     def get_test_results_table_notes(self):
         return "*This test does fully conform to the requirements of ASTM E336-20, ASTM E413-16, and ASTM E2235-04(2012), with exceptions noted below."
     
-    def get_results_plot(self, ATL_curve):
+    def get_results_plot(self):
         #### SITLL NEEDS WORK TO CONVERT TO ASTC ####
         main_elements = []
         STC_ref_label = 'Noise Reduction, NR (dB)'
@@ -1117,16 +995,27 @@ class NICTestReport(BaseTestReport):
         for vals in STCCurve:
             self.NIC_contour_final.append(vals+(self.NIC_final_val))
         NIC_exceptions = '' ### need to add exceptions to the table
-        Test_result_table = pd.DataFrame(
-            {
-                "Frequency": FREQUENCIES,
-                "Source OBA": onethird_srs,
-                "Reciever OBA": onethird_rec,
-                "Background OBA": onethird_bkgrd,
-                "NR": self.NR_val,
-                "Exceptions": NIC_exceptions
-            }
-        )
+        # Test_result_table = pd.DataFrame(
+        #     {
+        #         "Frequency": FREQUENCIES,
+        #         "Source OBA": onethird_srs,
+        #         "Reciever OBA": onethird_rec,
+        #         "Background OBA": onethird_bkgrd,
+        #         "NR": self.NR_val,
+        #         "Exceptions": NIC_exceptions
+        #     }
+        # )
+        table_data = self.create_test_results_table(
+                FREQUENCIES,
+                onethird_srs,
+                onethird_rec,
+                onethird_bkgrd,
+                self.NR_val,    
+                NIC_exceptions
+            )
+
+        # Create and style the table
+        Test_result_table = self.create_formatted_table(table_data)
         return Test_result_table
 
     def get_results_plot(self):
