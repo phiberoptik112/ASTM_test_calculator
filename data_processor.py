@@ -638,61 +638,80 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=True):
 
 def calc_astc_val(atl_val: pd.Series) -> float:
     pos_diffs = list()
-    diff_negative=0
-    diff_positive=0 
+    diff_negative = 0
+    diff_positive = 0 
     ASTC_start = 16
-    New_curve =list()
+    New_curve = list()
     new_sum = 0
-    ## Since ATL values only go from 125 to 4k, remove the end values from the curve
-    ATL_val_STC = atl_val[1:17]
-    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
+
+    # Debug input shape
+    print(f"\nInput ATL_val shape: {atl_val.shape}")
+    
+    # Since ATL values only go from 125 to 4k, we need to match array lengths
+    # ATL_val is length 15, so we need to adjust STCCurve to match
+    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]  # Length 15
+    
+    # Convert ATL_val to numpy array if it isn't already
+    if isinstance(atl_val, pd.Series):
+        atl_val = atl_val.to_numpy()
+    
+    # Ensure we're using the right slice of ATL values
+    ATL_val_STC = atl_val  # We already have the correct 15 values
+
     while (diff_negative <= 8 and new_sum <= 32):
-        # print('starting loop')
         print('ASTC fit test value: ', ASTC_start)
-        for vals in STCCurve:
-            New_curve.append(vals+ASTC_start)
-     
-        ASTC_curve = New_curve - ATL_val_STC
         
-        ASTC_curve = np.round(ASTC_curve)
-        print('ASTC curve: ',ASTC_curve)
+        # Create new curve with matching length
+        New_curve = np.array([val + ASTC_start for val in STCCurve])
+        
+        # Verify shapes before subtraction
+        # print(f"New_curve shape: {New_curve.shape}")
+        # print(f"ATL_val_STC shape: {ATL_val_STC.shape}")
+        
+        # Calculate ASTC curve
+        ASTC_curve = New_curve - ATL_val_STC
+        # ASTC_curve = np.round(ASTC_curve) ## may need a better rounding method
+        
+        # print('ASTC curve: ', ASTC_curve)
         diff_negative = np.max(ASTC_curve)
+        # print('Max, single diff: ', diff_negative)
 
-        print('Max, single diff: ', diff_negative)
-
-        for val in ASTC_curve:
-            if val > 0:
-                pos_diffs.append(np.round(val))
-            else:
-                pos_diffs.append(0)
-        # print(pos_diffs)
+        # Calculate positive differences
+        pos_diffs = [np.round(val) if val > 0 else 0 for val in ASTC_curve]
         new_sum = np.sum(pos_diffs)
-        print('Sum Positive diffs: ', new_sum)
+        # print('Sum Positive diffs: ', new_sum)
         
         if new_sum > 32 or diff_negative > 8:
             print('Curve too high! ASTC fit: ', ASTC_start-1) 
             return ASTC_start-1
+            
         pos_diffs = []
         New_curve = []
         ASTC_start = ASTC_start + 1
         
-        if ASTC_start >80: break
+        if ASTC_start > 80: 
+            break
+    print('ASTC final value: ', ASTC_start-1)
+    return ASTC_start-1
 
-def plot_curves(frequencies: List[float], y_label: str, ref_curve: pd.Series, 
-                field_curve: pd.Series, ref_label: str, field_label: str) -> ImageReader:
+def plot_curves(frequencies: List[float], y_label: str, ref_curve: np.ndarray, 
+                field_curve: np.ndarray, ref_label: str, field_label: str) -> ImageReader:
     """Creates a plot and returns it in a format compatible with ReportLab.
     
     Args:
-        frequencies: List of frequency values for x-axis
+        frequencies: List of frequency values for x-axis (length 15)
         y_label: Label for y-axis
-        ref_curve: Reference curve data
-        field_curve: Field measurement curve data
+        ref_curve: Reference curve data (length 15)
+        field_curve: Field measurement curve data (length 15)
         ref_label: Label for reference curve
         field_label: Label for field curve
-        
-    Returns:
-        ImageReader: ReportLab-compatible image object
     """
+    # Verify input shapes
+    print(f"Plot input shapes:")
+    print(f"frequencies: {len(frequencies)}")
+    print(f"ref_curve: {len(ref_curve)}")
+    print(f"field_curve: {len(field_curve)}")
+    
     # Create figure
     plt.figure(figsize=(10, 6))
     
@@ -712,15 +731,12 @@ def plot_curves(frequencies: List[float], y_label: str, ref_curve: pd.Series,
     plt.gca().xaxis.set_major_locator(ticker.FixedLocator(frequencies))
     plt.legend()
     
-    # Save plot to bytes buffer instead of file
+    # Save plot to bytes buffer
     img_buffer = BytesIO()
     plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=300)
     img_buffer.seek(0)
-    
-    # Clear the current figure to free memory
     plt.close()
     
-    # Create ReportLab ImageReader object
     return ImageReader(img_buffer)
 
 ## old code, remove?
