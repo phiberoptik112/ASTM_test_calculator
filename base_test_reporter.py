@@ -711,7 +711,7 @@ class AIICTestReport(BaseTestReport):
 
             # Calculate mean of positions and ensure numpy array
             onethird_rec_Total = np.array(np.mean(average_pos, axis=0), dtype=np.float64)
-
+            # print(f'AIIC onethird_rec_Total: {onethird_rec_Total}')
             # Calculate NR and related values
             try:
                 NR_results = calc_NR_new(
@@ -973,7 +973,7 @@ class ASTCTestReport(BaseTestReport):
     
     def get_test_results_paragraph(self):
         return (
-            f"The Apparent Sound Transmission Class (ASTC) was calculated. The ASTC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The ASTC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_text[0][0]
+            f"The Apparent Sound Transmission Class (ASTC) of {self.ASTC_final_val} was calculated. The ASTC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The ASTC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_text[0][0]
         )
     def get_test_results_table_notes(self):
         return "*This test does fully conform to the requirements of ASTM E336-20, ASTM E413-16, and ASTM E2235-04(2012), with exceptions noted below."

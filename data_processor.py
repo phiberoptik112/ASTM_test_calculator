@@ -276,7 +276,8 @@ def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd
         bkgrnd_overalloct = pd.to_numeric(bkgrnd_overalloct).to_numpy() if isinstance(bkgrnd_overalloct, pd.Series) else np.array(bkgrnd_overalloct)
         rt_thirty = rt_thirty.to_numpy() if isinstance(rt_thirty, pd.Series) else np.array(rt_thirty)
         srs_overalloct = pd.to_numeric(srs_overalloct).to_numpy() if isinstance(srs_overalloct, pd.Series) else np.array(srs_overalloct)
-        
+
+        ASTC_rec_overalloct = pd.to_numeric(ASTC_rec_overalloct).to_numpy() if isinstance(ASTC_rec_overalloct, pd.Series) else np.array(ASTC_rec_overalloct)
         # Verify array lengths
         expected_length = 15
         if not all(len(arr) == expected_length for arr in [bkgrnd_overalloct, rt_thirty, srs_overalloct]):
@@ -290,35 +291,70 @@ def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd
         print(f"Background: {bkgrnd_overalloct.shape}")
         print(f"RT thirty: {rt_thirty.shape}")
         print(f"Source: {srs_overalloct.shape}")
-
+        print(f'AIIC_rec_overalloct: {AIIC_rec_overalloct}')
+        
         # Process AIIC data if provided
         if AIIC_rec_overalloct is not None:
             try:
-                AIIC_rec_overalloct = pd.to_numeric(AIIC_rec_overalloct).to_numpy() if isinstance(AIIC_rec_overalloct, pd.Series) else np.array(AIIC_rec_overalloct)
-                AIIC_recieve_vsBkgrnd = AIIC_rec_overalloct - bkgrnd_overalloct
+                # Convert to numpy arrays and ensure float64 dtype
+                AIIC_rec_overalloct = np.array(AIIC_rec_overalloct, dtype=np.float64)
+                bkgrnd_overalloct_aiic = np.array(bkgrnd_overalloct, dtype=np.float64)
                 
-                AIIC_recieve_corr = []
-                for i, val in enumerate(AIIC_recieve_vsBkgrnd):
-                    if val < 5:
-                        AIIC_recieve_corr.append(AIIC_rec_overalloct[i]-2)
-                    else:
-                        input_aiic = 10**(AIIC_rec_overalloct[i]/10)
-                        background = 10**(bkgrnd_overalloct[i]/10)
-                        input_vs_bkgrnd = input_aiic - background
-                        if input_vs_bkgrnd < 0:
-                            input_vs_bkgrnd = abs(input_vs_bkgrnd)
-                        AIIC_recieve_corr.append(10*np.log10(input_vs_bkgrnd))
+                # Verify shapes match
+                if AIIC_rec_overalloct.shape != bkgrnd_overalloct_aiic.shape:
+                    raise ValueError(f"Shape mismatch: AIIC={AIIC_rec_overalloct.shape}, background={bkgrnd_overalloct_aiic.shape}")
                 
-                # AIIC_recieve_corr = np.round(np.array(AIIC_recieve_corr, dtype=np.float64), 1)
+                print("\nDebug - Arrays before calculation:")
+                print(f"AIIC data: {AIIC_rec_overalloct}")
+                print(f"Background data: {bkgrnd_overalloct_aiic}")
+                print(f"Sabines data: {sabines}")
                 
-                # Calculate AIIC_Normalized_recieve
-                log_term = np.log10(108/sabines)
-                scaling = 10 * log_term
+                # Calculate difference
+                AIIC_recieve_vsBkgrnd = AIIC_rec_overalloct - bkgrnd_overalloct_aiic
+                
+                # Initialize output array
+                AIIC_recieve_corr = np.zeros_like(AIIC_rec_overalloct)
+                
+                # Apply corrections using numpy where
+                mask_lt_5 = AIIC_recieve_vsBkgrnd < 5
+                
+                # Apply the two different calculations based on the mask
+                AIIC_recieve_corr = np.where(
+                    mask_lt_5,
+                    AIIC_rec_overalloct - 2,  # When difference < 5
+                    10 * np.log10(np.abs(np.power(10, AIIC_rec_overalloct/10) - np.power(10, bkgrnd_overalloct_aiic/10)))  # When difference >= 5
+                )
+                
+                # Round the results
+                AIIC_recieve_corr = np.round(AIIC_recieve_corr, decimals=1)
+                
+                print("\nDebug - After correction:")
+                print(f"AIIC_recieve_corr: {AIIC_recieve_corr}")
+                
+                # Ensure sabines is a numpy array of float64
+                sabines = np.array(sabines, dtype=np.float64)
+                
+                # Check for invalid values in sabines
+                if np.any(sabines <= 0):
+                    raise ValueError("Sabines contains zero or negative values")
+                
+                # Calculate normalized receive
+                scaling = 10 * np.log10(108/sabines)
                 AIIC_Normalized_recieve = AIIC_recieve_corr - scaling
                 AIIC_Normalized_recieve = np.round(AIIC_Normalized_recieve)
+                
+                print("\nDebug - Final normalized values:")
+                print(f"Scaling: {scaling}")
+                print(f"AIIC_Normalized_recieve: {AIIC_Normalized_recieve}")
+                
             except Exception as e:
-                print(f"Error in AIIC processing: {str(e)}")
-                AIIC_recieve_corr = np.array([])
+                print(f"\nDetailed error in AIIC processing:")
+                print(f"Error type: {type(e).__name__}")
+                print(f"Error message: {str(e)}")
+                print(f"AIIC_rec_overalloct shape: {getattr(AIIC_rec_overalloct, 'shape', 'unknown')}")
+                print(f"bkgrnd_overalloct shape: {getattr(bkgrnd_overalloct, 'shape', 'unknown')}")
+                print(f"sabines shape: {getattr(sabines, 'shape', 'unknown')}")
+                AIIC_recieve_corr = np.array([], dtype=np.float64)
                 AIIC_Normalized_recieve = None
 
         # Process ASTC data if provided
