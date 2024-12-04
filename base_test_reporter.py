@@ -745,15 +745,29 @@ class AIICTestReport(BaseTestReport):
 
                 # Create table only if we have valid data
                 if all(hasattr(self, attr) for attr in ['AIIC_Normalized_recieve', 'onethird_bkgrd', 'rt_thirty', 'AIIC_Exceptions']):
-                    table_data = self.create_test_results_table(
+                    table_data = [
                         self.AIIC_Normalized_recieve,
                         self.onethird_bkgrd,
                         self.rt_thirty,
                         self.AIIC_Exceptions
-                    )
-                    Test_result_table = self.create_formatted_table(table_data)
+                    ]
+
+                    Test_result_table = Table(table_data, colWidths=[60, 60, 80, 60, 60], hAlign='LEFT')
+                    Test_result_table.setStyle(TableStyle([
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, -1), 10),
+                        ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
+                        ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('PADDING', (0, 0), (-1, -1), 6),
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                    ]))
                     main_elements.append(Test_result_table)
                     main_elements.append(Spacer(1, 20))
+                    print(f"Table created with {len(table_data)} rows")
+                else:
+                    print("Warning: No data rows were created for the table")
 
             except Exception as e:
                 print(f"Error in AIIC processing: {str(e)}")
@@ -775,10 +789,14 @@ class AIICTestReport(BaseTestReport):
         )
     def get_results_plot(self):
         main_elements = []
-        STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]  # Length 15
-        
+
+        IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
+        IIC_contour_final = list()
+        # initial application of the IIC curve to the first AIIC start value 
+        for vals in IIC_curve:
+            IIC_contour_final.append(vals+(110-self.AIIC_contour_val))
         # Create ASTC contour
-        ASTC_contour_final = [val + self.ASTC_final_val for val in STCCurve]
+        # ASTC_contour_final = [val + self.ASTC_final_val for val in STCCurve]
         
         # Define the target frequency range (125Hz to 3150Hz) - removed 4000Hz
         FREQ_START, FREQ_END = 125, 3150
@@ -786,20 +804,21 @@ class AIICTestReport(BaseTestReport):
                                1000, 1250, 1600, 2000, 2500, 3150])
         
         print(f'table_freqs: {freq_series.tolist()}')
-        print(f'ASTC_contour_final: {ASTC_contour_final}')
+        print(f'ASTC_contour_final: {IIC_contour_final}')
         
-        Ref_label = f'ASTC {self.ASTC_final_val} Contour'
-        ASTC_yAxis = 'Transmission Loss (dB)'
-        Field_ASTC_label = 'Apparent Transmission Loss, ATL (dB)'
+        Ref_label = f'AIIC {self.AIIC_contour_val} Contour'
+        
+        AIIC_yAxis = 'Transmission Loss (dB)'
+        Field_AIIC_label = 'Absorption Normalized Impact Sound Pressure Level, AIIC (dB)'
         
         # Ensure all arrays are numpy arrays of the same length
         ASTC_plot_img = plot_curves(
             frequencies=freq_series.tolist(),
-            y_label=ASTC_yAxis,
-            ref_curve=np.array(ASTC_contour_final),
-            field_curve=np.array(self.NR_val),
+            y_label=AIIC_yAxis,
+            ref_curve=np.array(IIC_contour_final),
+            field_curve=np.array(self.AIIC_Normalized_recieve),
             ref_label=Ref_label,
-            field_label=Field_ASTC_label
+            field_label=Field_AIIC_label
         )
         
         main_elements.append(ASTC_plot_img)
@@ -887,12 +906,20 @@ class ASTCTestReport(BaseTestReport):
                         print(f"frequencies: {len(frequencies)}")
                         print(f"NR_val: {len(self.NR_val)}")
                         print(f"Background: {len(onethird_bkgrd)}")
+                        print(f"Source room level: {len(onethird_srs)}")
                         print(f"RT30: {len(rt_thirty)}")
-                        print(f"Sabines: {len(self.sabines)}")
+                        print(f"Average corrected receiver room level: {len(self.ASTC_recieve_corr)}")
                         
                         # Create table data
                         table_data = [
-                            ['Frequency (Hz)', 'NR (dB)', 'Background (dB)', 'RT60 (s)', 'Sabines']
+                            ['Frequency (Hz)',
+                             'L1, Average Source Room Level (dB)',
+                             'L2, Average Corrected Receiver Room Level (dB)',
+                             'Average Receiver Background Level (dB)',
+                             'Average RT60 (seconds)',
+                             'Noise Reduction, NR (dB)', 
+                             'Apparent Transmission Loss, ATL (dB)'
+                             ]
                         ]
                         
                         # Debug data types
@@ -900,22 +927,25 @@ class ASTCTestReport(BaseTestReport):
                         print(f"NR_val type: {type(self.NR_val)}")
                         print(f"Background type: {type(onethird_bkgrd)}")
                         print(f"RT30 type: {type(rt_thirty)}")
-                        print(f"Sabines type: {type(self.sabines)}")
+                        print(f"Average corrected receiver room level type: {type(self.ASTC_recieve_corr)}")
                         
                         for i in range(len(frequencies)):
                             try:
                                 # Access numpy array values directly
-                                nr_val = float(self.NR_val[i])
+                                srs_val = float(onethird_srs.iloc[i] if hasattr(onethird_srs, 'iloc') else onethird_srs[i])
+                                corr_rec_val = float(self.ASTC_recieve_corr[i])
                                 bkg_val = float(onethird_bkgrd.iloc[i] if hasattr(onethird_bkgrd, 'iloc') else onethird_bkgrd[i])
                                 rt_val = float(rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i])
-                                sab_val = int(round(float(self.sabines[i])))
-                                
+                                NR_table_val = float(self.NR_val[i])
+                                atl_val = float(self.ATL_val)
                                 row = [
                                     str(frequencies[i]),
-                                    f"{nr_val:.1f}",
+                                    f"{srs_val:.1f}",
+                                    f"{corr_rec_val:.1f}",
                                     f"{bkg_val:.1f}",
                                     f"{rt_val:.3f}",
-                                    str(sab_val)
+                                    f"{NR_table_val:.1f}",
+                                    f"{atl_val:.1f}"
                                 ]
                                 print(f"Created row {i}: {row}")  # Debug output
                                 table_data.append(row)
@@ -926,7 +956,6 @@ class ASTCTestReport(BaseTestReport):
                                 print(f"  NR_val: {self.NR_val[i] if i < len(self.NR_val) else 'index error'}")
                                 print(f"  Background: {onethird_bkgrd.iloc[i] if hasattr(onethird_bkgrd, 'iloc') else onethird_bkgrd[i] if i < len(onethird_bkgrd) else 'index error'}")
                                 print(f"  RT30: {rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i] if i < len(rt_thirty) else 'index error'}")
-                                print(f"  Sabines: {self.sabines[i] if i < len(self.sabines) else 'index error'}")
                                 continue
 
                         # Create and style the table
