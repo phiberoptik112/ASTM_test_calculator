@@ -796,7 +796,7 @@ class AIICTestReport(BaseTestReport):
         for vals in IIC_curve:
             IIC_contour_final.append(vals+(110-self.AIIC_contour_val))
         # Create ASTC contour
-        # ASTC_contour_final = [val + self.ASTC_final_val for val in STCCurve]
+        # IIC_contour_final = [val + self.ASTC_final_val for val in IIC_curve]
         
         # Define the target frequency range (125Hz to 3150Hz) - removed 4000Hz
         FREQ_START, FREQ_END = 125, 3150
