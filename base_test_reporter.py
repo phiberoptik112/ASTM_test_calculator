@@ -4,6 +4,7 @@ from reportlab.platypus import Paragraph, Spacer, Table, TableStyle, KeepInFrame
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate
+from reportlab.platypus import Image
 
 from config import standards_text, test_instrumentation_table, test_procedure_pg, ISR_ony_report, stockNIC_note, stockISR_notes, FREQUENCIES
 from data_processor import *
@@ -1012,7 +1013,9 @@ class ASTCTestReport(BaseTestReport):
         main_elements = []
         STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]
         # STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4] #without 4000 Hz
-
+            # Define frequencies
+        freq_series = pd.Series([125, 160, 200, 250, 315, 400, 500, 630, 800, 
+                                1000, 1250, 1600, 2000, 2500, 3150])
         ASTC_contour_final = list()
         for vals in STCCurve:
             ASTC_contour_final.append(vals+(self.ATL_val))
@@ -1023,11 +1026,25 @@ class ASTCTestReport(BaseTestReport):
         table_freqs = freq_series[mask].tolist()
         print(f'table_freqs: {table_freqs}')
         print(f'ASTC_contour_final: {ASTC_contour_final}')
+
+        
         Ref_label = f'ASTC {self.ASTC_final_val} Contour'
         ASTC_yAxis = 'Transmission Loss (dB)'
         Field_ASTC_label = 'Apparent Transmission Loss, ATL (dB)'
-        ASTC_plot_img = plot_curves(table_freqs, ASTC_yAxis, ASTC_contour_final,self.NR_val,Ref_label, Field_ASTC_label)
-        main_elements.append(ASTC_plot_img)
+        # Ensure all inputs are numpy arrays
+        ASTC_plot_img = plot_curves(
+            frequencies=freq_series.tolist(),
+            y_label=ASTC_yAxis,
+            ref_curve=ASTC_contour_final,
+            field_curve=np.array(self.ATL_val),  # Use ATL_val instead of NR_val
+            ref_label=Ref_label,
+            field_label=Field_ASTC_label
+        )
+        # Create a flowable image that ReportLab can handle
+        img = Image(ASTC_plot_img)
+        img.drawHeight = 400  # Adjust as needed
+        img.drawWidth = 500   # Adjust as needed
+        main_elements.append(img)
         return main_elements
 
 class NICTestReport(BaseTestReport):

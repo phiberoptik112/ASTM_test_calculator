@@ -520,7 +520,7 @@ def calc_atl_val(srs_overalloct: pd.Series, rec_overalloct: pd.Series,
     # ATL_val = np.round(ATL_val,1)
     print('ATL val: ',ATL_val)
     return ATL_val, sabines
-def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=True):
+def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=False):
     pos_diffs = list()
     diff_negative_min = 0
     AIIC_start = 94
@@ -553,10 +553,10 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=True):
     while (diff_negative_max < 8 and new_sum < 32 and iteration_count < max_iterations):
         if verbose:
             print(f"Iteration {iteration_count}:")
-            print(f"  AIIC_contour_val: {AIIC_contour_val}")
+            # print(f"  AIIC_contour_val: {AIIC_contour_val}")
             # print(f"  diff_negative_max: {diff_negative_max}")
             # print(f"  new_sum: {new_sum}")
-        print('Inside loop, current AIIC contour: ', AIIC_contour_val)
+        # print('Inside loop, current AIIC contour: ', AIIC_contour_val)
         # print('Contour curve (IIC curve minus ANISPL): ', Contour_curve_result)
         
         diff_negative = Normalized_recieve_IIC - IIC_contour
