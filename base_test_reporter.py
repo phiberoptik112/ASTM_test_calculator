@@ -497,17 +497,22 @@ class BaseTestReport:
             standards_table.setStyle(TableStyle([
                 ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
                 ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT')
             ]))
             main_elements.append(standards_table)
-
+            main_elements.append(Spacer(1, 10))
             # Statement of conformance
             main_elements.append(Paragraph("<u>STATEMENT OF CONFORMANCE:</u>", self.styleHeading))
             conformance_statement = self.get_statement_of_conformance()
             if not conformance_statement:
                 raise ValueError("Conformance statement is missing")
             main_elements.append(Paragraph(conformance_statement))
-
+            main_elements.append(Spacer(1, 10))
             # Test environment
             test_env = self.create_test_environment_section()
             print('>>>>>>>>> appending test environment <<<<<<<<<<')
@@ -552,8 +557,8 @@ class BaseTestReport:
                 
             test_instrumentation_table = Table(instrumentation, hAlign='LEFT')
             test_instrumentation_table.setStyle(TableStyle([
-                ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
-                ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
+                ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
+                ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
                 ('LEFTPADDING', (0, 0), (-1, -1), 6),
                 ('RIGHTPADDING', (0, 0), (-1, -1), 6),
                 ('TOPPADDING', (0, 0), (-1, -1), 6),
@@ -563,8 +568,6 @@ class BaseTestReport:
             ]))
             
             main_elements.append(test_instrumentation_table)
-            main_elements.append(PageBreak())
-            
             return main_elements
             
         except Exception as e:
@@ -603,8 +606,6 @@ class BaseTestReport:
             # Add spacing and test results paragraph
             main_elements.append(Spacer(1,10))
             # main_elements.append(self.get_test_results_paragraph())
-            main_elements.append(PageBreak())
-            
             return main_elements
             
         except Exception as e:
