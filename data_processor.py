@@ -20,8 +20,9 @@ import matplotlib
 matplotlib.use('Agg')  # Set backend to non-interactive
 import matplotlib.pyplot as plt
 from matplotlib import ticker
+import matplotlib.ticker as ticker
 from typing import List
-
+import tempfile
 
 @dataclass
 class RoomProperties:
@@ -741,6 +742,9 @@ def plot_curves(frequencies: List[float], y_label: str, ref_curve: np.ndarray,
         field_curve: Field measurement curve data (length 15)
         ref_label: Label for reference curve
         field_label: Label for field curve
+
+    Returns:
+        str: Path to the saved plot image
     """
     # Verify input shapes
     print(f"Plot input shapes:")
@@ -767,31 +771,14 @@ def plot_curves(frequencies: List[float], y_label: str, ref_curve: np.ndarray,
     plt.gca().xaxis.set_major_locator(ticker.FixedLocator(frequencies))
     plt.legend()
     
-    # Save plot to bytes buffer
-    img_buffer = BytesIO()
-    plt.savefig(img_buffer, format='png', bbox_inches='tight', dpi=300)
-    img_buffer.seek(0)
+    # Create temp file with .png extension
+    temp_dir = tempfile.gettempdir()
+    temp_path = os.path.join(temp_dir, 'plot.png')
+    
+    plt.savefig(temp_path, format='png', bbox_inches='tight', dpi=300)
     plt.close()
     
-    return ImageReader(img_buffer)
-
-## old code, remove?
-# def process_single_test(test_plan_entry: pd.Series, slm_data_paths: Dict[str, Path], 
-#                         output_folder: Path) -> Path:
-#     room_props = RoomProperties(**test_plan_entry.to_dict())
-    
-#     srs_data = load_slm_data(slm_data_paths['source'], 'OBA')
-#     rec_data = load_slm_data(slm_data_paths['receive'], 'OBA')
-#     bkgrnd_data = load_slm_data(slm_data_paths['background'], 'OBA')
-#     rt_data = load_slm_data(slm_data_paths['rt'], 'Summary')
-    
-#     test_data = TestData(srs_data, rec_data, bkgrnd_data, rt_data, room_props)
-    
-#     test_type = TestType(test_plan_entry['TestType'])
-    
-#     report_path = create_report(test_data, output_folder, test_type)
-    
-#     return report_path
+    return temp_path
 
 # Additional utility functions
 def sanitize_filepath(filepath: str) -> str:

@@ -1,7 +1,4 @@
 #ASTC GUI proto
-
-
-
 import string
 import time
 import pandas as pd
@@ -13,7 +10,7 @@ from openpyxl import cell
 from openpyxl.utils import get_column_letter
 from os import listdir, walk
 from os.path import isfile, join
-
+import tempfile
 from reportlab.platypus import Paragraph, Spacer, Table, TableStyle, KeepInFrame, PageBreak 
 
 import matplotlib.pyplot as plt
@@ -34,7 +31,8 @@ from data_processor import (
     calc_astc_val,
     format_SLMdata,
     extract_sound_levels,
-    calculate_onethird_Logavg
+    calculate_onethird_Logavg,
+    calc_AIIC_val_claude
 )
 
 from base_test_reporter import *

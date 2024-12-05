@@ -783,7 +783,7 @@ class AIICTestReport(BaseTestReport):
             raise
 
     def get_test_results_table_notes(self):
-        return "*This test does fully conform to the requirments... ect NEED TO COMPLETE "
+        return "The results stated in this report represent only the specific construction and acoustical conditions present at the time of the test. Measurements performed in accordance with this test method on nominally identical constructions and acoustical conditions may produce different results."
     def get_test_results_paragraph(self): 
         return (
             f"The Apparent Impact Insulation Class (AIIC) was calculated. The AIIC rating is based on Absorption Normalized Impact Sound Pressure Level (ANISPL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Absorption Normalized Impact Sound Pressure Level values, in accordance with the procedure of "+standards_text[0][0]
@@ -791,7 +791,7 @@ class AIICTestReport(BaseTestReport):
     def get_results_plot(self):
         main_elements = []
 
-        IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
+        IIC_curve = [2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
         IIC_contour_final = list()
         # initial application of the IIC curve to the first AIIC start value 
         for vals in IIC_curve:
@@ -800,7 +800,6 @@ class AIICTestReport(BaseTestReport):
         # IIC_contour_final = [val + self.ASTC_final_val for val in IIC_curve]
         
         # Define the target frequency range (125Hz to 3150Hz) - removed 4000Hz
-        FREQ_START, FREQ_END = 125, 3150
         freq_series = pd.Series([125, 160, 200, 250, 315, 400, 500, 630, 800, 
                                1000, 1250, 1600, 2000, 2500, 3150])
         
@@ -821,8 +820,11 @@ class AIICTestReport(BaseTestReport):
             ref_label=Ref_label,
             field_label=Field_AIIC_label
         )
-        
-        main_elements.append(ASTC_plot_img)
+        # Create a flowable image that ReportLab can handle
+        img = Image(ASTC_plot_img)
+        img.drawHeight = 400
+        img.drawWidth = 500
+        main_elements.append(img)
         return main_elements
 
 class ASTCTestReport(BaseTestReport):
@@ -1006,7 +1008,7 @@ class ASTCTestReport(BaseTestReport):
             f"The Apparent Sound Transmission Class (ASTC) of {self.ASTC_final_val} was calculated. The ASTC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The ASTC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_text[0][0]
         )
     def get_test_results_table_notes(self):
-        return "*This test does fully conform to the requirements of ASTM E336-20, ASTM E413-16, and ASTM E2235-04(2012), with exceptions noted below."
+        return "The results stated in this report represent only the specific construction and acoustical conditions present at the time of the test. Measurements performed in accordance with this test method on nominally identical constructions and acoustical conditions may produce different results."
     
     def get_results_plot(self):
         
@@ -1016,18 +1018,17 @@ class ASTCTestReport(BaseTestReport):
             # Define frequencies
         freq_series = pd.Series([125, 160, 200, 250, 315, 400, 500, 630, 800, 
                                 1000, 1250, 1600, 2000, 2500, 3150])
-        ASTC_contour_final = list()
-        for vals in STCCurve:
-            ASTC_contour_final.append(vals+(self.ATL_val))
-        # Define the target frequency range (125Hz to 3150Hz)
-        FREQ_START, FREQ_END = 125, 3150
-        freq_series = pd.Series(FREQUENCIES)
-        mask = (freq_series >= FREQ_START) & (freq_series <= FREQ_END)
-        table_freqs = freq_series[mask].tolist()
-        print(f'table_freqs: {table_freqs}')
-        print(f'ASTC_contour_final: {ASTC_contour_final}')
 
-        
+
+        # Define the target frequency range (125Hz to 3150Hz)
+        # FREQ_START, FREQ_END = 125, 3150
+        # freq_series = pd.Series(FREQUENCIES)
+        # mask = (freq_series >= FREQ_START) & (freq_series <= FREQ_END)
+        # table_freqs = freq_series[mask].tolist()
+        print(f'table_freqs: {freq_series.tolist()}')
+        print(f'ASTC_contour_final: {self.ASTC_contour_val}')
+
+
         Ref_label = f'ASTC {self.ASTC_final_val} Contour'
         ASTC_yAxis = 'Transmission Loss (dB)'
         Field_ASTC_label = 'Apparent Transmission Loss, ATL (dB)'
@@ -1035,7 +1036,7 @@ class ASTCTestReport(BaseTestReport):
         ASTC_plot_img = plot_curves(
             frequencies=freq_series.tolist(),
             y_label=ASTC_yAxis,
-            ref_curve=ASTC_contour_final,
+            ref_curve=self.ASTC_contour_val,
             field_curve=np.array(self.ATL_val),  # Use ATL_val instead of NR_val
             ref_label=Ref_label,
             field_label=Field_ASTC_label
@@ -1129,7 +1130,7 @@ class NICTestReport(BaseTestReport):
         main_elements.append(Test_result_table)
         return main_elements
     def get_test_results_table_notes(self):
-        return "*This test does fully conform to the requirments... ect NEED TO COMPLETE "
+        return "The results stated in this report represent only the specific construction and acoustical conditions present at the time of the test. Measurements performed in accordance with this test method on nominally identical constructions and acoustical conditions may produce different results."
     def get_test_results_paragraph(self):
         return (
             f"The Noise Isolation Class (NIC) was calculated. The NIC rating is based on Absorption Normalized Impact Sound Pressure Level (ANISPL), and includes the effects of noise flanking. The NIC reference contour is shown on the next page, and has been “fit” to the Absorption Normalized Impact Sound Pressure Level values, in accordance with the procedure of "+standards_text[0][0]
@@ -1146,12 +1147,21 @@ class NICTestReport(BaseTestReport):
         FREQ_START, FREQ_END = 125, 4000
         freq_series = pd.Series(FREQUENCIES)
         mask = (freq_series >= FREQ_START) & (freq_series <= FREQ_END)
-        table_freqs = freq_series[mask].tolist()
-        print(f'table_freqs: {table_freqs}')
         NICRef_label = f'NIC {self.NIC_final_val} Contour'
         Field_NIC_label = 'Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)'
-        NIC_plot_img = plot_curves(table_freqs, NIC_yAxis, NIC_contour_final,self.NR_val,NICRef_label, Field_NIC_label)
-        main_elements.append(NIC_plot_img)
+        NIC_plot_img = plot_curves(
+            frequencies=freq_series.tolist(),
+            y_label=NIC_yAxis,
+            ref_curve=NIC_contour_final,
+            field_curve=np.array(self.NR_val),
+            ref_label=NICRef_label,
+            field_label=Field_NIC_label
+        )
+        # Create a flowable image that ReportLab can handle
+        img = Image(NIC_plot_img)
+        img.drawHeight = 400
+        img.drawWidth = 500
+        main_elements.append(img)
         return main_elements
 
 
