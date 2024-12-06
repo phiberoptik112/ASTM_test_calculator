@@ -22,7 +22,6 @@ class BaseTestReport:
         self.doc = None
         self.styles = getSampleStyleSheet()
         self.custom_title_style = self.styles['Heading1']
-        # custom_title_style = styles['Heading1']
         # Define margins and heights
         self.left_margin = 0.75 * 72
         self.right_margin = 0.75 * 72
@@ -101,7 +100,9 @@ class BaseTestReport:
         leftside_data = [
             ["Report Date:", Paragraph(str(props['report_date']), self.styles['Normal'])],
             ['Test Date:', Paragraph(str(props['test_date']), self.styles['Normal'])],
-            ['DLAA Test No', Paragraph(str(props['test_label']), self.styles['Normal'])]
+            ['DLAA Test No', Paragraph(str(props['test_label']), self.styles['Normal'])],
+            ['Test Site', Paragraph(str(props['site_name']), self.styles['Normal'])],
+            ['Client', Paragraph(str(props['client_name']), self.styles['Normal'])]
         ]
         
         print('Building right side data')
@@ -148,16 +149,6 @@ class BaseTestReport:
         
         elements.append(Spacer(1, 10))
         
-        # Add site and client info as Paragraphs
-        elements.append(Paragraph(
-            'Test site: ' + str(props['site_name']), 
-            self.styles['Normal']
-        ))
-        elements.append(Spacer(1, 5))
-        elements.append(Paragraph(
-            'Client: ' + str(props['client_name']), 
-            self.styles['Normal']
-        ))
         
         return elements
 
@@ -165,13 +156,14 @@ class BaseTestReport:
         canvas.saveState()
         print('Building header and footer')
         # Build header
+        canvas.setFont('Helvetica', 10)
         self.header_frame._leftPadding = self.header_frame._rightPadding = 0
         header_story = self.header_elements()
         self.header_frame.addFromList(header_story, canvas)
         
         # Build footer
         canvas.setFont('Helvetica', 10)
-        footer_text = f"Page {doc.page}"
+        footer_text = f"This page alone is not a complete report. Page {doc.page} of 4" ## hardcoded to 4 pages for now
         canvas.drawCentredString(
             letter[0] / 2, 
             self.bottom_margin + self.footer_height / 2, 
@@ -603,9 +595,7 @@ class BaseTestReport:
                 main_elements.append(self.get_test_results_table_notes())
             except Exception as e:
                 raise ReportGenerationError(f"Error adding table notes: {str(e)}")
-            # Add spacing and test results paragraph
-            main_elements.append(Spacer(1,10))
-            # main_elements.append(self.get_test_results_paragraph())
+
             return main_elements
             
         except Exception as e:
@@ -673,19 +663,20 @@ class AIICTestReport(BaseTestReport):
         print('-=-=-=-=-=-=-= Getting AIIC test results-=-=-=-=-=-=-=-=-')
         props = vars(self.test_data.room_properties)
         main_elements = []
-
+        frequencies = [125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150]
         try:
             # Initial data loading with explicit slicing
             freq_indices = slice(1, 16)
             onethird_srs = format_SLMdata(self.test_data.srs_data)[freq_indices]
             onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
             self.onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)[freq_indices]
-            self.rt_thirty = self.test_data.rt['Unnamed: 10'][25:40]/1000
+            rt_thirty = self.test_data.rt['Unnamed: 10'][25:40]/1000
 
             # Debug input shapes
             print("\nInput shapes:")
             print(f"Background: {self.onethird_bkgrd.shape}")
-            print(f"RT thirty: {self.rt_thirty.shape}")
+            print(f"RT thirty: {rt_thirty.shape}")
+            print(f'rt_thirty vals: {rt_thirty}')
             print(f"Source: {onethird_srs.shape}")
 
             # Process tapping positions with validation
@@ -722,7 +713,7 @@ class AIICTestReport(BaseTestReport):
                     ASTC_rec_overalloct=onethird_rec,
                     bkgrnd_overalloct=self.onethird_bkgrd,
                     recieve_roomvol=float(props['receive_vol']),
-                    rt_thirty=self.rt_thirty
+                    rt_thirty=rt_thirty
                 )
                 
                 # Unpack results with explicit type checking
@@ -746,16 +737,51 @@ class AIICTestReport(BaseTestReport):
                     self.AIIC_Exceptions.append('0' if val > 2*(rec_roomvol**(2/3)) else '1')
 
                 # Create table only if we have valid data
-                if all(hasattr(self, attr) for attr in ['AIIC_Normalized_recieve', 'onethird_bkgrd', 'rt_thirty', 'AIIC_Exceptions']):
+                if self.AIIC_Normalized_recieve is not None and self.onethird_bkgrd is not None and rt_thirty is not None and self.AIIC_Exceptions is not None:
+                    print(f"\nArray lengths before table creation:")
+                    print(f"frequencies: {len(frequencies)}")
+                    print(f"ANISPL: {len(self.AIIC_Normalized_recieve)}")
+                    print(f"Background: {len(self.onethird_bkgrd)}")
+                    print(f"RT30: {len(rt_thirty)}")
+                    print(f"Exceptions: {len(self.AIIC_Exceptions)}")
                     table_data = [
-                        self.AIIC_Normalized_recieve,
-                        self.onethird_bkgrd,
-                        self.rt_thirty,
-                        self.AIIC_Exceptions
+                        ['Frequency (Hz)',
+                            'Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)',
+                            'Average Receiver Background Level (dB)',
+                            'Average RT60 (seconds)',
+                            'Exceptions noted to ASTM E1007-14'
+                            ]
                     ]
-
-                    Test_result_table = Table(table_data, colWidths=[60, 60, 80, 60, 60], hAlign='LEFT')
-                    Test_result_table.setStyle(TableStyle([
+                    print("\nTable data types:")
+                    print(f"ANISPL: {type(self.AIIC_Normalized_recieve)}")
+                    print(f"Background: {type(self.onethird_bkgrd)}")
+                    print(f"RT30: {type(rt_thirty)}")
+                    print(f"Exceptions: {type(self.AIIC_Exceptions)}")
+                    for i in range(len(frequencies)):
+                        try:
+                            anispl_val = float(self.AIIC_Normalized_recieve[i])
+                            bkg_val = float(self.onethird_bkgrd[i])
+                            rt_val = float(rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i])
+                            exceptions_val = self.AIIC_Exceptions[i]
+                            row = [
+                                str(frequencies[i]),
+                                f"{anispl_val:.1f}",
+                                f"{bkg_val:.1f}",
+                                f"{rt_val:.3f}",
+                                str(exceptions_val)
+                            ]
+                            table_data.append(row)
+                        except Exception as e:
+                            print(f"Error creating row {i}: {str(e)}")
+                            print(f"Values at index {i}:")
+                            print(f"  ANISPL: {anispl_val}")
+                            print(f"  Background: {bkg_val}")
+                            print(f"  RT30: {rt_val}")
+                            print(f"  Exceptions: {exceptions_val}")
+                            continue
+                    if len(table_data) > 1:
+                        Test_result_table = Table(table_data, colWidths=[60, 60, 80, 60, 60], hAlign='LEFT')
+                        Test_result_table.setStyle(TableStyle([
                         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                         ('FONTSIZE', (0, 0), (-1, -1), 10),
                         ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
@@ -763,14 +789,13 @@ class AIICTestReport(BaseTestReport):
                         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                         ('PADDING', (0, 0), (-1, -1), 6),
-                        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                    ]))
-                    main_elements.append(Test_result_table)
-                    main_elements.append(Spacer(1, 20))
-                    print(f"Table created with {len(table_data)} rows")
-                else:
-                    print("Warning: No data rows were created for the table")
-
+                            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                        ]))
+                        main_elements.append(Test_result_table)
+                        main_elements.append(Spacer(1, 20))
+                        print(f"Table created with {len(table_data)} rows")
+                    else:
+                        print("Warning: No data rows were created for the table")
             except Exception as e:
                 print(f"Error in AIIC processing: {str(e)}")
                 raise
@@ -787,7 +812,7 @@ class AIICTestReport(BaseTestReport):
         return "The results stated in this report represent only the specific construction and acoustical conditions present at the time of the test. Measurements performed in accordance with this test method on nominally identical constructions and acoustical conditions may produce different results."
     def get_test_results_paragraph(self): 
         return (
-            f"The Apparent Impact Insulation Class (AIIC) was calculated. The AIIC rating is based on Absorption Normalized Impact Sound Pressure Level (ANISPL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Absorption Normalized Impact Sound Pressure Level values, in accordance with the procedure of "+standards_text[0][0]
+            f"The Apparent Impact Insulation Class (AIIC) of {self.AIIC_contour_val} was calculated. The AIIC rating is based on Absorption Normalized Impact Sound Pressure Level (ANISPL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Absorption Normalized Impact Sound Pressure Level values, in accordance with the procedure of "+standards_text[0][0]
         )
     def get_results_plot(self):
         main_elements = []
@@ -942,7 +967,7 @@ class ASTCTestReport(BaseTestReport):
                                 bkg_val = float(onethird_bkgrd.iloc[i] if hasattr(onethird_bkgrd, 'iloc') else onethird_bkgrd[i])
                                 rt_val = float(rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i])
                                 NR_table_val = float(self.NR_val[i])
-                                atl_val = float(self.ATL_val)
+                                atl_val = float(self.ATL_val[i])
                                 row = [
                                     str(frequencies[i]),
                                     f"{srs_val:.1f}",
