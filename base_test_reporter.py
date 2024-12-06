@@ -5,7 +5,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate
 from reportlab.platypus import Image
-
+from reportlab.lib.enums import TA_CENTER
 from config import standards_text, test_instrumentation_table, test_procedure_pg, ISR_ony_report, stockNIC_note, stockISR_notes, FREQUENCIES
 from data_processor import *
 
@@ -644,9 +644,7 @@ class AIICTestReport(BaseTestReport):
         # Heading 'TEST ASSEMBLY'
         main_elements.append(Paragraph("<u>TEST ASSEMBLY:</u>", self.styleHeading))
         main_elements.append(Spacer(1, 10))  # Adds some space 
-        main_elements.append(Paragraph("The tested assembly was the"+props['test_assembly_type']+"The assembly was not field verified, and was based on information provided by the client and drawings for the project. The client advised that no slab treatment or self-leveling was applied. Results may vary if slab treatment or self-leveling or any adhesive is used in other installations."))
-        # ##### END OF FIRST PAGE TEXT  - ########
-        #   main_elements.append(PageBreak())
+        main_elements.append(Paragraph("The tested assembly was the "+props['test_assembly_type']+". The assembly was not field verified, and was based on information provided by the client and drawings for the project. The client advised that no slab treatment or self-leveling was applied. Results may vary if slab treatment or self-leveling or any adhesive is used in other installations."))
         return main_elements
 
     def get_test_instrumentation(self):
@@ -778,8 +776,7 @@ class AIICTestReport(BaseTestReport):
                             print(f"  Exceptions: {exceptions_val}")
                             continue
                     if len(table_data) > 1:
-                        from reportlab.lib.styles import ParagraphStyle
-                        from reportlab.lib.enums import TA_CENTER
+
                         # First, create shorter header texts that will be more readable when rotated
                         header_row = [
                             'Frequency\n(Hz)',
@@ -1034,27 +1031,66 @@ class ASTCTestReport(BaseTestReport):
 
                         # Create and style the table
                         if len(table_data) > 1:
-                            Test_result_table = Table(table_data, colWidths=[60, 60, 80, 60, 60], hAlign='LEFT')
-                            Test_result_table.setStyle(TableStyle([
-                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                                ('FONTSIZE', (0, 0), (-1, -1), 10),
-                                ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
-                                ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
-                                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                                ('PADDING', (0, 0), (-1, -1), 6),
-                                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                                                          # Add these new styles for header rotation
-                                ('TEXTANGLE', (0, 0), (-1, 0), 90),  # Rotate header text 90 degrees
-                                ('TOPPADDING', (0, 0), (-1, 0), 35),  # Add extra padding for rotated text
-                                ('BOTTOMPADDING', (0, 0), (-1, 0), 35),  # Add extra padding for rotated text
-                                ('LEFTPADDING', (0, 0), (-1, 0), 4),  # Reduce left padding in header
-                                ('RIGHTPADDING', (0, 0), (-1, 0), 4),  # Reduce right padding in header
-                            ]))
-                            main_elements.append(Test_result_table)
-                            main_elements.append(Spacer(1, 20))
-                            print(f"Table created with {len(table_data)} rows")
-                        else:
+                                 # First, create shorter header texts that will be more readable when rotated
+                            header_row = [
+                            'Frequency\n(Hz)',
+                            'L1,\nAverage\nSource\nRoom\nLevel\n(dB)',
+                            'L2,\nAverage\nCorrected\nReceiver\nRoom\nLevel\n(dB)',
+                            'Average\nReceiver\nBackground\nLevel\n(dB)',
+                            'Average\nRT60\n(seconds)',
+                            'Noise\nReduction,\nNR\n(dB)',
+                            'Apparent\nTransmission\nLoss,\nATL\n(dB)'
+                            ]
+                        
+                        # Create paragraph style for rotated headers
+                            rotated_style = ParagraphStyle(
+                            'RotatedHeader',
+                            fontName='Helvetica-Bold',
+                            fontSize=8,  # Slightly smaller font for headers
+                            alignment=TA_CENTER,
+                            textColor=colors.black,
+                            leading=10  # Controls line spacing for multi-line text
+                            )
+                        
+                        # Create rotated header paragraphs
+                            rotated_headers = [
+                            Paragraph(f'<rotate>{text}</rotate>', rotated_style)
+                            for text in header_row
+                            ]
+                            table_data[0] = rotated_headers
+
+                        # Create and style the table with adjusted dimensions
+                            Test_result_table = Table(
+                            table_data, 
+                            colWidths=[65, 85, 65, 45, 45],  # Narrower columns
+                            rowHeights=[80] + [20]*(len(table_data)-1),  # Shorter rows overall
+                            hAlign='LEFT'
+                            )
+                        
+                        Test_result_table.setStyle(TableStyle([
+                            # Header row styling
+                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                            ('FONTSIZE', (0, 0), (-1, 0), 8),  # Smaller font for header
+                            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                            
+                            # Data rows styling
+                            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                            ('FONTSIZE', (0, 1), (-1, -1), 8),  # Smaller font for data
+                            
+                            # General table styling
+                            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
+                            ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
+                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                            ('TOPPADDING', (0, 1), (-1, -1), 2),  # Reduced padding for data rows
+                            ('BOTTOMPADDING', (0, 1), (-1, -1), 2),
+                            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                        ]))
+                        main_elements.append(Test_result_table)
+                        main_elements.append(Spacer(1, 20))
+                        print(f"Table created with {len(table_data)} rows")
+                    else:
                             print("Warning: No data rows were created for the table")
 
                     return main_elements
@@ -1232,24 +1268,66 @@ class NICTestReport(BaseTestReport):
 
                         # Create and style the table
                         if len(table_data) > 1:
-                            Test_result_table = Table(table_data, colWidths=[60, 60, 80, 60, 60], hAlign='LEFT')
-                            Test_result_table.setStyle(TableStyle([
-                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                                ('FONTSIZE', (0, 0), (-1, -1), 10),
-                                ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
-                                ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
-                                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                                ('PADDING', (0, 1), (-1, -1), 2),  # Reduced padding for data rows
-                                ('BOTTOMPADDING', (0, 1), (-1, -1), 2),
-                                ('LEFTPADDING', (0, 0), (-1, -1), 4),
-                                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                            ]))
-                            main_elements.append(Test_result_table)
-                            main_elements.append(Spacer(1, 20))
-                            print(f"Table created with {len(table_data)} rows")
-                        else:
-                            print("Warning: No data rows were created for the table")
+                            # First, create shorter header texts that will be more readable when rotated
+                            header_row = [
+                            'Frequency\n(Hz)',
+                            'L1,\nAverage\nSource\nRoom\nLevel\n(dB)',
+                            'L2,\nAverage\nCorrected\nReceiver\nRoom\nLevel\n(dB)',
+                            'Average\nReceiver\nBackground\nLevel\n(dB)',
+                            'Noise\nReduction,\nNR\n(dB)'
+                            ]
+                        
+                        # Create paragraph style for rotated headers
+                            rotated_style = ParagraphStyle(
+                            'RotatedHeader',
+                            fontName='Helvetica-Bold',
+                            fontSize=8,  # Slightly smaller font for headers
+                            alignment=TA_CENTER,
+                            textColor=colors.black,
+                            leading=10  # Controls line spacing for multi-line text
+                            )
+                        
+                        # Create rotated header paragraphs
+                            rotated_headers = [
+                            Paragraph(f'<rotate>{text}</rotate>', rotated_style)
+                            for text in header_row
+                            ]
+                            table_data[0] = rotated_headers
+
+                        # Create and style the table with adjusted dimensions
+                            Test_result_table = Table(
+                            table_data, 
+                            colWidths=[65, 85, 65, 45, 45],  # Narrower columns
+                            rowHeights=[80] + [20]*(len(table_data)-1),  # Shorter rows overall
+                            hAlign='LEFT'
+                            )
+                        
+                        Test_result_table.setStyle(TableStyle([
+                            # Header row styling
+                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                            ('FONTSIZE', (0, 0), (-1, 0), 8),  # Smaller font for header
+                            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                            
+                            # Data rows styling
+                            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                            ('FONTSIZE', (0, 1), (-1, -1), 8),  # Smaller font for data
+                            
+                            # General table styling
+                            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
+                            ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
+                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                            ('TOPPADDING', (0, 1), (-1, -1), 2),  # Reduced padding for data rows
+                            ('BOTTOMPADDING', (0, 1), (-1, -1), 2),
+                            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                        ]))
+                        
+                        main_elements.append(Test_result_table)
+                        main_elements.append(Spacer(1, 20))
+                        print(f"Table created with {len(table_data)} rows")
+                    else:
+                        print("Warning: No data rows were created for the table")
 
                     return main_elements
 
