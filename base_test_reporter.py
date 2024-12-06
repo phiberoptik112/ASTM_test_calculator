@@ -148,8 +148,6 @@ class BaseTestReport:
         ))
         
         elements.append(Spacer(1, 10))
-        
-        
         return elements
 
     def header_footer(self, canvas, doc):
@@ -571,7 +569,7 @@ class BaseTestReport:
             main_elements = []
             
             # Add test results heading
-            main_elements.append(Paragraph("<u>STATEMENT OF TEST RESULTS:</u>", self.custom_title_style))
+            main_elements.append(Paragraph("<u>STATEMENT OF TEST RESULTS:</u>", self.styleHeading))
             
             # Get and format test results table
             try:
@@ -780,19 +778,65 @@ class AIICTestReport(BaseTestReport):
                             print(f"  Exceptions: {exceptions_val}")
                             continue
                     if len(table_data) > 1:
-                        Test_result_table = Table(table_data, colWidths=[60, 60, 80, 60, 60], hAlign='LEFT')
+                        from reportlab.lib.styles import ParagraphStyle
+                        from reportlab.lib.enums import TA_CENTER
+                        # First, create shorter header texts that will be more readable when rotated
+                        header_row = [
+                            'Frequency\n(Hz)',
+                            'Absorption\nNormalized\nImpact Sound\nPressure Level,\nANISPL (dB)',
+                            'Average\nReceiver\nBackground\nLevel (dB)',
+                            'Average\nRT60\n(seconds)',
+                            'Exceptions\nnoted to\nASTM\nE1007-14'
+                        ]
+                        
+                        # Create paragraph style for rotated headers
+                        rotated_style = ParagraphStyle(
+                            'RotatedHeader',
+                            fontName='Helvetica-Bold',
+                            fontSize=8,  # Slightly smaller font for headers
+                            alignment=TA_CENTER,
+                            textColor=colors.black,
+                            leading=10  # Controls line spacing for multi-line text
+                        )
+                        
+                        # Create rotated header paragraphs
+                        rotated_headers = [
+                            Paragraph(f'<rotate>{text}</rotate>', rotated_style)
+                            for text in header_row
+                        ]
+                        table_data[0] = rotated_headers
+
+                        # Create and style the table with adjusted dimensions
+                        Test_result_table = Table(
+                            table_data, 
+                            colWidths=[65, 85, 65, 45, 45],  # Narrower columns
+                            rowHeights=[80] + [20]*(len(table_data)-1),  # Shorter rows overall
+                            hAlign='LEFT'
+                        )
+                        
                         Test_result_table.setStyle(TableStyle([
-                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                        ('FONTSIZE', (0, 0), (-1, -1), 10),
-                        ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
-                        ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
-                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                        ('PADDING', (0, 0), (-1, -1), 6),
+                            # Header row styling
+                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                            ('FONTSIZE', (0, 0), (-1, 0), 8),  # Smaller font for header
                             ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                            
+                            # Data rows styling
+                            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                            ('FONTSIZE', (0, 1), (-1, -1), 8),  # Smaller font for data
+                            
+                            # General table styling
+                            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
+                            ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
+                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                            ('TOPPADDING', (0, 1), (-1, -1), 2),  # Reduced padding for data rows
+                            ('BOTTOMPADDING', (0, 1), (-1, -1), 2),
+                            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
                         ]))
+                        
                         main_elements.append(Test_result_table)
-                        main_elements.append(Spacer(1, 20))
+                        main_elements.append(Spacer(1, 10))  # Reduced spacer after table
                         print(f"Table created with {len(table_data)} rows")
                     else:
                         print("Warning: No data rows were created for the table")
@@ -1000,6 +1044,12 @@ class ASTCTestReport(BaseTestReport):
                                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                                 ('PADDING', (0, 0), (-1, -1), 6),
                                 ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                                                          # Add these new styles for header rotation
+                                ('TEXTANGLE', (0, 0), (-1, 0), 90),  # Rotate header text 90 degrees
+                                ('TOPPADDING', (0, 0), (-1, 0), 35),  # Add extra padding for rotated text
+                                ('BOTTOMPADDING', (0, 0), (-1, 0), 35),  # Add extra padding for rotated text
+                                ('LEFTPADDING', (0, 0), (-1, 0), 4),  # Reduce left padding in header
+                                ('RIGHTPADDING', (0, 0), (-1, 0), 4),  # Reduce right padding in header
                             ]))
                             main_elements.append(Test_result_table)
                             main_elements.append(Spacer(1, 20))
@@ -1047,25 +1097,21 @@ class ASTCTestReport(BaseTestReport):
 
         # table_freqs = freq_series[mask].tolist()
         print(f'table_freqs: {freq_series.tolist()}')
-        print(f'ASTC_contour_final: {self.ASTC_contour_val}')
 
-
-        Ref_label = f'ASTC {self.ASTC_final_val} Contour'
-        ASTC_yAxis = 'Transmission Loss (dB)'
+        ASTCRef_label = f'ASTC {self.ASTC_final_val} Contour'
         Field_ASTC_label = 'Apparent Transmission Loss, ATL (dB)'
-        # Ensure all inputs are numpy arrays
         ASTC_plot_img = plot_curves(
             frequencies=freq_series.tolist(),
-            y_label=ASTC_yAxis,
+            y_label=Field_ASTC_label,
             ref_curve=self.ASTC_contour_val,
             field_curve=np.array(self.ATL_val),  # Use ATL_val instead of NR_val
-            ref_label=Ref_label,
+            ref_label=ASTCRef_label,
             field_label=Field_ASTC_label
         )
         # Create a flowable image that ReportLab can handle
         img = Image(ASTC_plot_img)
-        img.drawHeight = 400  # Adjust as needed
-        img.drawWidth = 500   # Adjust as needed
+        img.drawHeight = 400
+        img.drawWidth = 500
         main_elements.append(img)
         return main_elements
 
@@ -1194,8 +1240,10 @@ class NICTestReport(BaseTestReport):
                                 ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
                                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                                ('PADDING', (0, 0), (-1, -1), 6),
-                                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                                ('PADDING', (0, 1), (-1, -1), 2),  # Reduced padding for data rows
+                                ('BOTTOMPADDING', (0, 1), (-1, -1), 2),
+                                ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
                             ]))
                             main_elements.append(Test_result_table)
                             main_elements.append(Spacer(1, 20))
