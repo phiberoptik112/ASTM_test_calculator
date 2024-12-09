@@ -364,7 +364,7 @@ class BaseTestReport:
         print('Getting signatures')
         signatures = {
             'test_engineer': 'Jake Pfitsch',
-            'test_engineer_signature': 'images/signature.png',
+            'test_engineer_signature': './images/JPsignature.png',
             'test_date': 'November 27, 2024'
         }
         return signatures
@@ -573,17 +573,25 @@ class BaseTestReport:
             
             # Get and format test results table
             try:
-                # get_test_results returns a list of elements
                 test_results_elements = self.get_test_results()
                 print(f"Number of test result elements: {len(test_results_elements)}")
-                
-                # Extend main_elements with all elements from get_test_results
                 main_elements.extend(test_results_elements)
                 
             except Exception as e:
                 print(f"Error details: {str(e)}")
                 print(f"Test results type: {type(test_results_elements) if 'test_results_elements' in locals() else 'Not created'}")
                 raise ReportGenerationError(f"Error creating test results table: {str(e)}")
+
+            # Add single number result text box
+            try:
+                print('Adding single number result text box')
+                result_paragraph = self.get_single_number_result()
+                if result_paragraph:
+                    main_elements.append(Spacer(1, 5))  # Add space before the box
+                    main_elements.append(result_paragraph)
+                    main_elements.append(Spacer(1, 5))  # Add space after the box
+            except Exception as e:
+                print(f"Error adding single number result: {str(e)}")
 
             # Add table notes
             try:
@@ -613,6 +621,48 @@ class BaseTestReport:
         main_elements.extend(self.get_signatures())
         
         return main_elements
+
+    def get_single_number_result(self):
+        """Get the single number result text box based on test type"""
+        try:
+            # Get test result value based on test type
+            result_value = None
+            if hasattr(self.test_data, 'single_number_result'):
+                result_value = self.test_data.single_number_result
+            
+            # Format text based on test type
+            result_text = {
+                TestType.AIIC: f"AIIC {result_value}",
+                TestType.ASTC: f"ASTC {result_value}",
+                TestType.NIC: f"NIC {result_value}",
+                TestType.DTC: f"DTC {result_value}"
+            }.get(self.test_type)
+
+            if not result_text:
+                raise ValueError(f"Unsupported test type: {self.test_type}")
+
+            # Create paragraph style for large text
+            large_text_style = ParagraphStyle(
+                'LargeText',
+                parent=self.styles['Normal'],
+                fontSize=18,
+                alignment=1,  # Right alignment
+                spaceAfter=5,
+                spaceBefore=5,
+                borderWidth=3,
+                borderColor=colors.black,
+                borderPadding=7,
+                leftIndent=200,
+                rightIndent=200,
+                leading=24,
+                valighn='MIDDLE'
+            )
+
+            return Paragraph(result_text, large_text_style)
+
+        except Exception as e:
+            print(f"Error creating single number result: {str(e)}")
+            return None
 
 class AIICTestReport(BaseTestReport):
     def get_doc_name(self):
@@ -725,7 +775,7 @@ class AIICTestReport(BaseTestReport):
                     self.ISR_contour_val, self.ISR_contour_result = calc_AIIC_val_claude(self.ASTC_recieve_corr)
                 else:
                     raise ValueError("AIIC_Normalized_recieve is invalid or None")
-
+                self.test_data.single_number_result = self.AIIC_contour_val
                 # Process exceptions
                 self.AIIC_Exceptions = []
                 rec_roomvol = float(props['receive_vol'])
@@ -807,7 +857,7 @@ class AIICTestReport(BaseTestReport):
                         Test_result_table = Table(
                             table_data, 
                             colWidths=[65, 85, 65, 45, 45],  # Narrower columns
-                            rowHeights=[80] + [20]*(len(table_data)-1),  # Shorter rows overall
+                            rowHeights=[60] + [10]*(len(table_data)-1),  # Shorter rows overall
                             hAlign='LEFT'
                         )
                         
@@ -967,6 +1017,7 @@ class ASTCTestReport(BaseTestReport):
                     # Calculate ASTC value
                     self.ASTC_final_val = calc_astc_val(self.ATL_val)
                     print(f"ASTC calculation complete - final value: {self.ASTC_final_val}")
+                    self.test_data.single_number_result = self.ASTC_final_val
                     # Create ASTC contour based on final value
                     STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]
                     self.ASTC_contour_val = [val + self.ASTC_final_val for val in STCCurve]
@@ -1063,7 +1114,7 @@ class ASTCTestReport(BaseTestReport):
                             Test_result_table = Table(
                             table_data, 
                             colWidths=[65, 85, 65, 45, 45],  # Narrower columns
-                            rowHeights=[80] + [20]*(len(table_data)-1),  # Shorter rows overall
+                            rowHeights=[60] + [10]*(len(table_data)-1),  # Shorter rows overall
                             hAlign='LEFT'
                             )
                         
@@ -1207,6 +1258,7 @@ class NICTestReport(BaseTestReport):
                     # Calculate ASTC value
                     self.NIC_final_val = calc_astc_val(self.NR_val)
                     print(f"NIC calculation complete - final value: {self.NIC_final_val}")
+                    self.test_data.single_number_result = self.NIC_final_val
                     # Create ASTC contour based on final value
                     STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]
                     self.NIC_contour_val = [val + self.NIC_final_val for val in STCCurve]
@@ -1298,7 +1350,7 @@ class NICTestReport(BaseTestReport):
                             Test_result_table = Table(
                             table_data, 
                             colWidths=[65, 85, 65, 45, 45],  # Narrower columns
-                            rowHeights=[80] + [20]*(len(table_data)-1),  # Shorter rows overall
+                            rowHeights=[60] + [10]*(len(table_data)-1),  # Shorter rows overall
                             hAlign='LEFT'
                             )
                         
