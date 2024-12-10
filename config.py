@@ -119,19 +119,7 @@ LastLocalcalLIst = ["Apr 2024",
 "N/A",
 "N/A",
 "N/A"
-]
-
-test_instrumentation = pd.DataFrame(
-    {
-        "Equipment Type": Equip_type_list,
-        "Manufacturer": Manuf_list,
-        "Model Number": Model_numlist,
-        "Serial Number": Serial_numList,
-        "Last NIST Tracable Calibration": Last_NISTcal_list,
-        "Last Local Calibration" : LastLocalcalLIst
-    },
-        # index=[0]
-)    
+] 
 
 ## STATEMENT OF TEST RESULTS 
 statement_test_results_text =' STATEMENT OF TEST RESULTS: '

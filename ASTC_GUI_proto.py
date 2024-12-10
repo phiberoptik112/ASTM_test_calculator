@@ -125,7 +125,7 @@ class FileLoaderApp(App):
         layout.add_widget(self.slm_data_e_path)
 
         # Label for the fifth text entry box
-        layout.add_widget(Label(text='Excel Report per test Output Folder path: '))
+        layout.add_widget(Label(text='PDF Report per test Output Folder path: '))
 
         # Text Entry Box for the fifth path
         self.output_folder_path = TextInput(multiline=False, hint_text='Output Path')

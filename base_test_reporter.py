@@ -93,7 +93,7 @@ class BaseTestReport:
         print('Building header elements')
         props = vars(self.test_data.room_properties)
         elements.extend(self.get_report_title())
-        elements.append(Spacer(1, 10))
+        elements.append(Spacer(1, 5))
         print('Building left side data')
         
         # Convert all data to strings and wrap in Paragraphs where needed
@@ -118,16 +118,14 @@ class BaseTestReport:
         
         table_left.setStyle(TableStyle([
             ('GRID', (0, 0), (-1, -1), 1, colors.white),
-            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
-            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
             ('FONTNAME', (1, 0), (1, -1), 'Helvetica')
         ]))
         
         table_right.setStyle(TableStyle([
             ('GRID', (0, 0), (-1, -1), 1, colors.white),
-            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
-            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
             ('FONTNAME', (1, 0), (1, -1), 'Helvetica')
         ]))
@@ -153,6 +151,7 @@ class BaseTestReport:
     def header_footer(self, canvas, doc):
         canvas.saveState()
         print('Building header and footer')
+        
         # Build header
         canvas.setFont('Helvetica', 10)
         self.header_frame._leftPadding = self.header_frame._rightPadding = 0
@@ -161,12 +160,33 @@ class BaseTestReport:
         
         # Build footer
         canvas.setFont('Helvetica', 10)
-        footer_text = f"This page alone is not a complete report. Page {doc.page} of 4" ## hardcoded to 4 pages for now
+        footer_text = f"This page alone is not a complete report. Page {doc.page} of 4"
         canvas.drawCentredString(
             letter[0] / 2, 
             self.bottom_margin + self.footer_height / 2, 
             footer_text
         )
+        
+        # Draw address block in footer on right side
+        canvas.setFont('Helvetica', 8)  # Smaller font for address
+        address_lines = [
+            "970 N. Kalaheo Ave",
+            "Suite A311",
+            "Kailua, HI 96734",
+            "www.dlaa.com",
+            "808-254-3318x222"
+        ]
+        # Calculate position for right-aligned text block
+        line_height = 12  # Adjust spacing between lines
+        total_height = line_height * len(address_lines)
+        start_y = self.bottom_margin + self.footer_height - total_height
+        
+        # Draw each line of the address
+        for i, line in enumerate(address_lines):
+            text_width = canvas.stringWidth(line)
+            x = letter[0] - self.right_margin - text_width - 10  # Add 10pt padding from right
+            y = start_y + (i * line_height)
+            canvas.drawString(x, y, line)
         
         canvas.restoreState()
 
@@ -211,7 +231,7 @@ class BaseTestReport:
         main_elements.append(Paragraph('Determination of space-average sound pressure levels was performed via the manually scanned microphones techique, described in ' + standards_text[0][0] + ', Paragraph 11.4.3.3.'+ "The source room was selected in accordance with ASTM E336-11 Paragraph 9.2.5, which states that 'If a corridor must be used as one of the spaces for measurement of ATL or FTL, it shall be used as the source space.'"))
         main_elements.append(Spacer(1,10))
         main_elements.append(Paragraph("Flanking transmission was not evaluated."))
-        main_elements.append(Paragraph("To evaluate room absorption, 1 microphone was used to measure 4 decays at 4 locations around the receiving room for a total of 16 measurements, per"+standards_text[2][0]))
+        main_elements.append(Paragraph("To evaluate room absorption, 1 microphone was used to measure 4 decays at 4 locations around the receiving room for a total of 16 measurements, per "+standards_text[2][0]))
         print('>>>>>>>>> Test procedure retrieved <<<<<<<<<<')
         return main_elements
         
@@ -246,7 +266,8 @@ class BaseTestReport:
 
     def get_report_title(self, style=None):
         print('Getting report title for specific test')
-        style = style or self.custom_title_style
+        # style = style or self.custom_title_style
+        style = self.styleHeading
         title_by_type = {
             TestType.AIIC: [
                 Paragraph("<b>Field Impact Sound Transmission Test Report</b>", style),
@@ -487,15 +508,10 @@ class BaseTestReport:
             standards_table.setStyle(TableStyle([
                 ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.white),
                 ('BOX', (0, 0), (-1, -1), 0.25, colors.white),
-                ('LEFTPADDING', (0, 0), (-1, -1), 6),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT')
             ]))
             main_elements.append(standards_table)
-            main_elements.append(Spacer(1, 10))
             # Statement of conformance
             main_elements.append(Paragraph("<u>STATEMENT OF CONFORMANCE:</u>", self.styleHeading))
             conformance_statement = self.get_statement_of_conformance()
@@ -542,11 +558,38 @@ class BaseTestReport:
             main_elements.append(Paragraph("<u>TEST INSTRUMENTATION:</u>", self.styleHeading))
             
             instrumentation = self.get_test_instrumentation()
+
+            header_row = ["Equipment Type","Manufacturer","Model Number","Serial Number","Last NIST Traceable Calibration","Last Local Calibration"]
+            rotated_style = ParagraphStyle(
+                'RotatedHeader',
+                fontName='Helvetica-Bold',
+                fontSize=8,  # Slightly smaller font for headers
+                alignment=TA_CENTER,
+                textColor=colors.black,
+                leading=10  # Controls line spacing for multi-line text
+            )
+            rotated_headers = [
+                            Paragraph(f'<rotate>{text}</rotate>', rotated_style)
+                            for text in header_row
+                        ]
+            instrumentation[0] = rotated_headers
+
             if not instrumentation:
                 raise ValueError("Test instrumentation data is missing")
                 
-            test_instrumentation_table = Table(instrumentation, hAlign='LEFT')
+            test_instrumentation_table = Table(
+                instrumentation, 
+                rowHeights=[65] + [20]*(len(instrumentation)-1), 
+                hAlign='LEFT'
+            )
+
+
             test_instrumentation_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 8),  # Smaller font for header
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),  # Smaller font for data
                 ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
                 ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
                 ('LEFTPADDING', (0, 0), (-1, -1), 6),
@@ -618,6 +661,8 @@ class BaseTestReport:
         ## need to append a large text box with teh appropriate single number result from the test calc
         # #### sane here -single number result from the test calc
         main_elements.append(Spacer(1,10))
+        main_elements.append(self.get_single_number_result())
+        main_elements.append(Spacer(1,10))
         main_elements.extend(self.get_signatures())
         
         return main_elements
@@ -632,10 +677,10 @@ class BaseTestReport:
             
             # Format text based on test type
             result_text = {
-                TestType.AIIC: f"AIIC {result_value}",
-                TestType.ASTC: f"ASTC {result_value}",
-                TestType.NIC: f"NIC {result_value}",
-                TestType.DTC: f"DTC {result_value}"
+                TestType.AIIC: f"AIIC: {result_value}",
+                TestType.ASTC: f"ASTC: {result_value}",
+                TestType.NIC: f"NIC: {result_value}",
+                TestType.DTC: f"DTC: {result_value}"
             }.get(self.test_type)
 
             if not result_text:
@@ -669,13 +714,13 @@ class AIICTestReport(BaseTestReport):
         props = vars(self.test_data.room_properties)
         return f"{props['project_name']} AIIC Test Report_{props['test_label']}.pdf"
 
-    def get_standards_data(self):
-        return [
-            ['ASTM E1007-14', 'Standard Test Method for Field Measurement of Tapping Machine Impact Sound Transmission Through Floor-Ceiling Assemblies and Associated Support Structure'],
-            ['ASTM E413-16', 'Standard Classification for Rating Sound Insulation'],
-            ['ASTM E2235-04(2012)', 'Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods'],
-            ['ASTM E989-06(2012)', 'Standard Classification for Determination of Impact Insulation Class (IIC)']
-        ]
+    # def get_standards_data(self):
+    #     return [
+    #         ['ASTM E1007-14', 'Standard Test Method for Field Measurement of Tapping Machine Impact Sound Transmission Through Floor-Ceiling Assemblies and Associated Support Structure'],
+    #         ['ASTM E413-16', 'Standard Classification for Rating Sound Insulation'],
+    #         ['ASTM E2235-04(2012)', 'Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods'],
+    #         ['ASTM E989-06(2012)', 'Standard Classification for Determination of Impact Insulation Class (IIC)']
+    #     ]
     def get_statement_of_conformance(self):
         return "Testing was conducted in accordance with ASTM E1007-14, ASTM E413-16, ASTM E2235-04(2012), and ASTM E989-06(2012), with exceptions noted below. All requrements for measuring abd reporting Absorption Normalized Impact Sound Pressure Level (ANISPL) and Apparent Impact Insulation Class (AIIC) were met."
     
@@ -685,15 +730,12 @@ class AIICTestReport(BaseTestReport):
         print('-=-=-=-=-=-=-= Getting AIIC test environment-=-=-=-=-=-=-=-=-')
         main_elements.append(Paragraph("<u>TEST ENVIRONMENT:</u>", self.styleHeading))
         main_elements.append(Paragraph('The source room was '+props['source_room_name']+'. The space was'+props['source_room_finish']+'. The floor was '+props['srs_floor']+'. The ceiling was '+props['srs_ceiling']+". The walls were"+props['srs_walls']+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+props['source_vol']+"cu. ft."))
-        main_elements.append(Spacer(1, 10))  # Adds some space 
         ### Recieve room paragraph
         main_elements.append(Paragraph('The receiver room was '+props['receive_room_name']+'. The space was'+props['receive_room_finish']+'. The floor was '+props['rec_floor']+'. The ceiling was '+props['rec_ceiling']+". The walls were"+props['rec_walls']+". All doors and windows were closed during the testing period. The source room had a volume of approximately "+str(props['receive_vol'])+"cu. ft."))
-        main_elements.append(Spacer(1, 10))  # Adds some space 
         main_elements.append(Paragraph('The test assembly measured approximately '+props['partition_dim']+", and had an area of approximately "+str(props['partition_area'])+"sq. ft."))
-        main_elements.append(Spacer(1, 10))  # Adds some space 
+        main_elements.append(Spacer(1, 5))  # Adds some space 
         # Heading 'TEST ASSEMBLY'
         main_elements.append(Paragraph("<u>TEST ASSEMBLY:</u>", self.styleHeading))
-        main_elements.append(Spacer(1, 10))  # Adds some space 
         main_elements.append(Paragraph("The tested assembly was the "+props['test_assembly_type']+". The assembly was not field verified, and was based on information provided by the client and drawings for the project. The client advised that no slab treatment or self-leveling was applied. Results may vary if slab treatment or self-leveling or any adhesive is used in other installations."))
         return main_elements
 
@@ -701,7 +743,7 @@ class AIICTestReport(BaseTestReport):
         equipment = super().get_test_instrumentation()
         # Add AIIC-specific equipment
         aiic_equipment = [
-            ["Tapping Machine:", "Norsonics", "CAL200", "2775671", "9/19/2022", "N/A"],
+            ["Tapping Machine", "Norsonics", "CAL200", "2775671", "9/19/2022", "N/A"],
         ]
         return equipment + aiic_equipment
     
@@ -939,7 +981,7 @@ class AIICTestReport(BaseTestReport):
         )
         # Create a flowable image that ReportLab can handle
         img = Image(ASTC_plot_img)
-        img.drawHeight = 400
+        img.drawHeight = 300
         img.drawWidth = 500
         main_elements.append(img)
         return main_elements
@@ -949,12 +991,12 @@ class ASTCTestReport(BaseTestReport):
 
         props = vars(self.test_data.room_properties)
         return f"{props['project_name']} ASTC Test Report_{props['test_label']}.pdf"
-    def get_standards_data(self):
-        return [
-            ['ASTM E336-20', 'Standard Test Method for Measurement of Airborne Sound Attenuation between Rooms in Buildings'],
-            ['ASTM E413-16', 'Standard Classification for Rating Sound Insulation'],
-            ['ASTM E2235-04(2012)', 'Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods']
-        ]
+    # def get_standards_data(self):
+    #     return [
+    #         ['ASTM E336-20', 'Standard Test Method for Measurement of Airborne Sound Attenuation between Rooms in Buildings'],
+    #         ['ASTM E413-16', 'Standard Classification for Rating Sound Insulation'],
+    #         ['ASTM E2235-04(2012)', 'Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods']
+    #     ]
     def get_test_instrumentation(self):
         equipment = super().get_test_instrumentation()
         # Add ASTC-specific equipment
@@ -1010,16 +1052,19 @@ class ASTCTestReport(BaseTestReport):
                 try:
                     # Define standard frequencies - ensure length matches data
                     frequencies = [125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150]
+                    # need to add back in 4k at some point ##
                     
                     # Ensure STCCurve matches our data length
                     STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]  # Length 15
-                    
+                    # will have to change this to 4k at some point ## - extra 4 on the end
+                    # 4k code
+                    # STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]  # Length 16
+
                     # Calculate ASTC value
                     self.ASTC_final_val = calc_astc_val(self.ATL_val)
                     print(f"ASTC calculation complete - final value: {self.ASTC_final_val}")
                     self.test_data.single_number_result = self.ASTC_final_val
                     # Create ASTC contour based on final value
-                    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]
                     self.ASTC_contour_val = [val + self.ASTC_final_val for val in STCCurve]
 
                     if self.NR_val is not None and self.ASTC_recieve_corr is not None:
@@ -1113,7 +1158,7 @@ class ASTCTestReport(BaseTestReport):
                         # Create and style the table with adjusted dimensions
                             Test_result_table = Table(
                             table_data, 
-                            colWidths=[65, 85, 65, 45, 45],  # Narrower columns
+                            colWidths=[65, 85, 65, 45, 65],  # Narrower columns
                             rowHeights=[60] + [10]*(len(table_data)-1),  # Shorter rows overall
                             hAlign='LEFT'
                             )
@@ -1197,7 +1242,7 @@ class ASTCTestReport(BaseTestReport):
         )
         # Create a flowable image that ReportLab can handle
         img = Image(ASTC_plot_img)
-        img.drawHeight = 400
+        img.drawHeight = 300
         img.drawWidth = 500
         main_elements.append(img)
         return main_elements
@@ -1218,7 +1263,7 @@ class NICTestReport(BaseTestReport):
     # Implement other methods as needed
     def get_test_procedure(self):
         return super().get_test_procedure()
-
+ 
     def get_test_instrumentation(self):
         return super().get_test_instrumentation()
 
@@ -1254,13 +1299,14 @@ class NICTestReport(BaseTestReport):
                     
                     # Ensure STCCurve matches our data length
                     STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]  # Length 15
-                    
+                    # 4k code
+                    # STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]  # Length 16
                     # Calculate ASTC value
                     self.NIC_final_val = calc_astc_val(self.NR_val)
                     print(f"NIC calculation complete - final value: {self.NIC_final_val}")
                     self.test_data.single_number_result = self.NIC_final_val
                     # Create ASTC contour based on final value
-                    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]
+
                     self.NIC_contour_val = [val + self.NIC_final_val for val in STCCurve]
 
                     if self.NR_val is not None and self.ASTC_recieve_corr is not None:
@@ -1432,7 +1478,7 @@ class NICTestReport(BaseTestReport):
         )
         # Create a flowable image that ReportLab can handle
         img = Image(NIC_plot_img)
-        img.drawHeight = 400
+        img.drawHeight = 300
         img.drawWidth = 500
         main_elements.append(img)
         return main_elements
