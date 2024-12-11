@@ -181,11 +181,14 @@ def extract_sound_levels(slm_data: pd.DataFrame,
 
 
 def calculate_onethird_Logavg(average_pos):
-    if isinstance(average_pos, pd.DataFrame):
-        average_pos = average_pos.values
+    # Convert list of position arrays to numpy array for easier manipulation
+    pos_array = np.array(average_pos)
+    # Transpose to get frequency bins as first dimension
+    pos_array = pos_array.T
+    
     onethird_rec_Total = []
-    for i in range(len(average_pos)):
-        freqbin = average_pos[i]
+    # Now iterate over frequency bins
+    for freqbin in pos_array:
         total = 0
         count = 0
         for val in freqbin:
@@ -197,6 +200,7 @@ def calculate_onethird_Logavg(average_pos):
             onethird_rec_Total.append(10 * np.log10(average))
         else:
             onethird_rec_Total.append(np.nan)
+            
     onethird_rec_Total = np.round(onethird_rec_Total, 1)
     return onethird_rec_Total
 
@@ -332,8 +336,8 @@ def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd
                 print("\nDebug - After correction:")
                 print(f"AIIC_recieve_corr: {AIIC_recieve_corr}")
                 
-                # Ensure sabines is a numpy array of float64
-                sabines = np.array(sabines, dtype=np.float64)
+                # Ensure sabines is a numpy array of float64 and rounded to 1 decimal place
+                sabines = np.array(sabines, dtype=np.float64).round(0)
                 
                 # Check for invalid values in sabines
                 if np.any(sabines <= 0):
@@ -342,11 +346,12 @@ def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd
                 # Calculate normalized receive
                 scaling = 10 * np.log10(108/sabines)
                 AIIC_Normalized_recieve = AIIC_recieve_corr - scaling
-                AIIC_Normalized_recieve = np.round(AIIC_Normalized_recieve)
+                AIIC_Normalized_recieve = np.round(AIIC_Normalized_recieve, decimals=1)
                 
                 print("\nDebug - Final normalized values:")
                 print(f"Scaling: {scaling}")
                 print(f"AIIC_Normalized_recieve: {AIIC_Normalized_recieve}")
+                print("sabines: ",sabines)
                 
             except Exception as e:
                 print(f"\nDetailed error in AIIC processing:")
@@ -542,7 +547,7 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=False):
     Normalized_recieve_IIC = np.array(Normalized_recieve_IIC)
     Normalized_recieve_IIC = np.round(Normalized_recieve_IIC,1)
     Normalized_recieve_IIC = Normalized_recieve_IIC[1:14] # values from 125-3150 (not including 4khz)
-    # print('Normalized recieve ANISPL: ', Normalized_recieve_IIC)
+    print('Normalized recieve ANISPL: ', Normalized_recieve_IIC)
     # print('length of normalized recieve: ',len(Normalized_recieve_IIC))
     # print('length of IIC contour: ',len(IIC_contour))
     # Contour_curve_result = IIC_contour - Normalized_recieve_IIC
@@ -550,45 +555,40 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=False):
     Contour_curve_result =  Normalized_recieve_IIC - IIC_contour
     Contour_curve_result = np.round(Contour_curve_result,1)
     
-    # print('Contour curve: ', Contour_curve_result)
+    print('Contour curve: ', Contour_curve_result)
+    # Debug 315Hz bin (index 4)
+    # print("\nDebugging 315Hz in AIIC calculation:")
+    # print(f"315Hz Normalized input: {Normalized_recieve_IIC[4]}")
+    # print(f"315Hz IIC contour value: {IIC_contour[4]}")
+    
     while (diff_negative_max < 8 and new_sum < 32 and iteration_count < max_iterations):
         if verbose:
-            print(f"Iteration {iteration_count}:")
-            # print(f"  AIIC_contour_val: {AIIC_contour_val}")
-            # print(f"  diff_negative_max: {diff_negative_max}")
-            # print(f"  new_sum: {new_sum}")
-        # print('Inside loop, current AIIC contour: ', AIIC_contour_val)
-        # print('Contour curve (IIC curve minus ANISPL): ', Contour_curve_result)
+            print(f"\nIteration {iteration_count}:")
+            print(f"AIIC_contour_val: {AIIC_contour_val}")
+            print(f"Max difference: {diff_negative_max}")
+            print(f"Sum of positive differences: {new_sum}")
+            print(f"Current contour: {IIC_contour}")
+            # print(f"315Hz Difference: {diff_negative[4]}")
+            # print(f"315Hz Positive diff: {pos_diffs[4]}")
         
         diff_negative = Normalized_recieve_IIC - IIC_contour
-        # print('diff negative: ', diff_negative)
         diff_negative_max = np.max(diff_negative)
         diff_negative = pd.to_numeric(diff_negative, errors='coerce')
         diff_negative = np.array(diff_negative)
-        # print('Max, single diff: ', diff_negative_max)
-        pos_diffs = [np.round(val,1) if val > 0 else 0 for val in diff_negative]
-        # print('positive diffs: ', pos_diffs)
-        new_sum = np.sum(pos_diffs)
-        # ipdb.set_trace()   ### debugging 
         
-        # print('Sum Positive diffs: ', new_sum)
-        # print('Evaluating sums and differences vs 32, 8: ', new_sum, diff_negative_max)
+        pos_diffs = [np.round(val,1) if val > 0 else 0 for val in diff_negative]
+        new_sum = np.sum(pos_diffs)
         
         if new_sum > 32 or diff_negative_max > 8:
             print('Difference condition met! AIIC value: ', AIIC_contour_val)
             print('AIIC result curve: ', Contour_curve_result)
             return AIIC_contour_val, Contour_curve_result
         else:
-            # print('difference condition not met, subtracting 1 from AIIC start and recalculating the IIC contour')
             AIIC_start -= 1
-            # print('new AIIC start: ', AIIC_start)
             AIIC_contour_val += 1
-            # print('AIIC contour value: ', AIIC_contour_val)
             IIC_contour = [vals + AIIC_start for vals in IIC_curve]
-            # print('IIC contour: ', IIC_contour)
             
             Contour_curve_result =  Normalized_recieve_IIC - IIC_contour
-            # print('Contour curve result: ', Contour_curve_result)
             
             iteration_count += 1
 
@@ -597,11 +597,8 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=False):
     else:
         print("Loop completed without meeting conditions. Returning last calculated values.")
     print(f"Loop exited. Final values:")
-    # print(f"  diff_negative_max: {diff_negative_max}")
-    # print(f"  new_sum: {new_sum}")
     print(f"  iterations: {iteration_count}")
     print('Contour curve (IIC curve minus ANISPL): ', Contour_curve_result)
-    # print('IIC contour value: ', AIIC_contour_val)
 
 
     return AIIC_contour_val, Contour_curve_result

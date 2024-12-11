@@ -11,10 +11,10 @@ from data_processor import *
 
 class BaseTestReport:
     def __init__(self, test_data, reportOutputfolder, test_type):
-        print(f"Debug: BaseTestReport initialization:")
-        print(f"- Test data type: {type(test_data)}")
-        print(f"- Test data attributes: {dir(test_data)}")
-        print(f"- Has room_properties: {hasattr(test_data, 'room_properties')}")
+        # print(f"Debug: BaseTestReport initialization:")
+        # print(f"- Test data type: {type(test_data)}")
+        # print(f"- Test data attributes: {dir(test_data)}")
+        # print(f"- Has room_properties: {hasattr(test_data, 'room_properties')}")
 
         self.test_data = test_data
         self.reportOutputfolder = reportOutputfolder
@@ -35,13 +35,13 @@ class BaseTestReport:
         """Setup the document template with proper frames and margins"""
         try:
             print('-=-=-=-=- INSIDE DOCUMENT SETUP =-=-=-=-=-=-')
-            print(f"Test Type: {self.test_type}")
-            print(f"Output Folder: {self.reportOutputfolder}")
-            print(f"Room Properties: {vars(self.test_data.room_properties)}")  # Print all properties
+            # print(f"Test Type: {self.test_type}")
+            # print(f"Output Folder: {self.reportOutputfolder}")
+            # print(f"Room Properties: {vars(self.test_data.room_properties)}")  # Print all properties
 
             # Create output path
             output_path = Path(self.reportOutputfolder) / self.get_doc_name()
-            print(f'Output path: {output_path}')
+            # print(f'Output path: {output_path}')
             self.doc = BaseDocTemplate(
                 str(output_path),  # Convert Path to string
                 pagesize=letter,
@@ -50,7 +50,7 @@ class BaseTestReport:
                 topMargin=self.top_margin, 
                 bottomMargin=self.bottom_margin
             )
-            print('Base Document Template created')
+            # print('Base Document Template created')
             # Define frames
             self.header_frame = Frame(
                 self.left_margin, 
@@ -298,7 +298,7 @@ class BaseTestReport:
         return NICreporting_Note
     
     def get_doc_name(self):
-        print('Getting doc name')
+        # print('Getting doc name')
         props = vars(self.test_data.room_properties)  # Convert to dictionary
         return f'{props["project_name"]} {self.test_type.value} Test Report_{props["test_label"]}.pdf'
 
@@ -310,9 +310,9 @@ class BaseTestReport:
             main_elements = []
             
             # Debug print
-            print('Debug: Room properties:')
-            for key, value in props.items():
-                print(f"{key}: {type(value)} = {value}")
+            # print('Debug: Room properties:')
+            # for key, value in props.items():
+            #     print(f"{key}: {type(value)} = {value}")
 
             # Helper function to safely handle string conversion
             def safe_str(value):
@@ -427,7 +427,7 @@ class BaseTestReport:
                                   report.create_second_page,
                                   report.create_third_page,
                                   report.create_fourth_page]:
-                    print(f'Creating {page_method.__name__}')
+                    # print(f'Creating {page_method.__name__}')
                     page_elements = page_method()
                     
                     # Validate elements
@@ -456,7 +456,7 @@ class BaseTestReport:
             try:
                 # Build and save document
                 output_path = output_dir / report.get_doc_name()
-                print(f"Building document with {len(main_elements)} elements")
+                # print(f"Building document with {len(main_elements)} elements")
                 
                 # Remove the last PageBreak if it exists
                 if main_elements and isinstance(main_elements[-1], PageBreak):
@@ -493,7 +493,7 @@ class BaseTestReport:
         """
         try:
             main_elements = []
-            print('Creating standards section')
+            # print('Creating standards section')
             # Standards section
             self.styleHeading = ParagraphStyle('heading', parent=self.styles['Normal'], spaceAfter=10)
 
@@ -755,11 +755,18 @@ class AIICTestReport(BaseTestReport):
         try:
             # Initial data loading with explicit slicing
             freq_indices = slice(1, 16)
+            # Convert to numpy arrays first, then round
             onethird_srs = format_SLMdata(self.test_data.srs_data)[freq_indices]
-            onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
-            self.onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)[freq_indices]
-            rt_thirty = self.test_data.rt['Unnamed: 10'][25:40]/1000
+            onethird_srs = np.array(onethird_srs, dtype=np.float64).round(1)
 
+            onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
+            onethird_rec = np.array(onethird_rec, dtype=np.float64).round(1)
+
+            self.onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)[freq_indices]
+            self.onethird_bkgrd = np.array(self.onethird_bkgrd, dtype=np.float64).round(1)
+
+            rt_thirty = self.test_data.rt['Unnamed: 10'][25:40]/1000  ## need to ensure this pulls from 100-3150 when moving to 100hz calculations
+            rt_thirty = np.array(rt_thirty, dtype=np.float64).round(3) ## looks like rounding this number to 1 screws up sabines calculations
             # Debug input shapes
             print("\nInput shapes:")
             print(f"Background: {self.onethird_bkgrd.shape}")
@@ -780,7 +787,8 @@ class AIICTestReport(BaseTestReport):
                 if positions[i] is not None:
                     try:
                         pos_data = format_SLMdata(positions[i])[freq_indices]
-                        if pos_data is not None and len(pos_data) == 15:  # Validate length
+                        pos_data = np.array(pos_data, dtype=np.float64).round(1)
+                        if pos_data is not None and len(pos_data) == 15:
                             average_pos.append(pos_data)
                         else:
                             print(f"Warning: Position {i} data invalid or wrong length")
@@ -791,7 +799,8 @@ class AIICTestReport(BaseTestReport):
                 raise ValueError("No valid position data could be processed")
 
             # Calculate mean of positions and ensure numpy array
-            onethird_rec_Total = np.array(np.mean(average_pos, axis=0), dtype=np.float64)
+            # onethird_rec_Total = np.array(np.mean(average_pos, axis=0), dtype=np.float64)
+            onethird_rec_Total = np.array(calculate_onethird_Logavg(average_pos), dtype=np.float64)
             # print(f'AIIC onethird_rec_Total: {onethird_rec_Total}')
             # Calculate NR and related values
             try:
@@ -808,12 +817,14 @@ class AIICTestReport(BaseTestReport):
                 self.NR_val, _, self.sabines, self.AIIC_recieve_corr, self.ASTC_recieve_corr, self.AIIC_Normalized_recieve = NR_results
                 
                 print("\nCalculation results:")
+                print(f"AIIC normalized recieve: {self.AIIC_Normalized_recieve}")
                 print(f"NR_val type: {type(self.NR_val)}, shape: {getattr(self.NR_val, 'shape', 'no shape')}")
                 print(f"AIIC_Normalized_recieve type: {type(self.AIIC_Normalized_recieve)}, shape: {getattr(self.AIIC_Normalized_recieve, 'shape', 'no shape')}")
 
                 # Only proceed with contour calculations if AIIC_Normalized_recieve is valid
                 if self.AIIC_Normalized_recieve is not None and isinstance(self.AIIC_Normalized_recieve, np.ndarray):
                     self.AIIC_contour_val, self.Contour_curve_result = calc_AIIC_val_claude(self.AIIC_Normalized_recieve)
+                    
                     self.ISR_contour_val, self.ISR_contour_result = calc_AIIC_val_claude(self.ASTC_recieve_corr)
                 else:
                     raise ValueError("AIIC_Normalized_recieve is invalid or None")
@@ -945,7 +956,7 @@ class AIICTestReport(BaseTestReport):
         return "The results stated in this report represent only the specific construction and acoustical conditions present at the time of the test. Measurements performed in accordance with this test method on nominally identical constructions and acoustical conditions may produce different results."
     def get_test_results_paragraph(self): 
         return (
-            f"The Apparent Impact Insulation Class (AIIC) of {self.AIIC_contour_val} was calculated. The AIIC rating is based on Absorption Normalized Impact Sound Pressure Level (ANISPL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been “fit” to the Absorption Normalized Impact Sound Pressure Level values, in accordance with the procedure of "+standards_text[0][0]
+            f"The Apparent Impact Insulation Class (AIIC) of {self.AIIC_contour_val} was calculated. The AIIC rating is based on Absorption Normalized Impact Sound Pressure Level (ANISPL), and includes the effects of noise flanking. The AIIC reference contour is shown on the next page, and has been fit to the Absorption Normalized Impact Sound Pressure Level values, in accordance with the procedure of "+standards_text[0][0]
         )
     def get_results_plot(self):
         main_elements = []
@@ -963,7 +974,7 @@ class AIICTestReport(BaseTestReport):
                                1000, 1250, 1600, 2000, 2500, 3150])
         
         print(f'table_freqs: {freq_series.tolist()}')
-        print(f'ASTC_contour_final: {IIC_contour_final}')
+        print(f'IIC_contour_final: {IIC_contour_final}')
         
         Ref_label = f'AIIC {self.AIIC_contour_val} Contour'
         
@@ -1214,7 +1225,7 @@ class ASTCTestReport(BaseTestReport):
     
     def get_test_results_paragraph(self):
         return (
-            f"The Apparent Sound Transmission Class (ASTC) of {self.ASTC_final_val} was calculated. The ASTC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The ASTC reference contour is shown on the next page, and has been “fit” to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_text[0][0]
+            f"The Apparent Sound Transmission Class (ASTC) of {self.ASTC_final_val} was calculated. The ASTC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The ASTC reference contour is shown on the next page, and has been fit to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_text[0][0]
         )
     def get_test_results_table_notes(self):
         return "The results stated in this report represent only the specific construction and acoustical conditions present at the time of the test. Measurements performed in accordance with this test method on nominally identical constructions and acoustical conditions may produce different results."
@@ -1296,6 +1307,8 @@ class NICTestReport(BaseTestReport):
                 try:
                     # Define standard frequencies - ensure length matches data
                     frequencies = [125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150]
+                    ## need to add 4k data here 
+                    # frequencies = frequencies.append(pd.Series([4000]))
                     
                     # Ensure STCCurve matches our data length
                     STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]  # Length 15
@@ -1451,7 +1464,7 @@ class NICTestReport(BaseTestReport):
         return "The results stated in this report represent only the specific construction and acoustical conditions present at the time of the test. Measurements performed in accordance with this test method on nominally identical constructions and acoustical conditions may produce different results."
     def get_test_results_paragraph(self):
         return (
-            f"The Noise Isolation Class (NIC) of {self.NIC_final_val} was calculated. The NIC rating is based on Noise Reduction (NR), and includes the effects of noise flanking. The NIC reference contour is shown on the next page, and has been “fit” to the Noise Reduction values, in accordance with the procedure of "+standards_text[0][0]
+            f"The Noise Isolation Class (NIC) of {self.NIC_final_val} was calculated. The NIC rating is based on Noise Reduction (NR), and includes the effects of noise flanking. The NIC reference contour is shown on the next page, and has been fit to the Noise Reduction values, in accordance with the procedure of "+standards_text[0][0]
         )
 
     def get_results_plot(self):
@@ -1462,6 +1475,8 @@ class NICTestReport(BaseTestReport):
             # Define frequencies
         freq_series = pd.Series([125, 160, 200, 250, 315, 400, 500, 630, 800, 
                                 1000, 1250, 1600, 2000, 2500, 3150])
+        ## need to add 4k data here 
+        # freq_series = freq_series.append(pd.Series([4000]))
 
         # table_freqs = freq_series[mask].tolist()
         print(f'table_freqs: {freq_series.tolist()}')
