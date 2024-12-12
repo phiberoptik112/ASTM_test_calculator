@@ -751,28 +751,30 @@ class AIICTestReport(BaseTestReport):
         print('-=-=-=-=-=-=-= Getting AIIC test results-=-=-=-=-=-=-=-=-')
         props = vars(self.test_data.room_properties)
         main_elements = []
-        frequencies = [125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150]
+        frequencies = [100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150]
         try:
             # Initial data loading with explicit slicing
-            freq_indices = slice(1, 16)
+            freq_indices = slice(0, 16)
             # Convert to numpy arrays first, then round
+            print('__________PULLING RAW DATA__________')
             onethird_srs = format_SLMdata(self.test_data.srs_data)[freq_indices]
             onethird_srs = np.array(onethird_srs, dtype=np.float64).round(1)
-
+            print("srs data: ", onethird_srs)
             onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
             onethird_rec = np.array(onethird_rec, dtype=np.float64).round(1)
-
+            print("rec data: ", onethird_rec)
             self.onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)[freq_indices]
             self.onethird_bkgrd = np.array(self.onethird_bkgrd, dtype=np.float64).round(1)
-
-            rt_thirty = self.test_data.rt['Unnamed: 10'][25:40]/1000  ## need to ensure this pulls from 100-3150 when moving to 100hz calculations
+            print("bkgrd data: ", self.onethird_bkgrd)
+            rt_thirty = self.test_data.rt['Unnamed: 10'][24:40]/1000  ## need to ensure this pulls from 100-3150 when moving to 100hz calculations
             rt_thirty = np.array(rt_thirty, dtype=np.float64).round(3) ## looks like rounding this number to 1 screws up sabines calculations
+            print(f'rt_thirty vals: {rt_thirty}')
             # Debug input shapes
             print("\nInput shapes:")
             print(f"Background: {self.onethird_bkgrd.shape}")
-            print(f"RT thirty: {rt_thirty.shape}")
-            print(f'rt_thirty vals: {rt_thirty}')
-            print(f"Source: {onethird_srs.shape}")
+            print(f"RT thirty shape: {rt_thirty.shape}")
+            print(f"Source shape: {onethird_srs.shape}")
+            print(f"Recieve shape: {onethird_rec.shape}")
 
             # Process tapping positions with validation
             positions = {
@@ -788,7 +790,7 @@ class AIICTestReport(BaseTestReport):
                     try:
                         pos_data = format_SLMdata(positions[i])[freq_indices]
                         pos_data = np.array(pos_data, dtype=np.float64).round(1)
-                        if pos_data is not None and len(pos_data) == 15:
+                        if pos_data is not None and len(pos_data) == 16:
                             average_pos.append(pos_data)
                         else:
                             print(f"Warning: Position {i} data invalid or wrong length")
@@ -801,6 +803,7 @@ class AIICTestReport(BaseTestReport):
             # Calculate mean of positions and ensure numpy array
             # onethird_rec_Total = np.array(np.mean(average_pos, axis=0), dtype=np.float64)
             onethird_rec_Total = np.array(calculate_onethird_Logavg(average_pos), dtype=np.float64)
+            print(f'AIIC onethird_rec_Total: {onethird_rec_Total}')
             # print(f'AIIC onethird_rec_Total: {onethird_rec_Total}')
             # Calculate NR and related values
             print("-=-=-=-=-=-=-= Calculating NR -=-=-=-=-=-=-=-")
@@ -964,7 +967,7 @@ class AIICTestReport(BaseTestReport):
     def get_results_plot(self):
         main_elements = []
 
-        IIC_curve = [2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
+        IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
         IIC_contour_final = list()
         # initial application of the IIC curve to the first AIIC start value 
         for vals in IIC_curve:
@@ -974,7 +977,7 @@ class AIICTestReport(BaseTestReport):
         
         # Define the target frequency range (125Hz to 3150Hz) - removed 4000Hz
         # need to add in 100hz
-        freq_series = pd.Series([125, 160, 200, 250, 315, 400, 500, 630, 800, 
+        freq_series = pd.Series([100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 
                                1000, 1250, 1600, 2000, 2500, 3150])
         
         print(f'table_freqs: {freq_series.tolist()}')
@@ -1027,16 +1030,35 @@ class ASTCTestReport(BaseTestReport):
             print('-=-=-=-=-=-=-= Getting ASTC test results-=-=-=-=-=-=-=-=-')
             props = vars(self.test_data.room_properties)
             main_elements = []
-            
-            # Initial data loading and slicing - all length 15
-            freq_indices = slice(1, 16)
-            onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
-            onethird_srs = format_SLMdata(self.test_data.srs_data)[freq_indices]
-            onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)[freq_indices]
-            ##### RT 30 is 41 for 4k data 
-            rt_thirty = self.test_data.rt['Unnamed: 10'][25:40]/1000### MAKE SURE THIS CHANGES TO 4k for later changes 
+                                
+            # Ensure STCCurve matches our data length
+            # STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]  # Length 15
+            # will have to change this to 4k at some point ## - extra 4 on the end
+            # 4k code
+            STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4]  # Length 17
 
+            # Define standard frequencies - ensure length matches data
+            frequencies = [100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
+            # need to add back in 4k at some point ##
+            # Initial data loading and slicing - all length 16
+            print('__________PULLING RAW DATA__________')
+            freq_indices = slice(0, 17)
+            onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
+            print(f'onethird_rec: {onethird_rec}')
+            onethird_srs = format_SLMdata(self.test_data.srs_data)[freq_indices]
+            print(f'onethird_srs: {onethird_srs}')
+            onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)[freq_indices]
+            print(f'onethird_bkgrd: {onethird_bkgrd}')
+            ##### RT 30 is 41 for 4k data 
+            rt_thirty = self.test_data.rt['Unnamed: 10'][24:41]/1000### MAKE SURE THIS CHANGES TO 4k for later changes 
+            print(f'rt_thirty: {rt_thirty}')
             # Calculate ATL first
+            print("\nInput shapes:")
+            print(f"Background: {onethird_bkgrd.shape}")
+            print(f"RT thirty shape: {rt_thirty.shape}")
+            print(f"Source shape: {onethird_srs.shape}")
+            print(f"Recieve shape: {onethird_rec.shape}")
+            print('__________CALCULATING ATL__________')
             try:
                 self.ATL_val, self.sabines = calc_atl_val(
                     onethird_srs, 
@@ -1053,6 +1075,7 @@ class ASTCTestReport(BaseTestReport):
                 raise
 
             # Calculate NR with same arrays
+            print('__________CALCULATING NR__________')
             try:
                 self.NR_val, _, self.sabines, _, self.ASTC_recieve_corr, _ = calc_NR_new(
                     srs_overalloct=onethird_srs,
@@ -1064,17 +1087,8 @@ class ASTCTestReport(BaseTestReport):
                 )
 
                 # Calculate ASTC - Fixed array length handling
+                print('__________CALCULATING ASTC__________')
                 try:
-                    # Define standard frequencies - ensure length matches data
-                    frequencies = [125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150]
-                    # need to add back in 4k at some point ##
-                    
-                    # Ensure STCCurve matches our data length
-                    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]  # Length 15
-                    # will have to change this to 4k at some point ## - extra 4 on the end
-                    # 4k code
-                    # STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]  # Length 16
-
                     # Calculate ASTC value
                     self.ASTC_final_val = calc_astc_val(self.ATL_val)
                     print(f"ASTC calculation complete - final value: {self.ASTC_final_val}")
@@ -1239,8 +1253,8 @@ class ASTCTestReport(BaseTestReport):
         main_elements = []
 
             # Define frequencies
-        freq_series = pd.Series([125, 160, 200, 250, 315, 400, 500, 630, 800, 
-                                1000, 1250, 1600, 2000, 2500, 3150])
+        freq_series = pd.Series([100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 
+                                1000, 1250, 1600, 2000, 2500, 3150, 4000])
 
         # table_freqs = freq_series[mask].tolist()
         print(f'table_freqs: {freq_series.tolist()}')
@@ -1290,12 +1304,12 @@ class NICTestReport(BaseTestReport):
 
             ## obtain SLM data from overall dataframe
             ## need to convert all of this to use the dataclasses and the data_processor.py functions 
-            freq_indices = slice(1, 16)
+            freq_indices = slice(0, 17)
             onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
             onethird_srs = format_SLMdata(self.test_data.srs_data)[freq_indices]
             onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)[freq_indices]
             ##### RT 30 is 41 for 4k data 
-            rt_thirty = self.test_data.rt['Unnamed: 10'][25:40]/1000 ### MAKE SURE THIS CHANGES TO 4k for later changes 
+            rt_thirty = self.test_data.rt['Unnamed: 10'][24:41]/1000 ### MAKE SURE THIS CHANGES TO 4k for later changes 
         # Calculate NR with same arrays
             try:
                 self.NR_val, _, self.sabines, _, self.ASTC_recieve_corr, _ = calc_NR_new(
@@ -1310,14 +1324,13 @@ class NICTestReport(BaseTestReport):
                 # Calculate ASTC - Fixed array length handling
                 try:
                     # Define standard frequencies - ensure length matches data
-                    frequencies = [125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150]
+                    frequencies = [100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
                     ## need to add 4k data here 
                     # frequencies = frequencies.append(pd.Series([4000]))
                     
                     # Ensure STCCurve matches our data length
-                    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]  # Length 15
                     # 4k code
-                    # STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]  # Length 16
+                    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4]  # Length 17
                     # Calculate ASTC value
                     self.NIC_final_val = calc_astc_val(self.NR_val)
                     print(f"NIC calculation complete - final value: {self.NIC_final_val}")
@@ -1477,8 +1490,8 @@ class NICTestReport(BaseTestReport):
         main_elements = []
 
             # Define frequencies
-        freq_series = pd.Series([125, 160, 200, 250, 315, 400, 500, 630, 800, 
-                                1000, 1250, 1600, 2000, 2500, 3150])
+        freq_series = pd.Series([100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 
+                                1000, 1250, 1600, 2000, 2500, 3150, 4000])
         ## need to add 4k data here 
         # freq_series = freq_series.append(pd.Series([4000]))
 
