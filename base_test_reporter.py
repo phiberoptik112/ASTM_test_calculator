@@ -803,6 +803,7 @@ class AIICTestReport(BaseTestReport):
             onethird_rec_Total = np.array(calculate_onethird_Logavg(average_pos), dtype=np.float64)
             # print(f'AIIC onethird_rec_Total: {onethird_rec_Total}')
             # Calculate NR and related values
+            print("-=-=-=-=-=-=-= Calculating NR -=-=-=-=-=-=-=-")
             try:
                 NR_results = calc_NR_new(
                     srs_overalloct=onethird_srs,
@@ -823,8 +824,9 @@ class AIICTestReport(BaseTestReport):
 
                 # Only proceed with contour calculations if AIIC_Normalized_recieve is valid
                 if self.AIIC_Normalized_recieve is not None and isinstance(self.AIIC_Normalized_recieve, np.ndarray):
+                    print("-=-=-=-=-=-=-= Calculating AIIC contour -=-=-=-=-=-=-=-")
                     self.AIIC_contour_val, self.Contour_curve_result = calc_AIIC_val_claude(self.AIIC_Normalized_recieve)
-                    
+                    print("-=-=-=-=-=-=-= Calculating ISR contour -=-=-=-=-=-=-=-")
                     self.ISR_contour_val, self.ISR_contour_result = calc_AIIC_val_claude(self.ASTC_recieve_corr)
                 else:
                     raise ValueError("AIIC_Normalized_recieve is invalid or None")
@@ -832,6 +834,7 @@ class AIICTestReport(BaseTestReport):
                 # Process exceptions
                 self.AIIC_Exceptions = []
                 rec_roomvol = float(props['receive_vol'])
+                print(f"rec_roomvol: {rec_roomvol}")
                 for val in self.sabines:
                     self.AIIC_Exceptions.append('0' if val > 2*(rec_roomvol**(2/3)) else '1')
 
@@ -970,6 +973,7 @@ class AIICTestReport(BaseTestReport):
         # IIC_contour_final = [val + self.ASTC_final_val for val in IIC_curve]
         
         # Define the target frequency range (125Hz to 3150Hz) - removed 4000Hz
+        # need to add in 100hz
         freq_series = pd.Series([125, 160, 200, 250, 315, 400, 500, 630, 800, 
                                1000, 1250, 1600, 2000, 2500, 3150])
         

@@ -537,7 +537,7 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=False):
     diff_negative_max = 0
     # IIC_curve = [2,2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
     # shorening curve for properly representing the frq bands used, not using 63hz, 4 and 5khz
-    IIC_curve = [2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12]
+    IIC_curve = [2,2,2,2,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18]
     max_iterations = 100  # Maximum number of iterations to prevent infinite loop
     iteration_count = 0
     # initial application of the IIC curve to the first AIIC start value 
@@ -546,7 +546,7 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=False):
     Normalized_recieve_IIC = pd.to_numeric(Normalized_recieve_IIC, errors='coerce')
     Normalized_recieve_IIC = np.array(Normalized_recieve_IIC)
     Normalized_recieve_IIC = np.round(Normalized_recieve_IIC,1)
-    Normalized_recieve_IIC = Normalized_recieve_IIC[1:14] # values from 125-3150 (not including 4khz)
+    # Normalized_recieve_IIC = Normalized_recieve_IIC[1:14] # values from 125-3150 (not including 4khz)
     print('Normalized recieve ANISPL: ', Normalized_recieve_IIC)
     # print('length of normalized recieve: ',len(Normalized_recieve_IIC))
     # print('length of IIC contour: ',len(IIC_contour))
