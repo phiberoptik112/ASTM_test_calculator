@@ -1044,13 +1044,17 @@ class ASTCTestReport(BaseTestReport):
             print('__________PULLING RAW DATA__________')
             freq_indices = slice(0, 17)
             onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
+            onethird_rec = np.array(onethird_rec, dtype=np.float64).round(1)
             print(f'onethird_rec: {onethird_rec}')
             onethird_srs = format_SLMdata(self.test_data.srs_data)[freq_indices]
+            onethird_srs = np.array(onethird_srs, dtype=np.float64).round(1)
             print(f'onethird_srs: {onethird_srs}')
             onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)[freq_indices]
+            onethird_bkgrd = np.array(onethird_bkgrd, dtype=np.float64).round(1)
             print(f'onethird_bkgrd: {onethird_bkgrd}')
             ##### RT 30 is 41 for 4k data 
-            rt_thirty = self.test_data.rt['Unnamed: 10'][24:41]/1000### MAKE SURE THIS CHANGES TO 4k for later changes 
+            rt_thirty = self.test_data.rt['Unnamed: 10'][24:41]/1000#
+            rt_thirty = np.array(rt_thirty, dtype=np.float64).round(7) ## looks like rounding this number to 1 screws up sabines calculations
             print(f'rt_thirty: {rt_thirty}')
             # Calculate ATL first
             print("\nInput shapes:")
@@ -1085,7 +1089,7 @@ class ASTCTestReport(BaseTestReport):
                     recieve_roomvol=float(props['receive_vol']),
                     rt_thirty=rt_thirty
                 )
-
+                print(f'NR_val: {self.NR_val}')
                 # Calculate ASTC - Fixed array length handling
                 print('__________CALCULATING ASTC__________')
                 try:

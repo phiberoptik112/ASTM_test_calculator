@@ -127,7 +127,7 @@ def format_SLMdata(srs_data):
     ## verify that srs_data iloc[7] is correct- will have a label as 1/3 octave
     srs_thirdoct = srs_data.iloc[7] # hardcoded to SLM export data format
     # srssrs_thirdoct = srs_thirdoct[13:31] # previous code, only goes from 125 to 3150
-    srs_thirdoct = srs_thirdoct[12:31] # 100hz to 3150hz
+    srs_thirdoct = srs_thirdoct[13:32] # 100hz to 4000hz
 
     # verify step to check for SPL info? 
     return srs_thirdoct
@@ -153,7 +153,7 @@ def extract_sound_levels(slm_data: pd.DataFrame,
         spectrum_row_idx = slm_data.apply(lambda x: x.astype(str).str.contains('Overall 1/3 Spectra')).any(axis=1).idxmax()
         
         # Get frequency labels (one row above spectrum data)
-        freq_labels = pd.to_numeric(slm_data.iloc[spectrum_row_idx - 1, 13:31], errors='coerce')
+        freq_labels = pd.to_numeric(slm_data.iloc[spectrum_row_idx - 1, 13:32], errors='coerce')
         
         # Validate frequency bands
         if not all(f in freq_labels.values for f in freq_bands):
@@ -237,7 +237,7 @@ def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd
             raise ValueError(f"Input arrays must have length {expected_length}")
 
         # Calculate sabines
-        sabines = 0.049 * (recieve_roomvol/rt_thirty)
+        sabines = 0.049 * recieve_roomvol/rt_thirty
 
         print("\nInput shapes:")
         print(f"Background: {bkgrnd_overalloct.shape}")
@@ -405,10 +405,10 @@ def calc_atl_val(srs_overalloct: pd.Series, rec_overalloct: pd.Series,
     # print('recieve roomvol: ',recieve_roomvol)
     if isinstance(rt_thirty, pd.DataFrame):
         rt_thirty = rt_thirty.values
-    # print('rt_thirty: ',rt_thirty)
-    
+    print('rt_thirty: ',rt_thirty)
+    print('receive roomvol: ',receive_roomvol)
     sabines = 0.049*receive_roomvol/rt_thirty  # this produces accurate sabines values
-
+    ## sabines gets this calc, but is still not accurate to spreadhseet reference, even with the right rt_thirty value
     if isinstance(bkgrnd_overalloct, pd.DataFrame):
         bkgrnd_overalloct = bkgrnd_overalloct.values
     print('bkgrnd_overalloct: ',bkgrnd_overalloct)
@@ -425,22 +425,22 @@ def calc_atl_val(srs_overalloct: pd.Series, rec_overalloct: pd.Series,
 
     if isinstance(rec_overalloct, pd.DataFrame):
         rec_overalloct = rec_overalloct.values
-    # print('recieve vs  background: ',recieve_vsBkgrnd)
+    print('recieve vs  background: ',recieve_vsBkgrnd)
     # print('recieve roomvol: ',recieve_roomvol)
     #### something wrong with this loop #### 
     for i, val in enumerate(recieve_vsBkgrnd):
         if val < 5:
-            # print('recieve vs background: ',val)
+            print('recieve vs background: ',val)
             recieve_corr.append(rec_overalloct[i]-2)
-            # print('less than 5, appending: ',recieve_corr[i])
+            print('less than 5, appending: ',recieve_corr[i])
         elif val < 10:
-            # print('recieve vs background: ',val)
+            print('recieve vs background: ',val)
             recieve_corr.append(10*np.log10((10**(rec_overalloct[i]/10))-(10**(bkgrnd_overalloct[i]/10))))
-            # print('less than 10, appending: ',recieve_corr[i])
+            print('less than 10, appending: ',recieve_corr[i])
         else:
-            # print('recieve vs background: ',val)
+            print('recieve vs background: ',val)
             recieve_corr.append(rec_overalloct[i])
-            # print('greater than 10, appending: ',recieve_corr[i])
+            print('greater than 10, appending: ',recieve_corr[i])
             
     
     # print('recieve correction: ',recieve_corr)
@@ -450,10 +450,14 @@ def calc_atl_val(srs_overalloct: pd.Series, rec_overalloct: pd.Series,
         srs_overalloct = srs_overalloct.values
     if isinstance(sabines, pd.DataFrame):
         sabines = sabines.values
-    # print('srs overalloct: ',srs_overalloct)
-    # print('recieve correction: ',recieve_corr)
-    # print('sabines: ',sabines)
-    ATL_val = []
+    print('srs overalloct: ',srs_overalloct)
+    print('recieve correction: ',recieve_corr)
+    print('sabines: ',sabines)
+
+    # ATL val initalized to 0
+    # ATL_val = []
+    print('=-=-=-=-=-=-=-ATL val initalized to 0-=-=-=-=-=-=-=-')
+    ATL_val = np.zeros(len(srs_overalloct))
     # for i, val in enumerate(srs_overalloct):
     #     ATL_val.append(srs_overalloct[i]-recieve_corr[i]+10*(np.log10(partition_area/sabines.iloc[i])))
 
@@ -470,14 +474,16 @@ def calc_atl_val(srs_overalloct: pd.Series, rec_overalloct: pd.Series,
     sabines = sabines[:min_length]
     
     # Vectorized calculation
+    # print('=-=-=-=-=-=-=-Vectorized calculation-=-=-=-=-=-=-=-')
     ATL_val = srs_overalloct - recieve_corr + 10 * np.log10(partition_area / sabines)
     # Convert ATL_val to numpy array if not already
     # ATL_val = np.array(ATL_val)
     # ATL_val = srs_overalloct - recieve_corr+10*(np.log(parition_area/sabines)) 
-    # ATL_val = np.round(ATL_val,1)
+    print('-=-=-Rounding ATL val-=-=-=')
+    ATL_val = np.round(ATL_val,1)
     print('ATL val: ',ATL_val)
     return ATL_val, sabines
-def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=False):
+def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=True):
     pos_diffs = list()
     diff_negative_min = 0
     AIIC_start = 94
@@ -496,7 +502,7 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=False):
         IIC_contour.append(vals+AIIC_start)
     Normalized_recieve_IIC = pd.to_numeric(Normalized_recieve_IIC, errors='coerce')
     Normalized_recieve_IIC = np.array(Normalized_recieve_IIC)
-    Normalized_recieve_IIC = np.round(Normalized_recieve_IIC,1)
+    Normalized_recieve_IIC = np.round(Normalized_recieve_IIC)
     # Normalized_recieve_IIC = Normalized_recieve_IIC[1:14] # values from 125-3150 (not including 4khz)
     print('Normalized recieve ANISPL: ', Normalized_recieve_IIC)
     # print('length of normalized recieve: ',len(Normalized_recieve_IIC))
@@ -512,7 +518,7 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=False):
     # print(f"315Hz Normalized input: {Normalized_recieve_IIC[4]}")
     # print(f"315Hz IIC contour value: {IIC_contour[4]}")
     
-    while (diff_negative_max < 8 and new_sum < 32 and iteration_count < max_iterations):
+    while (diff_negative_max <= 8 and new_sum <= 32 and iteration_count < max_iterations):
         if verbose:
             print(f"\nIteration {iteration_count}:")
             print(f"AIIC_contour_val: {AIIC_contour_val}")
@@ -531,16 +537,16 @@ def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=False):
         new_sum = np.sum(pos_diffs)
         
         if new_sum > 32 or diff_negative_max > 8:
-            print('Difference condition met! AIIC value: ', AIIC_contour_val)
+            print('Difference condition met! AIIC value: ', AIIC_contour_val-1)
             print('AIIC result curve: ', Contour_curve_result)
-            return AIIC_contour_val, Contour_curve_result
+            return AIIC_contour_val-1, Contour_curve_result
         else:
             AIIC_start -= 1
             AIIC_contour_val += 1
             IIC_contour = [vals + AIIC_start for vals in IIC_curve]
             
             Contour_curve_result =  Normalized_recieve_IIC - IIC_contour
-            
+            # Contour_curve_result =  IIC_contour - Normalized_recieve_IIC
             iteration_count += 1
 
     if iteration_count == max_iterations:
@@ -561,7 +567,7 @@ def calc_astc_val(atl_val: pd.Series) -> float:
     ASTC_start = 16
     New_curve = list()
     new_sum = 0
-    print('__________CALCULATING ASTC__________')
+    # print('__________CALCULATING ASTC__________')
     # Debug input shape
     print(f"\nInput ATL_val shape: {atl_val.shape}")
     # Since ATL values only go from 125 to 4k, we need to match array lengths
@@ -575,8 +581,7 @@ def calc_astc_val(atl_val: pd.Series) -> float:
     
     # Ensure we're using the right slice of ATL values
     # we need to truncate the ATL_val to 16 values from 125-4000
-    ATL_val_STC = atl_val[0:16]  # We already have the correct 16 values
-    print('-=-=-=-=-=-=-=-ATL val STC: ', ATL_val_STC)
+    ATL_val_STC = atl_val[1:17]  # must use values from 125-4000, not 100-4000
     while (diff_negative <= 8 and new_sum <= 32):
         print('ASTC fit test value: ', ASTC_start)
         
@@ -589,7 +594,7 @@ def calc_astc_val(atl_val: pd.Series) -> float:
         
         # Calculate ASTC curve
         ASTC_curve = New_curve - ATL_val_STC
-        # ASTC_curve = np.round(ASTC_curve) ## may need a better rounding method
+        ASTC_curve = np.round(ASTC_curve) ## may need a better rounding method
         
         # print('ASTC curve: ', ASTC_curve)
         diff_negative = np.max(ASTC_curve)
