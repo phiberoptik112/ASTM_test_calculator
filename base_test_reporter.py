@@ -383,12 +383,22 @@ class BaseTestReport:
     
     def get_signatures(self):
         print('Getting signatures')
-        signatures = {
-            'test_engineer': 'Jake Pfitsch',
-            'test_engineer_signature': './images/JPsignature.png',
-            'test_date': 'November 27, 2024'
-        }
-        return signatures
+        main_elements = []
+        main_elements.append(Paragraph('Test Conducted By:', self.styles['Normal']))
+        jp_sig_image = Image('./images/JPsignature.png')
+        jp_sig_image.drawHeight = 50
+        jp_sig_image.drawWidth = 100
+        jp_sig_image.hAlign = 'LEFT'
+        main_elements.append(jp_sig_image)
+        main_elements.append(Paragraph('Jake Pfitsch, Project Consultant', self.styles['Normal']))
+
+        zw_sig_image = Image('./images/ZWsignature.png')
+        zw_sig_image.drawHeight = 40
+        zw_sig_image.drawWidth = 130
+        zw_sig_image.hAlign = 'LEFT'
+        main_elements.append(zw_sig_image)
+        main_elements.append(Paragraph('Zane Wright, Project Consultant', self.styles['Normal']))
+        return main_elements
     
     @classmethod
     def create_report(cls, test_data, output_folder: Path, test_type):
@@ -985,7 +995,7 @@ class AIICTestReport(BaseTestReport):
         
         Ref_label = f'AIIC {self.AIIC_contour_val} Contour'
         
-        AIIC_yAxis = 'Transmission Loss (dB)'
+        AIIC_yAxis = 'Sound Pressure Level (dB)'
         Field_AIIC_label = 'Absorption Normalized Impact Sound Pressure Level, AIIC (dB)'
         
         # Ensure all arrays are numpy arrays of the same length
