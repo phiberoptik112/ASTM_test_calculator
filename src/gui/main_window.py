@@ -9,11 +9,13 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.scrollview import ScrollView
 from kivy.core.window import Window
 from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelItem
+from kivy.uix.image import Image as KivyImage
 
 from typing import Dict, List, Optional
 import pandas as pd
 import tempfile
 import os
+import fitz
 
 from src.core.test_data_manager import TestDataManager
 from src.gui.analysis_dashboard import ResultsAnalysisDashboard
@@ -178,18 +180,27 @@ class MainWindow(BoxLayout):
     def load_data(self, instance):
         """Load and process test data files"""
         try:
-            if self.debug_checkbox.active:
-                print("Loading test data...")
+            if not all([self.test_plan_path.text, self.slm_data_1_path.text, 
+                       self.slm_data_2_path.text, self.output_path.text]):
+                raise ValueError("All file paths must be specified")
+                
+            # Process test plan
+            test_plan = pd.read_excel(self.test_plan_path.text)
             
-            # Implementation similar to ASTC_GUI_proto's load_data
-            # but integrated with TestDataManager
+            # Process SLM data
+            slm_data_1 = extract_sound_levels(pd.read_excel(self.slm_data_1_path.text))
+            slm_data_2 = extract_sound_levels(pd.read_excel(self.slm_data_2_path.text))
+            
+            # Update test data manager
+            self.test_data_manager.process_test_data(
+                test_plan, slm_data_1, slm_data_2, self.output_path.text
+            )
             
             self.status_label.text = 'Status: Data loaded successfully'
+            self.update_test_list()
             
         except Exception as e:
-            self.status_label.text = f'Status: Error loading data - {str(e)}'
-            if self.debug_checkbox.active:
-                print(f"Error loading data: {str(e)}")
+            self._show_error(f'Error loading data: {str(e)}')
 
     def calculate_single_test(self, instance):
         """Calculate results for a single test"""
@@ -239,6 +250,83 @@ class MainWindow(BoxLayout):
         self.test_data_manager.add_test(room_properties, test_type)
         # Update UI
         self.update_test_list()
+
+    def preview_pdf(self, pdf_path):
+        """Preview generated PDF report"""
+        try:
+            if os.path.exists(pdf_path):
+                # Create temporary image of first page
+                doc = fitz.open(pdf_path)
+                page = doc[0]
+                pix = page.get_pixmap()
+                img_path = tempfile.mktemp(suffix='.png')
+                pix.save(img_path)
+                
+                # Create scrollable image preview
+                scroll = ScrollView(size_hint=(1, 1))
+                image = KivyImage(source=img_path, size_hint_y=None)
+                image.height = image.texture_size[1]
+                scroll.add_widget(image)
+                
+                # Create popup with preview
+                content = BoxLayout(orientation='vertical')
+                content.add_widget(scroll)
+                
+                preview_popup = Popup(
+                    title='PDF Preview',
+                    content=content,
+                    size_hint=(0.9, 0.9)
+                )
+                preview_popup.open()
+            else:
+                self._show_error('PDF file not found')
+                
+        except Exception as e:
+            self._show_error(f'Error previewing PDF: {str(e)}')
+
+    def show_results(self, test_data: TestData):
+        """Display test results in a popup"""
+        content = GridLayout(cols=1, padding=10, spacing=5)
+        
+        # Add test information
+        props = test_data.room_properties
+        info_text = (
+            f"Test Label: {props.test_label}\n"
+            f"Project: {props.project_name}\n"
+            f"Test Date: {props.test_date}\n"
+            f"Source Room: {props.source_room}\n"
+            f"Receive Room: {props.receive_room}"
+        )
+        content.add_widget(Label(text=info_text))
+        
+        # Add results table
+        results_table = self._create_results_table(test_data)
+        content.add_widget(results_table)
+        
+        popup = Popup(
+            title='Test Results',
+            content=content,
+            size_hint=(0.8, 0.8)
+        )
+        popup.open()
+
+    def generate_report(self, test_data: TestData):
+        """Generate PDF report for test"""
+        try:
+            from src.reports.base_report import BaseReport
+            
+            report = BaseReport(
+                test_data=test_data,
+                output_folder=self.output_path.text,
+                test_type=test_data.test_type
+            )
+            
+            pdf_path = report.generate()
+            self.preview_pdf(pdf_path)
+            self.status_label.text = 'Status: Report generated successfully'
+            
+        except Exception as e:
+            self._show_error(f'Error generating report: {str(e)}')
 
 class MainApp(App):
     def build(self):

@@ -1,145 +1,94 @@
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.label import Label
+from kivy.uix.button import Button
+from kivy.uix.gridlayout import GridLayout
+from kivy.uix.scrollview import ScrollView
+
 class ResultsAnalysisDashboard(BoxLayout):
     def __init__(self, test_data_manager, **kwargs):
         super().__init__(**kwargs)
         self.orientation = 'vertical'
-        self.padding = 10
-        self.spacing = 10
         self.test_data_manager = test_data_manager
         
-        # Controls Layout at top
-        self.add_widget(self._create_controls())
-        
-        # Results Display
-        self.results_display = BoxLayout(size_hint_y=0.1)
-        self.single_number_label = Label(text="")
-        self.results_display.add_widget(self.single_number_label)
-        self.add_widget(self.results_display)
-        
-        # Tabs for different analysis views
-        self.tabs = TabbedPanel()
-        
-        # Frequency Response Tab
-        self.freq_tab = TabbedPanelItem(text='Frequency Response')
-        self.freq_plot_container = BoxLayout(orientation='vertical')
-        self.freq_tab.add_widget(self.freq_plot_container)
-        
-        # Statistical Analysis Tab
-        self.stats_tab = TabbedPanelItem(text='Statistical Analysis')
-        self.stats_container = BoxLayout(orientation='vertical')
-        self.stats_tab.add_widget(self.stats_container)
-        
-        # Comparison Tab
-        self.compare_tab = TabbedPanelItem(text='Test Comparisons')
-        self.compare_container = BoxLayout(orientation='vertical')
-        self.compare_tab.add_widget(self.compare_container)
-        
-        # Add tabs
-        self.tabs.add_widget(self.freq_tab)
-        self.tabs.add_widget(self.stats_tab)
-        self.tabs.add_widget(self.compare_tab)
-        
-        self.add_widget(self.tabs)
-        
-        # Initialize empty plots
-        self.create_empty_plots()
-
-    def _create_controls(self):
-        """Create control panel with test type and test selection"""
-        controls = BoxLayout(size_hint_y=0.1)
-        
-        # Test type selector
-        self.test_type_spinner = Spinner(
-            text='Select Test Type',
-            values=[t.value for t in TestType],
-            size_hint_x=0.2
+        # Create results grid
+        self.results_grid = GridLayout(
+            cols=4,  # Adjust based on your needs
+            size_hint_y=None
         )
-        self.test_type_spinner.bind(text=self.on_test_type_selected)
+        self.results_grid.bind(minimum_height=self.results_grid.setter('height'))
         
-        # Test number selector
-        self.test_spinner = Spinner(
-            text='Select Test',
-            values=[],
-            size_hint_x=0.2
+        # Add headers
+        headers = ['Test Label', 'Test Type', 'Result', 'Status']
+        for header in headers:
+            self.results_grid.add_widget(Label(
+                text=header,
+                size_hint_y=None,
+                height=40
+            ))
+        
+        # Add results in a scroll view
+        scroll = ScrollView(size_hint=(1, 0.8))
+        scroll.add_widget(self.results_grid)
+        self.add_widget(scroll)
+        
+        # Add refresh button
+        refresh_btn = Button(
+            text='Refresh Results',
+            size_hint_y=0.1
         )
-        self.test_spinner.bind(text=self.on_test_selected)
+        refresh_btn.bind(on_press=self.refresh_results)
+        self.add_widget(refresh_btn)
         
-        controls.add_widget(Label(text='Test Type:', size_hint_x=0.1))
-        controls.add_widget(self.test_type_spinner)
-        controls.add_widget(Label(text='Test:', size_hint_x=0.1))
-        controls.add_widget(self.test_spinner)
+        # Initial load
+        self.refresh_results()
+    
+    def refresh_results(self, *args):
+        """Refresh the results display"""
+        # Clear existing results (except headers)
+        while len(self.results_grid.children) > 4:
+            self.results_grid.remove_widget(self.results_grid.children[0])
         
-        return controls
-
-    def create_empty_plots(self):
-        """Initialize empty plots for all tabs"""
-        # Frequency Response Plot
-        self.freq_fig, self.freq_ax = plt.subplots(figsize=(10, 6))
-        self.freq_canvas = FigureCanvasKivyAgg(self.freq_fig)
-        self.freq_plot_container.clear_widgets()
-        self.freq_plot_container.add_widget(self.freq_canvas)
-        
-        # Statistics Plot
-        self.stats_fig, self.stats_ax = plt.subplots(figsize=(10, 6))
-        self.stats_canvas = FigureCanvasKivyAgg(self.stats_fig)
-        self.stats_container.clear_widgets()
-        self.stats_container.add_widget(self.stats_canvas)
-        
-        # Comparison Plot
-        self.compare_fig, self.compare_ax = plt.subplots(figsize=(10, 6))
-        self.compare_canvas = FigureCanvasKivyAgg(self.compare_fig)
-        self.compare_container.clear_widgets()
-        self.compare_container.add_widget(self.compare_canvas)
-
-    def on_test_selected(self, instance, value):
-        """Update all tabs when a test is selected"""
-        if value != 'Select Test':
-            self.current_test = value
-            self.current_test_data = self.test_data_manager.get_test_data(
-                self.test_type_spinner.text,
-                value
-            )
-            self.update_single_number_result()
-            self.update_frequency_plot()
-            self.update_stats_view()
-            self.update_comparison_view()
-
-    def update_frequency_plot(self):
-        """Update frequency response plot with all measurement data"""
-        self.freq_ax.clear()
-        
-        if hasattr(self, 'current_test_data'):
-            data = self.current_test_data
+        # Add test results
+        for test in self.test_data_manager.get_sorted_tests():
+            # Add test label
+            self.results_grid.add_widget(Label(
+                text=test.room_properties.test_label,
+                size_hint_y=None,
+                height=40
+            ))
             
-            # Plot all measurements
-            self.freq_ax.plot(data.frequencies, data.source_levels, 
-                            label='Source Room', color='blue', marker='o')
-            self.freq_ax.plot(data.frequencies, data.receive_levels, 
-                            label='Receive Room', color='green', marker='s')
-            self.freq_ax.plot(data.frequencies, data.background_levels, 
-                            label='Background', color='red', marker='^')
-            self.freq_ax.plot(data.frequencies, data.final_results, 
-                            label='Final Results', color='purple', marker='D')
+            # Add test type
+            self.results_grid.add_widget(Label(
+                text=str(test.test_type),
+                size_hint_y=None,
+                height=40
+            ))
             
-            self._format_freq_plot()
-            self.freq_canvas.draw()
-
-    def update_stats_view(self):
-        """Update statistical analysis view"""
-        self.stats_ax.clear()
-        
-        if hasattr(self, 'current_test_data'):
-            # Add statistical analysis plots (boxplots, distributions, etc.)
-            data = self.current_test_data
-            # ... statistical visualization code ...
-            self.stats_canvas.draw()
-
-    def update_comparison_view(self):
-        """Update test comparison view"""
-        self.compare_ax.clear()
-        
-        if hasattr(self, 'current_test_data'):
-            # Add comparison with other tests of same type
-            test_type = self.current_test_data.test_type
-            all_tests = self.test_data_manager.get_tests_by_type(test_type)
-            # ... comparison visualization code ...
-            self.compare_canvas.draw() 
+            # Add result value
+            result = self._get_test_result(test)
+            self.results_grid.add_widget(Label(
+                text=str(result),
+                size_hint_y=None,
+                height=40
+            ))
+            
+            # Add status
+            self.results_grid.add_widget(Label(
+                text='Complete',
+                size_hint_y=None,
+                height=40
+            ))
+    
+    def _get_test_result(self, test):
+        """Get the primary result value for a test"""
+        try:
+            if hasattr(test, 'NIC_final_val'):
+                return f"NIC {test.NIC_final_val}"
+            elif hasattr(test, 'ASTC_val'):
+                return f"ASTC {test.ASTC_val}"
+            elif hasattr(test, 'AIIC_val'):
+                return f"AIIC {test.AIIC_val}"
+            else:
+                return "N/A"
+        except Exception:
+            return "Error"
