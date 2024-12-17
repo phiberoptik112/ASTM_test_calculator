@@ -846,11 +846,23 @@ class AIICTestReport(BaseTestReport):
                 self.test_data.single_number_result = self.AIIC_contour_val
                 # Process exceptions
                 self.AIIC_Exceptions = []
+                self.AIIC_exceptions_backcheck = []
                 rec_roomvol = float(props['receive_vol'])
                 print(f"rec_roomvol: {rec_roomvol}")
-                for val in self.sabines:
-                    self.AIIC_Exceptions.append('0' if val > 2*(rec_roomvol**(2/3)) else '1')
 
+                # Fix for sabines exceptions
+                for val in self.sabines:
+                    # Convert val to float to ensure scalar comparison
+                    val_float = float(val)
+                    self.AIIC_Exceptions.append('1' if val_float > 2 * rec_roomvol**(2/3) else '0')
+
+                # Fix for background check exceptions
+                for i, val in enumerate(self.onethird_bkgrd):
+                    # Use explicit indexing and convert to float for comparison
+                    background_diff = float(onethird_rec_Total[i]) - float(val)
+                    self.AIIC_exceptions_backcheck.append('0' if background_diff > 5 else '1')
+
+                
                 # Create table only if we have valid data
                 if self.AIIC_Normalized_recieve is not None and self.onethird_bkgrd is not None and rt_thirty is not None and self.AIIC_Exceptions is not None:
                     print(f"\nArray lengths before table creation:")
@@ -858,13 +870,15 @@ class AIICTestReport(BaseTestReport):
                     print(f"ANISPL: {len(self.AIIC_Normalized_recieve)}")
                     print(f"Background: {len(self.onethird_bkgrd)}")
                     print(f"RT30: {len(rt_thirty)}")
-                    print(f"Exceptions: {len(self.AIIC_Exceptions)}")
+                    print(f"Absorption Exceptions: {len(self.AIIC_Exceptions)}")
+                    print(f"Backgrnd check Exceptions: {len(self.AIIC_exceptions_backcheck)}")
                     table_data = [
                         ['Frequency (Hz)',
                             'Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)',
                             'Average Receiver Background Level (dB)',
                             'Average RT60 (seconds)',
-                            'Exceptions noted to ASTM E1007-14'
+                            'Exceptions noted to ASTM E1007-14',
+                            'Backgrnd check Exceptions'
                             ]
                     ]
                     print("\nTable data types:")
@@ -872,18 +886,21 @@ class AIICTestReport(BaseTestReport):
                     print(f"Background: {type(self.onethird_bkgrd)}")
                     print(f"RT30: {type(rt_thirty)}")
                     print(f"Exceptions: {type(self.AIIC_Exceptions)}")
+                    print(f"Backgrnd check Exceptions: {type(self.AIIC_exceptions_backcheck)}")
                     for i in range(len(frequencies)):
                         try:
                             anispl_val = float(self.AIIC_Normalized_recieve[i])
                             bkg_val = float(self.onethird_bkgrd[i])
                             rt_val = float(rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i])
                             exceptions_val = self.AIIC_Exceptions[i]
+                            backgrnd_check_val = self.AIIC_exceptions_backcheck[i]
                             row = [
                                 str(frequencies[i]),
                                 f"{anispl_val:.1f}",
                                 f"{bkg_val:.1f}",
                                 f"{rt_val:.3f}",
-                                str(exceptions_val)
+                                str(exceptions_val),
+                                str(backgrnd_check_val)
                             ]
                             table_data.append(row)
                         except Exception as e:
@@ -893,6 +910,7 @@ class AIICTestReport(BaseTestReport):
                             print(f"  Background: {bkg_val}")
                             print(f"  RT30: {rt_val}")
                             print(f"  Exceptions: {exceptions_val}")
+                            print(f"  Backgrnd check: {backgrnd_check_val}")
                             continue
                     if len(table_data) > 1:
 
@@ -902,7 +920,8 @@ class AIICTestReport(BaseTestReport):
                             'Absorption\nNormalized\nImpact Sound\nPressure Level,\nANISPL (dB)',
                             'Average\nReceiver\nBackground\nLevel (dB)',
                             'Average\nRT60\n(seconds)',
-                            'Exceptions\nnoted to\nASTM\nE1007-14'
+                            'Exceptions\nnoted to\nASTM\nE1007-14',
+                            'Backgrnd check\nExceptions'
                         ]
                         
                         # Create paragraph style for rotated headers
@@ -925,7 +944,7 @@ class AIICTestReport(BaseTestReport):
                         # Create and style the table with adjusted dimensions
                         Test_result_table = Table(
                             table_data, 
-                            colWidths=[65, 85, 65, 45, 45],  # Narrower columns
+                            colWidths=[65, 85, 65, 45, 45, 45],  # Narrower columns
                             rowHeights=[60] + [10]*(len(table_data)-1),  # Shorter rows overall
                             hAlign='LEFT'
                         )
@@ -1109,7 +1128,12 @@ class ASTCTestReport(BaseTestReport):
                     self.test_data.single_number_result = self.ASTC_final_val
                     # Create ASTC contour based on final value
                     self.ASTC_contour_val = [val + self.ASTC_final_val for val in STCCurve]
-
+                    print(f"ASTC contour: {self.ASTC_contour_val}")
+                    self.ASTC_exceptions_backcheck = []
+                    for i, val in enumerate(onethird_bkgrd):
+                        # Use explicit indexing and convert to float for comparison
+                        background_diff = float(onethird_rec[i]) - float(val)
+                        self.ASTC_exceptions_backcheck.append('0' if background_diff > 5 else '1')
                     if self.NR_val is not None and self.ASTC_recieve_corr is not None:
                         # Verify lengths before creating table
                         print(f"\nArray lengths before table creation:")
@@ -1119,7 +1143,7 @@ class ASTCTestReport(BaseTestReport):
                         print(f"Source room level: {len(onethird_srs)}")
                         print(f"RT30: {len(rt_thirty)}")
                         print(f"Average corrected receiver room level: {len(self.ASTC_recieve_corr)}")
-                        
+                        print(f"ASTC exceptions backcheck: {len(self.ASTC_exceptions_backcheck)}")
                         # Create table data
                         table_data = [
                             ['Frequency (Hz)',
@@ -1128,7 +1152,8 @@ class ASTCTestReport(BaseTestReport):
                              'Average Receiver Background Level (dB)',
                              'Average RT60 (seconds)',
                              'Noise Reduction, NR (dB)', 
-                             'Apparent Transmission Loss, ATL (dB)'
+                             'Apparent Transmission Loss, ATL (dB)',
+                             'Backgrnd check\nExceptions'
                              ]
                         ]
                         
@@ -1148,6 +1173,7 @@ class ASTCTestReport(BaseTestReport):
                                 rt_val = float(rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i])
                                 NR_table_val = float(self.NR_val[i])
                                 atl_val = float(self.ATL_val[i])
+                                backgrnd_check_val = self.ASTC_exceptions_backcheck[i]
                                 row = [
                                     str(frequencies[i]),
                                     f"{srs_val:.1f}",
@@ -1155,7 +1181,8 @@ class ASTCTestReport(BaseTestReport):
                                     f"{bkg_val:.1f}",
                                     f"{rt_val:.3f}",
                                     f"{NR_table_val:.1f}",
-                                    f"{atl_val:.1f}"
+                                    f"{atl_val:.1f}",
+                                    str(backgrnd_check_val)
                                 ]
                                 print(f"Created row {i}: {row}")  # Debug output
                                 table_data.append(row)
@@ -1178,7 +1205,8 @@ class ASTCTestReport(BaseTestReport):
                             'Average\nReceiver\nBackground\nLevel\n(dB)',
                             'Average\nRT60\n(seconds)',
                             'Noise\nReduction,\nNR\n(dB)',
-                            'Apparent\nTransmission\nLoss,\nATL\n(dB)'
+                            'Apparent\nTransmission\nLoss,\nATL\n(dB)',
+                            'Exceptions\nnoted\nto\nASTM\nE336-16'
                             ]
                         
                         # Create paragraph style for rotated headers
@@ -1201,7 +1229,7 @@ class ASTCTestReport(BaseTestReport):
                         # Create and style the table with adjusted dimensions
                             Test_result_table = Table(
                             table_data, 
-                            colWidths=[65, 85, 65, 45, 65],  # Narrower columns
+                            colWidths=[65, 85, 65, 45, 65, 65, 65, 45],  # Narrower columns
                             rowHeights=[60] + [10]*(len(table_data)-1),  # Shorter rows overall
                             hAlign='LEFT'
                             )
