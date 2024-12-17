@@ -1206,7 +1206,7 @@ class ASTCTestReport(BaseTestReport):
                             'Average\nRT60\n(seconds)',
                             'Noise\nReduction,\nNR\n(dB)',
                             'Apparent\nTransmission\nLoss,\nATL\n(dB)',
-                            'Exceptions\nnoted\nto\nASTM\nE336-16'
+                            'Exceptions\nnoted\nin\nASTM\nE336-16'
                             ]
                         
                         # Create paragraph style for rotated headers
@@ -1229,7 +1229,7 @@ class ASTCTestReport(BaseTestReport):
                         # Create and style the table with adjusted dimensions
                             Test_result_table = Table(
                             table_data, 
-                            colWidths=[65, 85, 65, 45, 65, 65, 65, 45],  # Narrower columns
+                            colWidths=[65, 85, 65, 45, 65, 65, 65, 65],  # Narrower columns
                             rowHeights=[60] + [10]*(len(table_data)-1),  # Shorter rows overall
                             hAlign='LEFT'
                             )
