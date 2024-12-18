@@ -11,13 +11,16 @@ from kivy.core.window import Window
 from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelItem
 from kivy.uix.image import Image as KivyImage
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 import pandas as pd
 import tempfile
 import os
+from os import listdir
+from os.path import isfile, join
 import fitz
 
 from src.core.test_data_manager import TestDataManager
+from src.gui.test_plan_input import TestPlanInputWindow
 from src.gui.analysis_dashboard import ResultsAnalysisDashboard
 from data_processor import (
     TestType, 
@@ -31,9 +34,10 @@ from data_processor import (
     calc_astc_val,
     format_SLMdata,
     extract_sound_levels,
-    calculate_onethird_Logavg
+    calculate_onethird_Logavg,
+    sanitize_filepath
 )
-from src.gui.test_plan_input import TestPlanInputWindow
+from src.core.test_processor import TestProcessor
 
 class MainWindow(BoxLayout):
     def __init__(self, **kwargs):
@@ -44,6 +48,7 @@ class MainWindow(BoxLayout):
         
         # Initialize managers
         self.test_data_manager = TestDataManager()
+        self.test_processor = TestProcessor(debug_mode=True)  # or False for production
         
         # Create UI Components
         self._create_file_inputs()
@@ -88,13 +93,38 @@ class MainWindow(BoxLayout):
         
         self.add_widget(input_grid)
         
+        # Button Layout
+        button_layout = BoxLayout(
+            orientation='horizontal',
+            spacing=5,
+            size_hint_y=0.1
+        )
+        
         # Load Data Button
         self.load_button = Button(
             text='Load Data',
-            size_hint_y=0.1
+            size_hint_x=0.5
         )
         self.load_button.bind(on_press=self.load_data)
-        self.add_widget(self.load_button)
+        button_layout.add_widget(self.load_button)
+        
+        # Populate Test Inputs Button
+        self.populate_button = Button(
+            text='Load Example Data',
+            size_hint_x=0.5
+        )
+        self.populate_button.bind(on_press=self.populate_test_inputs)
+        button_layout.add_widget(self.populate_button)
+        
+        # Add New Test Button
+        self.new_test_button = Button(
+            text='Add New Test',
+            size_hint_x=0.5
+        )
+        self.new_test_button.bind(on_press=self.show_test_plan_input)
+        button_layout.add_widget(self.new_test_button)
+        
+        self.add_widget(button_layout)
 
     def _create_test_controls(self):
         """Create test control section"""
@@ -177,30 +207,145 @@ class MainWindow(BoxLayout):
         
         self.add_widget(status_layout)
 
+    def _show_error(self, message: str):
+        """Display error message in popup"""
+        popup = Popup(
+            title='Error',
+            content=Label(text=message),
+            size_hint=(None, None),
+            size=(400, 200)
+        )
+        popup.open()
+
     def load_data(self, instance):
         """Load and process test data files"""
+        self.test_data_collection = {}  # Initialize collection
         try:
+            # Validate inputs
             if not all([self.test_plan_path.text, self.slm_data_1_path.text, 
                        self.slm_data_2_path.text, self.output_path.text]):
                 raise ValueError("All file paths must be specified")
+
+            # Load test plan
+            try:
+                self.test_list = pd.read_excel(self.test_plan_path.text)
+                if self.debug_checkbox.active:
+                    print("Test plan columns:", self.test_list.columns.tolist())
+            except Exception as e:
+                raise ValueError(f"Error reading test plan: {str(e)}")
+
+            # Get data files
+            try:
+                self.D_datafiles = [f for f in listdir(self.slm_data_1_path.text) 
+                                   if isfile(join(self.slm_data_1_path.text, f))]
+                self.E_datafiles = [f for f in listdir(self.slm_data_2_path.text) 
+                                   if isfile(join(self.slm_data_2_path.text, f))]
                 
-            # Process test plan
-            test_plan = pd.read_excel(self.test_plan_path.text)
-            
-            # Process SLM data
-            slm_data_1 = extract_sound_levels(pd.read_excel(self.slm_data_1_path.text))
-            slm_data_2 = extract_sound_levels(pd.read_excel(self.slm_data_2_path.text))
-            
-            # Update test data manager
-            self.test_data_manager.process_test_data(
-                test_plan, slm_data_1, slm_data_2, self.output_path.text
-            )
-            
-            self.status_label.text = 'Status: Data loaded successfully'
-            self.update_test_list()
-            
+                if self.debug_checkbox.active:
+                    print('D_datafiles:', self.D_datafiles)
+                    print('E_datafiles:', self.E_datafiles)
+            except Exception as e:
+                raise ValueError(f"Error accessing data files: {str(e)}")
+
+            # Process each test in the test plan
+            for index, curr_test in self.test_list.iterrows():
+                try:
+                    # Ensure required columns exist
+                    required_columns = ['Test_Label', 'AIIC', 'ASTC', 'NIC', 'DTC']
+                    missing_columns = [col for col in required_columns if col not in curr_test.index]
+                    if missing_columns:
+                        raise ValueError(f"Missing required columns: {', '.join(missing_columns)}")
+
+                    if self.debug_checkbox.active:
+                        print(f"\nProcessing test row {index}:")
+                        print(curr_test)
+
+                    test_label = curr_test['Test_Label']
+                    self.status_label.text = f'Status: Processing test: {test_label}'
+
+                    # Create room properties
+                    try:
+                        room_props = self.assign_room_properties(curr_test)
+                    except Exception as e:
+                        raise ValueError(f"Error creating room properties: {str(e)}")
+
+                    # Process enabled tests
+                    curr_test_data = {}
+                    for test_type, column in {
+                        TestType.AIIC: 'AIIC',
+                        TestType.ASTC: 'ASTC',
+                        TestType.NIC: 'NIC',
+                        TestType.DTC: 'DTC'
+                    }.items():
+                        if curr_test[column] == 1:
+                            try:
+                                if self.debug_checkbox.active:
+                                    print(f"Loading {test_type.value} test data...")
+                                slm_data_paths = {
+                                    'meter_1': self.slm_data_1_path.text,
+                                    'meter_2': self.slm_data_2_path.text
+                                }
+                                test_data = self.test_processor.load_test_data(
+                                    curr_test=curr_test,
+                                    test_type=test_type,
+                                    room_props=room_props,
+                                    slm_data_paths=slm_data_paths
+                                )
+                                curr_test_data[test_type] = {
+                                    'room_properties': room_props,
+                                    'test_data': test_data
+                                }
+                            except Exception as e:
+                                print(f"Error loading {test_type.value} test: {str(e)}")
+
+                    if curr_test_data:
+                        self.test_data_collection[test_label] = curr_test_data
+
+                except Exception as e:
+                    print(f"Error processing test row {index}: {str(e)}")
+                    continue
+
+            self.status_label.text = 'Status: All test data loaded successfully'
+            return True
+
         except Exception as e:
-            self._show_error(f'Error loading data: {str(e)}')
+            error_msg = f"Error loading data: {str(e)}"
+            print(error_msg)
+            self.status_label.text = f'Status: {error_msg}'
+            self._show_error(error_msg)
+            return False
+
+    def assign_room_properties(self, test_row: pd.Series) -> RoomProperties:
+        """Create RoomProperties from test row data"""
+        print('test_row:', test_row)
+        return RoomProperties(
+            site_name=test_row['Site_Name'],
+            client_name=test_row['Client_Name'],
+            source_room=test_row['Source Room'],
+            receive_room=test_row['Receiving Room'], 
+            test_date=test_row['Test Date'],
+            report_date=test_row['Report Date'],
+            project_name=test_row['Project Name'],
+            test_label=test_row['Test_Label'],
+            source_vol=test_row['source room vol'],
+            receive_vol=test_row['receive room vol'],
+            partition_area=test_row['partition area'],
+            partition_dim=test_row['partition dim'],
+            source_room_finish=test_row['source room finish'],
+            source_room_name=test_row['Source Room'],
+            receive_room_finish=test_row['receive room finish'],
+            receive_room_name=test_row['Receiving Room'],
+            srs_floor=test_row['srs floor descrip.'],
+            srs_ceiling=test_row['srs ceiling descrip.'],
+            srs_walls=test_row['srs walls descrip.'],
+            rec_floor=test_row['rec floor descrip.'],
+            rec_ceiling=test_row['rec ceiling descrip.'],
+            rec_walls=test_row['rec walls descrip.'],
+            annex_2_used=test_row['Annex 2 used?'],
+            tested_assembly=test_row['tested assembly'],  ## potentially redunant - expect to remove
+            test_assembly_type=test_row['Test assembly Type'],
+            expected_performance=test_row['expected performance']
+        )
 
     def calculate_single_test(self, instance):
         """Calculate results for a single test"""
@@ -234,22 +379,40 @@ class MainWindow(BoxLayout):
             if self.debug_checkbox.active:
                 print(f"Error viewing test data: {str(e)}")
 
-    def open_test_plan_input(self, instance):
-        """Open test plan input window"""
-        content = TestPlanInputWindow(callback_on_save=self.on_test_plan_saved)
-        popup = Popup(
-            title='Test Plan Input',
+    def show_test_plan_input(self, instance):
+        """Show test plan input window"""
+        content = TestPlanInputWindow(callback_on_save=self.on_test_plan_save)
+        self.test_plan_popup = Popup(
+            title='Add New Test',
             content=content,
-            size_hint=(0.8, 0.9)
+            size_hint=(0.9, 0.9)
         )
-        popup.open()
+        self.test_plan_popup.open()
 
-    def on_test_plan_saved(self, room_properties: RoomProperties, test_type: TestType):
+    def on_test_plan_save(self, room_properties: RoomProperties, test_type: TestType):
         """Handle saved test plan data"""
-        # Update test data manager
-        self.test_data_manager.add_test(room_properties, test_type)
-        # Update UI
-        self.update_test_list()
+        try:
+            # Add the new test data to the collection
+            test_label = room_properties.test_label
+            self.test_data_collection[test_label] = {
+                test_type: {
+                    'room_properties': room_properties,
+                    'test_data': None  # Will be populated when data files are loaded
+                }
+            }
+            
+            if self.debug_checkbox.active:
+                print(f"Added new test: {test_label} ({test_type.value})")
+                print(f"Room properties: {vars(room_properties)}")
+            
+            self.status_label.text = f'Status: Added new test {test_label}'
+            
+            # Update analysis dashboard if it exists
+            if hasattr(self, 'analysis_dashboard'):
+                self.analysis_dashboard.update_data(self.test_data_collection)
+                
+        except Exception as e:
+            self._show_error(f"Error saving test plan: {str(e)}")
 
     def preview_pdf(self, pdf_path):
         """Preview generated PDF report"""
@@ -327,6 +490,24 @@ class MainWindow(BoxLayout):
             
         except Exception as e:
             self._show_error(f'Error generating report: {str(e)}')
+
+    def populate_test_inputs(self, instance):
+        """Populate test input fields with default test paths"""
+        try:
+            # Set default test paths
+            self.test_plan_path.text = "./Exampledata/TestPlan_ASTM_testingv2.xlsx"
+            self.output_path.text = "./Exampledata/testeroutputs/"
+            self.slm_data_1_path.text = "./Exampledata/RawData/A_Meter/"
+            self.slm_data_2_path.text = "./Exampledata/RawData/E_Meter/"
+            
+            # Update status label
+            self.status_label.text = "Status: Example test inputs populated"
+            
+            if self.debug_checkbox.active:
+                print("Test inputs populated with example data")
+                
+        except Exception as e:
+            self._show_error(f"Error populating test inputs: {str(e)}")
 
 class MainApp(App):
     def build(self):
