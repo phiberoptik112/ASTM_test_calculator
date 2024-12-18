@@ -47,8 +47,7 @@ class MainWindow(BoxLayout):
         self.spacing = 10
         
         # Initialize managers
-        self.test_data_manager = TestDataManager()
-        self.test_processor = TestProcessor(debug_mode=True)  # or False for production
+        self.test_data_manager = TestDataManager(debug_mode=True)  # or False for production
         
         # Create UI Components
         self._create_file_inputs()
@@ -219,100 +218,25 @@ class MainWindow(BoxLayout):
 
     def load_data(self, instance):
         """Load and process test data files"""
-        self.test_data_collection = {}  # Initialize collection
         try:
-            # Validate inputs
-            if not all([self.test_plan_path.text, self.slm_data_1_path.text, 
-                       self.slm_data_2_path.text, self.output_path.text]):
-                raise ValueError("All file paths must be specified")
-
+            # Set data paths
+            self.test_data_manager.set_data_paths(
+                meter_1_path=self.slm_data_1_path.text,
+                meter_2_path=self.slm_data_2_path.text
+            )
+            
             # Load test plan
-            try:
-                self.test_list = pd.read_excel(self.test_plan_path.text)
-                if self.debug_checkbox.active:
-                    print("Test plan columns:", self.test_list.columns.tolist())
-            except Exception as e:
-                raise ValueError(f"Error reading test plan: {str(e)}")
-
-            # Get data files
-            try:
-                self.D_datafiles = [f for f in listdir(self.slm_data_1_path.text) 
-                                   if isfile(join(self.slm_data_1_path.text, f))]
-                self.E_datafiles = [f for f in listdir(self.slm_data_2_path.text) 
-                                   if isfile(join(self.slm_data_2_path.text, f))]
-                
-                if self.debug_checkbox.active:
-                    print('D_datafiles:', self.D_datafiles)
-                    print('E_datafiles:', self.E_datafiles)
-            except Exception as e:
-                raise ValueError(f"Error accessing data files: {str(e)}")
-
-            # Process each test in the test plan
-            for index, curr_test in self.test_list.iterrows():
-                try:
-                    # Ensure required columns exist
-                    required_columns = ['Test_Label', 'AIIC', 'ASTC', 'NIC', 'DTC']
-                    missing_columns = [col for col in required_columns if col not in curr_test.index]
-                    if missing_columns:
-                        raise ValueError(f"Missing required columns: {', '.join(missing_columns)}")
-
-                    if self.debug_checkbox.active:
-                        print(f"\nProcessing test row {index}:")
-                        print(curr_test)
-
-                    test_label = curr_test['Test_Label']
-                    self.status_label.text = f'Status: Processing test: {test_label}'
-
-                    # Create room properties
-                    try:
-                        room_props = self.assign_room_properties(curr_test)
-                    except Exception as e:
-                        raise ValueError(f"Error creating room properties: {str(e)}")
-
-                    # Process enabled tests
-                    curr_test_data = {}
-                    for test_type, column in {
-                        TestType.AIIC: 'AIIC',
-                        TestType.ASTC: 'ASTC',
-                        TestType.NIC: 'NIC',
-                        TestType.DTC: 'DTC'
-                    }.items():
-                        if curr_test[column] == 1:
-                            try:
-                                if self.debug_checkbox.active:
-                                    print(f"Loading {test_type.value} test data...")
-                                slm_data_paths = {
-                                    'meter_1': self.slm_data_1_path.text,
-                                    'meter_2': self.slm_data_2_path.text
-                                }
-                                test_data = self.test_processor.load_test_data(
-                                    curr_test=curr_test,
-                                    test_type=test_type,
-                                    room_props=room_props,
-                                    slm_data_paths=slm_data_paths
-                                )
-                                curr_test_data[test_type] = {
-                                    'room_properties': room_props,
-                                    'test_data': test_data
-                                }
-                            except Exception as e:
-                                print(f"Error loading {test_type.value} test: {str(e)}")
-
-                    if curr_test_data:
-                        self.test_data_collection[test_label] = curr_test_data
-
-                except Exception as e:
-                    print(f"Error processing test row {index}: {str(e)}")
-                    continue
-
+            self.test_data_manager.load_test_plan(self.test_plan_path.text)
+            
+            # Process all test data
+            self.test_data_manager.process_test_data()
+            
+            # Update status
             self.status_label.text = 'Status: All test data loaded successfully'
             return True
-
+            
         except Exception as e:
-            error_msg = f"Error loading data: {str(e)}"
-            print(error_msg)
-            self.status_label.text = f'Status: {error_msg}'
-            self._show_error(error_msg)
+            self._show_error(f"Error loading data: {str(e)}")
             return False
 
     def assign_room_properties(self, test_row: pd.Series) -> RoomProperties:
