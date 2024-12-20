@@ -347,7 +347,7 @@ class TestDataManager:
 
         # Get meter identifier and number
         meter_id = find_datafile[0].upper()
-        file_number = find_datafile[1:]  # e.g., '034' or '282'
+        file_number = find_datafile[1:].zfill(3)  # e.g., '034' or '282' (ensure 3 digits)
         
         # Define paths for different meter types
         raw_testpaths = {
@@ -372,20 +372,22 @@ class TestDataManager:
         datatype_clean = datatype.replace('.', '')  # Remove dot from datatype
 
         # Look for files that match the pattern:
-        # 831_*-{datatype}{file_number}.xlsx
+        # 831_*-{datatype}.{file_number}.xlsx
         matching_files = []
         for filename in datafiles:
+            # Check if file matches our pattern
             if (datatype_clean in filename and  # Contains datatype (e.g., '831_Data' or 'RT_Data')
-                filename.endswith(f"{file_number}.xlsx")):  # Ends with the number we want
+                filename.endswith(f"{file_number}.xlsx")):  # Ends with .034.xlsx for example
                 matching_files.append(filename)
                 if self.debug_mode:
                     print(f"Found matching file: {filename}")
 
         if not matching_files:
             if self.debug_mode:
-                print("\nAvailable files:")
+                print("\nNo matches found. Available files:")
                 for f in datafiles:
                     print(f"  {f}")
+                print(f"\nWas looking for pattern: *{datatype_clean}*{file_number}.xlsx")
             raise ValueError(f"No matching files found for number {file_number} with type {datatype_clean}")
 
         # Use the most recent file if multiple matches exist
