@@ -43,21 +43,25 @@ class MainWindow(BoxLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.orientation = 'vertical'
-        self.padding = 10
         self.spacing = 10
+        self.padding = 10
         
-        # Initialize managers
-        self.test_data_manager = TestDataManager(debug_mode=True)  # or False for production
+        # Initialize TestDataManager with debug mode
+        self.test_data_manager = TestDataManager(debug_mode=True)  # Can be tied to checkbox later
         
-        # Create UI Components
-        self._create_file_inputs()
+        # Create UI sections
+        self._create_input_section()
         self._create_test_controls()
         self._create_analysis_section()
         self._create_status_section()
-        
-    def _create_file_inputs(self):
-        """Create file input section"""
-        input_grid = GridLayout(cols=2, spacing=5, size_hint_y=0.4)
+
+    def _create_input_section(self):
+        """Create input fields section"""
+        input_grid = GridLayout(
+            cols=2,
+            spacing=5,
+            size_hint_y=0.4
+        )
         
         # Test Plan Input
         input_grid.add_widget(Label(text='Test Plan:'))
@@ -114,14 +118,6 @@ class MainWindow(BoxLayout):
         )
         self.populate_button.bind(on_press=self.populate_test_inputs)
         button_layout.add_widget(self.populate_button)
-        
-        # Add New Test Button
-        self.new_test_button = Button(
-            text='Add New Test',
-            size_hint_x=0.5
-        )
-        self.new_test_button.bind(on_press=self.show_test_plan_input)
-        button_layout.add_widget(self.new_test_button)
         
         self.add_widget(button_layout)
 
@@ -216,27 +212,71 @@ class MainWindow(BoxLayout):
         )
         popup.open()
 
+    def populate_test_inputs(self, instance):
+        """Populate input fields with example data paths"""
+        self.test_plan_path.text = "./Exampledata/TestPlan_ASTM_testingv2.xlsx"
+        self.slm_data_1_path.text = "./Exampledata/RawData/A_Meter/"
+        self.slm_data_2_path.text = "./Exampledata/RawData/E_Meter/"
+        self.output_path.text = "./Exampledata/testeroutputs/"
+        
+        self.status_label.text = "Status: Test inputs populated with example data"
+
     def load_data(self, instance):
         """Load and process test data files"""
         try:
-            # Set data paths
+            # Update status
+            self.status_label.text = 'Status: Loading Data...'
+            
+            # Get debug mode from checkbox
+            debug_mode = self.debug_checkbox.active
+            
+            # Initialize TestDataManager with debug mode
+            self.test_data_manager = TestDataManager(debug_mode=debug_mode)
+            
+            if debug_mode:
+                print("\n=== Loading Data ===")
+                print(f"Test Plan Path: {self.test_plan_path.text}")
+                print(f"Meter 1 Path: {self.slm_data_1_path.text}")
+                print(f"Meter 2 Path: {self.slm_data_2_path.text}")
+                print(f"Output Path: {self.output_path.text}")
+            
+            # Sanitize and validate paths
+            paths = {
+                'test_plan': os.path.abspath(self.test_plan_path.text),
+                'meter_1': os.path.abspath(self.slm_data_1_path.text),
+                'meter_2': os.path.abspath(self.slm_data_2_path.text),
+                'output': os.path.abspath(self.output_path.text)
+            }
+            
+            # Set paths in TestDataManager
             self.test_data_manager.set_data_paths(
-                meter_1_path=self.slm_data_1_path.text,
-                meter_2_path=self.slm_data_2_path.text
+                test_plan_path=paths['test_plan'],
+                meter_d_path=paths['meter_1'],
+                meter_e_path=paths['meter_2'],
+                output_path=paths['output']
             )
             
             # Load test plan
-            self.test_data_manager.load_test_plan(self.test_plan_path.text)
+            if debug_mode:
+                print("\nLoading test plan...")
+            self.test_data_manager.load_test_plan()
             
             # Process all test data
-            self.test_data_manager.process_test_data()
-            
-            # Update status
-            self.status_label.text = 'Status: All test data loaded successfully'
-            return True
+            if self.test_data_manager.process_test_data():
+                self.status_label.text = 'Status: All test data loaded successfully'
+                return True
+            else:
+                self.status_label.text = 'Status: Error processing test data'
+                return False
             
         except Exception as e:
-            self._show_error(f"Error loading data: {str(e)}")
+            error_msg = f"Error loading data: {str(e)}"
+            if debug_mode:
+                print(f"\nERROR: {error_msg}")
+                print(f"Stack trace:")
+                import traceback
+                traceback.print_exc()
+            self._show_error(error_msg)
             return False
 
     def assign_room_properties(self, test_row: pd.Series) -> RoomProperties:
@@ -414,24 +454,6 @@ class MainWindow(BoxLayout):
             
         except Exception as e:
             self._show_error(f'Error generating report: {str(e)}')
-
-    def populate_test_inputs(self, instance):
-        """Populate test input fields with default test paths"""
-        try:
-            # Set default test paths
-            self.test_plan_path.text = "./Exampledata/TestPlan_ASTM_testingv2.xlsx"
-            self.output_path.text = "./Exampledata/testeroutputs/"
-            self.slm_data_1_path.text = "./Exampledata/RawData/A_Meter/"
-            self.slm_data_2_path.text = "./Exampledata/RawData/E_Meter/"
-            
-            # Update status label
-            self.status_label.text = "Status: Example test inputs populated"
-            
-            if self.debug_checkbox.active:
-                print("Test inputs populated with example data")
-                
-        except Exception as e:
-            self._show_error(f"Error populating test inputs: {str(e)}")
 
 class MainApp(App):
     def build(self):
