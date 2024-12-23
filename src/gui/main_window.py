@@ -46,6 +46,9 @@ class MainWindow(BoxLayout):
         self.spacing = 10
         self.padding = 10
         
+        # Initialize collections
+        self.test_data_collection = {}
+        
         # Initialize TestDataManager with debug mode
         self.test_data_manager = TestDataManager(debug_mode=False)  # Can be tied to checkbox later
         
@@ -65,11 +68,24 @@ class MainWindow(BoxLayout):
         
         # Test Plan Input
         input_grid.add_widget(Label(text='Test Plan:'))
+        test_plan_layout = BoxLayout(orientation='horizontal', spacing=5)
+        
         self.test_plan_path = TextInput(
             multiline=False,
-            hint_text='Path to test plan Excel file'
+            hint_text='Path to test plan Excel file',
+            size_hint_x=0.7
         )
-        input_grid.add_widget(self.test_plan_path)
+        test_plan_layout.add_widget(self.test_plan_path)
+        
+        # Add Test Plan GUI Button
+        self.test_plan_gui_button = Button(
+            text='Open Test Plan GUI',
+            size_hint_x=0.3
+        )
+        self.test_plan_gui_button.bind(on_press=self.show_test_plan_input)
+        test_plan_layout.add_widget(self.test_plan_gui_button)
+        
+        input_grid.add_widget(test_plan_layout)
         
         # SLM Data Inputs
         input_grid.add_widget(Label(text='SLM Data Meter 1:'))
