@@ -111,11 +111,16 @@ class TestDataManager:
         if self.test_plan is None:
             raise ValueError("No test plan loaded")
 
+        if self.debug_mode:
+            print("\n=== Processing Test Data ===")
+            print(f"Number of tests to process: {len(self.test_plan)}")
+
         for index, curr_test in self.test_plan.iterrows():
             try:
                 test_label = curr_test['Test_Label']
                 if self.debug_mode:
-                    print(f"\nProcessing test {test_label}")
+                    print(f"\nProcessing test {test_label} (row {index})")
+                    print(f"Test data: {curr_test}")
 
                 # Create room properties
                 room_props = self._create_room_properties(curr_test)
@@ -130,26 +135,41 @@ class TestDataManager:
                 }.items():
                     if curr_test[column] == 1:
                         try:
-                            test_data = self.test_processor.load_test_data(
+                            if self.debug_mode:
+                                print(f"\nProcessing {test_type.value} test")
+                                
+                            # Use the class's own load_test_data method instead of test_processor
+                            test_data = self.load_test_data(
                                 curr_test=curr_test,
                                 test_type=test_type,
-                                room_props=room_props,
-                                slm_data_paths=self.slm_data_paths
+                                room_props=room_props
                             )
+                            
                             curr_test_data[test_type] = {
                                 'room_properties': room_props,
                                 'test_data': test_data
                             }
+                            
+                            if self.debug_mode:
+                                print(f"Successfully processed {test_type.value} test")
+                                
                         except Exception as e:
                             if self.debug_mode:
                                 print(f"Error processing {test_type.value} test: {str(e)}")
+                                import traceback
+                                traceback.print_exc()
 
                 if curr_test_data:
                     self.test_data_collection[test_label] = curr_test_data
+                    if self.debug_mode:
+                        print(f"Added test data for {test_label} with types: {list(curr_test_data.keys())}")
 
             except Exception as e:
                 if self.debug_mode:
                     print(f"Error processing test row {index}: {str(e)}")
+                print(f"Test label: {curr_test.get('Test_Label', 'Unknown')}")
+                import traceback
+                traceback.print_exc()
 
     def get_test_data(self, test_label: str, test_type: TestType) -> Optional[Dict]:
         """Retrieve test data for specific test and type"""
@@ -276,7 +296,7 @@ class TestDataManager:
                 print('Loading base data')
             base_data = {
                 'srs_data': self._raw_slm_datapull(curr_test['Source'], '-831_Data.'),
-                'recive_data': self._raw_slm_datapull(curr_test['Recieve '], '-831_Data.'),
+                'recive_data': self._raw_slm_datapull(curr_test['Receive'], '-831_Data.'),
                 'bkgrnd_data': self._raw_slm_datapull(curr_test['BNL'], '-831_Data.'),
                 'rt': self._raw_slm_datapull(curr_test['RT'], '-RT_Data.')
             }
@@ -331,23 +351,19 @@ class TestDataManager:
         return DTCtestData(room_properties=room_props, test_data=dtc_data)
 
     def _raw_slm_datapull(self, find_datafile: str, datatype: str) -> pd.DataFrame:
-        """Pull data from SLM files
-        
-        Args:
-            find_datafile (str): File identifier (e.g., 'A034' or 'E282')
-            datatype (str): Either '-831_Data.' for regular measurements or '-RT_Data.' for reverberation time
-            
-        Returns:
-            pd.DataFrame: Formatted measurement data
-        """
+        """Pull data from SLM files"""
+        ### need to put in format_SLM data function???
         if self.debug_mode:
             print("\n=== RAW_SLM_DATAPULL ===")
             print(f"Looking for file identifier: {find_datafile}")
             print(f"Data type: {datatype}")
 
         # Get meter identifier and number
+        if not find_datafile or len(find_datafile) < 2:
+            raise ValueError(f"Invalid file identifier: {find_datafile}")
+        
         meter_id = find_datafile[0].upper()
-        file_number = find_datafile[1:].zfill(3)  # e.g., '034' or '282' (ensure 3 digits)
+        file_number = find_datafile[1:].zfill(3)  # e.g., '034' or '282'
         
         # Define paths for different meter types
         raw_testpaths = {
@@ -369,15 +385,15 @@ class TestDataManager:
             print(f"Data type: {datatype}")
 
         # Clean up datatype string for matching
-        datatype_clean = datatype.replace('.', '')  # Remove dot from datatype
+        datatype_clean = datatype.replace('.', '').replace('-', '')  # Remove dots and hyphens
 
-        # Look for files that match the pattern:
-        # 831_*-{datatype}.{file_number}.xlsx
+        # Look for files that match the actual pattern:
+        # 831_*-*-831_Data.034.xlsx or 831_*-*-RT_Data.034.xlsx
         matching_files = []
         for filename in datafiles:
-            # Check if file matches our pattern
-            if (datatype_clean in filename and  # Contains datatype (e.g., '831_Data' or 'RT_Data')
-                filename.endswith(f"{file_number}.xlsx")):  # Ends with .034.xlsx for example
+            # Check if both the data type and file number are in the filename
+            if (datatype_clean in filename.replace('-', '') and  # Handle data type
+                f".{file_number}.xlsx" in filename):            # Handle file number
                 matching_files.append(filename)
                 if self.debug_mode:
                     print(f"Found matching file: {filename}")
@@ -387,7 +403,9 @@ class TestDataManager:
                 print("\nNo matches found. Available files:")
                 for f in datafiles:
                     print(f"  {f}")
-                print(f"\nWas looking for pattern: *{datatype_clean}*{file_number}.xlsx")
+                print(f"\nWas looking for:")
+                print(f"  - Data type: {datatype_clean}")
+                print(f"  - File number: {file_number}")
             raise ValueError(f"No matching files found for number {file_number} with type {datatype_clean}")
 
         # Use the most recent file if multiple matches exist
@@ -399,14 +417,12 @@ class TestDataManager:
             print(f"Full path: {full_path}")
 
         try:
-            if datatype == '-831_Data.':
-                print(f"Reading OBA sheet for measurement data")
-                df = pd.read_excel(full_path, sheet_name='OBA')
-            elif datatype == '-RT_Data.':
+            if 'RT_Data' in datatype:
                 print(f"Reading Summary sheet for RT data")
                 df = pd.read_excel(full_path, sheet_name='Summary')
             else:
-                raise ValueError(f"Unknown datatype: {datatype}")
+                print(f"Reading OBA sheet for measurement data")
+                df = pd.read_excel(full_path, sheet_name='OBA')
             
             if df.empty:
                 raise ValueError(f"Empty DataFrame loaded from {full_path}")

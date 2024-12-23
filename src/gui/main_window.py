@@ -47,7 +47,7 @@ class MainWindow(BoxLayout):
         self.padding = 10
         
         # Initialize TestDataManager with debug mode
-        self.test_data_manager = TestDataManager(debug_mode=True)  # Can be tied to checkbox later
+        self.test_data_manager = TestDataManager(debug_mode=False)  # Can be tied to checkbox later
         
         # Create UI sections
         self._create_input_section()
@@ -231,52 +231,76 @@ class MainWindow(BoxLayout):
             debug_mode = self.debug_checkbox.active
             
             # Initialize TestDataManager with debug mode
+            print(f"Debug mode: {debug_mode}")
+            print(f"TestDataManager: {self.test_data_manager}")
             self.test_data_manager = TestDataManager(debug_mode=debug_mode)
             
+            # Print debug info before path processing
             if debug_mode:
                 print("\n=== Loading Data ===")
-                print(f"Test Plan Path: {self.test_plan_path.text}")
-                print(f"Meter 1 Path: {self.slm_data_1_path.text}")
-                print(f"Meter 2 Path: {self.slm_data_2_path.text}")
-                print(f"Output Path: {self.output_path.text}")
+                print(f"Raw Test Plan Path: {self.test_plan_path.text}")
+                print(f"Raw Meter 1 Path: {self.slm_data_1_path.text}")
+                print(f"Raw Meter 2 Path: {self.slm_data_2_path.text}")
+                print(f"Raw Output Path: {self.output_path.text}")
             
-            # Sanitize and validate paths
-            paths = {
-                'test_plan': os.path.abspath(self.test_plan_path.text),
-                'meter_1': os.path.abspath(self.slm_data_1_path.text),
-                'meter_2': os.path.abspath(self.slm_data_2_path.text),
-                'output': os.path.abspath(self.output_path.text)
-            }
+            # Convert relative paths to absolute and normalize them
+            try:
+                base_dir = os.path.dirname(os.path.abspath(__file__))  # Get the directory of main_window.py
+                paths = {
+                    'test_plan': os.path.abspath(os.path.join(base_dir, '..', '..', self.test_plan_path.text)),
+                    'meter_1': os.path.abspath(os.path.join(base_dir, '..', '..', self.slm_data_1_path.text)),
+                    'meter_2': os.path.abspath(os.path.join(base_dir, '..', '..', self.slm_data_2_path.text)),
+                    'output': os.path.abspath(os.path.join(base_dir, '..', '..', self.output_path.text))
+                }
+                
+                if debug_mode:
+                    print("\n=== Resolved Paths ===")
+                    for key, path in paths.items():
+                        print(f"{key}: {path}")
+                        print(f"Exists: {os.path.exists(path)}")
+            
+            except Exception as e:
+                raise ValueError(f"Error resolving paths: {str(e)}")
             
             # Set paths in TestDataManager
-            self.test_data_manager.set_data_paths(
-                test_plan_path=paths['test_plan'],
-                meter_d_path=paths['meter_1'],
-                meter_e_path=paths['meter_2'],
-                output_path=paths['output']
-            )
+            try:
+                self.test_data_manager.set_data_paths(
+                    test_plan_path=paths['test_plan'],
+                    meter_d_path=paths['meter_1'],
+                    meter_e_path=paths['meter_2'],
+                    output_path=paths['output']
+                )
+            except Exception as e:
+                raise ValueError(f"Error setting paths in TestDataManager: {str(e)}")
             
             # Load test plan
-            if debug_mode:
-                print("\nLoading test plan...")
-            self.test_data_manager.load_test_plan()
+            try:
+                if debug_mode:
+                    print("\nLoading test plan...")
+                self.test_data_manager.load_test_plan()
+            except Exception as e:
+                raise ValueError(f"Error loading test plan: {str(e)}")
             
-            # Process all test data
-            if self.test_data_manager.process_test_data():
+            # Process test data
+            try:
+                if debug_mode:
+                    print("\nProcessing test data...")
+                self.test_data_manager.process_test_data()
                 self.status_label.text = 'Status: All test data loaded successfully'
                 return True
-            else:
-                self.status_label.text = 'Status: Error processing test data'
-                return False
-            
+                
+            except Exception as e:
+                raise ValueError(f"Error processing test data: {str(e)}")
+                
         except Exception as e:
             error_msg = f"Error loading data: {str(e)}"
             if debug_mode:
                 print(f"\nERROR: {error_msg}")
-                print(f"Stack trace:")
+                print("Stack trace:")
                 import traceback
                 traceback.print_exc()
             self._show_error(error_msg)
+            self.status_label.text = f"Status: {error_msg}"
             return False
 
     def assign_room_properties(self, test_row: pd.Series) -> RoomProperties:
