@@ -11,7 +11,8 @@ from data_processor import (
     AIICTestData,
     ASTCTestData,
     NICTestData,
-    DTCtestData
+    DTCtestData,
+    SLMData
 )
 from src.core.test_processor import TestProcessor
 
@@ -170,6 +171,14 @@ class TestDataManager:
                 print(f"Test label: {curr_test.get('Test_Label', 'Unknown')}")
                 import traceback
                 traceback.print_exc()
+
+        if self.debug_mode:
+            print(f"\nProcessed {len(self.test_data_collection)} tests")
+        
+        # Show test overview window
+        if hasattr(self, 'parent_window'):
+            from src.gui.components.test_overview import TestOverviewWindow
+            TestOverviewWindow(self.parent_window, self)
 
     def get_test_data(self, test_label: str, test_type: TestType) -> Optional[Dict]:
         """Retrieve test data for specific test and type"""
@@ -350,8 +359,51 @@ class TestDataManager:
         dtc_data.update(additional_data)
         return DTCtestData(room_properties=room_props, test_data=dtc_data)
 
-    def _raw_slm_datapull(self, find_datafile: str, datatype: str) -> pd.DataFrame:
-        """Pull data from SLM files"""
+    def format_slm_data(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Format raw SLM data from OBA sheet into properly structured DataFrame
+        
+        Args:
+            df: Raw DataFrame from OBA sheet
+        
+        Returns:
+            Formatted DataFrame with proper column labels and frequency data
+        """
+        try:
+            # Extract frequency rows (first few rows contain 1/3 octave data)
+            freq_data = df.iloc[0:12]  # Adjust range if needed
+            
+            # Get frequency values from first row
+            frequencies = freq_data.iloc[0].dropna().tolist()[1:]  # Skip first column
+            
+            # Create dictionary to store different measurements
+            measurements = {
+                'Overall 1/3 Spectra': freq_data.iloc[2].dropna().tolist()[1:],
+                'Max 1/3 Spectra': freq_data.iloc[3].dropna().tolist()[1:],
+                'Min 1/3 Spectra': freq_data.iloc[4].dropna().tolist()[1:]
+            }
+            
+            # Create formatted DataFrame
+            formatted_df = pd.DataFrame(measurements, index=frequencies)
+            
+            # Set frequency as column name instead of index
+            formatted_df.reset_index(inplace=True)
+            formatted_df.rename(columns={'index': 'Frequency (Hz)'}, inplace=True)
+            
+            # Convert frequency values to numeric
+            formatted_df['Frequency (Hz)'] = pd.to_numeric(formatted_df['Frequency (Hz)'])
+            
+            # Convert measurement values to numeric
+            for col in formatted_df.columns[1:]:
+                formatted_df[col] = pd.to_numeric(formatted_df[col], errors='coerce')
+            
+            return formatted_df
+        
+        except Exception as e:
+            raise ValueError(f"Error formatting SLM data: {str(e)}")
+
+    def _raw_slm_datapull(self, find_datafile: str, datatype: str) -> SLMData:
+        """Pull data from SLM files and return as SLMData object"""
         ### need to put in format_SLM data function???
         if self.debug_mode:
             print("\n=== RAW_SLM_DATAPULL ===")
@@ -420,18 +472,24 @@ class TestDataManager:
             if 'RT_Data' in datatype:
                 print(f"Reading Summary sheet for RT data")
                 df = pd.read_excel(full_path, sheet_name='Summary')
+                measurement_type = 'RT_Data'
             else:
                 print(f"Reading OBA sheet for measurement data")
                 df = pd.read_excel(full_path, sheet_name='OBA')
+                measurement_type = '831_Data'
             
             if df.empty:
                 raise ValueError(f"Empty DataFrame loaded from {full_path}")
             
+            # Create SLMData object
+            slm_data = SLMData(raw_data=df, measurement_type=measurement_type)
+            
             if self.debug_mode:
                 print(f"Successfully loaded data with shape: {df.shape}")
-                print("Columns:", df.columns.tolist())
-            
-            return df
+                print("Measurement type:", measurement_type)
+                print("Frequency bands:", len(slm_data.frequency_bands))
+                
+            return slm_data
             
         except Exception as e:
             if self.debug_mode:
@@ -439,4 +497,4 @@ class TestDataManager:
                 print(f"Exception: {str(e)}")
                 print(f"File: {selected_file}")
                 print(f"Path attempted: {full_path}")
-            raise ValueError(f"Error reading {full_path}: {str(e)}")
+            raise

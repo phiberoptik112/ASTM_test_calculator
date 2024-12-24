@@ -673,5 +673,125 @@ def sanitize_filepath(filepath: str) -> str:
     filepath = filepath.replace('\\', '/')
     return filepath
 
+@dataclass
+class SLMData:
+    """Class to handle Sound Level Meter data with both raw and processed formats"""
+    raw_data: pd.DataFrame
+    measurement_type: str  # '831_Data' or 'RT_Data'
+    
+    def __post_init__(self):
+        """Validate and process raw data after initialization"""
+        self._validate_raw_data()
+        self._process_data()
+    
+    def _validate_raw_data(self):
+        """Validate the raw data format"""
+        if self.raw_data.empty:
+            raise ValueError("Empty DataFrame provided")
+        
+        if self.measurement_type == 'RT_Data':
+            if 'Unnamed: 10' not in self.raw_data.columns:
+                raise ValueError("RT data missing required column 'Unnamed: 10'")
+        else:
+            expected_cols = ['Frequency (Hz)', 'Overall 1/3 Spectra', 'Max 1/3 Spectra', 'Min 1/3 Spectra']
+            if not all(col in self.raw_data.columns for col in expected_cols):
+                raise ValueError(f"Missing required columns. Expected: {expected_cols}")
+    
+    def _process_data(self):
+        """Process raw data into structured format"""
+        if self.measurement_type == 'RT_Data':
+            self.processed_data = self.raw_data.copy()
+            # Extract RT30 values (indices 24:41 for 100-4000Hz range)
+            # Convert from milliseconds to seconds and round to 3 decimal places
+            self.rt_thirty = np.array(self.raw_data['Unnamed: 10'][24:41]/1000, 
+                                    dtype=np.float64).round(3)
+            self.frequency_bands = np.array([100, 125, 160, 200, 250, 315, 400, 500, 630, 
+                                          800, 1000, 1250, 1600, 2000, 2500, 3150, 4000])
+            self.overall_levels = self.rt_thirty
+        else:
+            # Process OBA sheet data
+            self.processed_data = self._format_oba_data()
+            self.frequency_bands = self.processed_data['Frequency (Hz)'].values
+            self.overall_levels = self.processed_data['Overall 1/3 Spectra'].values
+    
+    def _format_oba_data(self) -> pd.DataFrame:
+        """Format OBA sheet data into structured format"""
+        try:
+            # Find the 1/3 Octave section
+            third_oct_idx = self.raw_data.index[self.raw_data.iloc[:, 0] == '1/3 Octave'].tolist()[0]
+            
+            # Get all numeric data after the 1/3 Octave header
+            data_rows = []
+            current_row = []
+            
+            # Scan rows after 1/3 Octave header
+            for idx in range(third_oct_idx + 1, third_oct_idx + 15):  # Adjust range as needed
+                row = self.raw_data.iloc[idx]
+                # Convert row to numeric, keeping only valid numbers
+                numeric_values = pd.to_numeric(row, errors='coerce').dropna().tolist()
+                if numeric_values:
+                    data_rows.append(numeric_values)
+                    
+            # Combine all numeric values into frequency bands
+            all_values = []
+            for row in data_rows:
+                all_values.extend(row)
+                
+            # Standard frequency bands for 1/3 octave
+            frequencies = [12.5, 16, 20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160, 
+                          200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 
+                          2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000]
+                          
+            # Create DataFrame with the collected values
+            df = pd.DataFrame({
+                'Frequency (Hz)': frequencies[:len(all_values)],
+                'Overall 1/3 Spectra': all_values,
+                'Max 1/3 Spectra': all_values,  # Using same values for now
+                'Min 1/3 Spectra': all_values   # Using same values for now
+            })
+            
+            # Debug output
+            print("\nProcessed OBA Data:")
+            print(f"Found {len(all_values)} values")
+            print(f"Frequency range: {df['Frequency (Hz)'].min()} - {df['Frequency (Hz)'].max()} Hz")
+            print(f"Data shape: {df.shape}")
+            
+            return df
+            
+        except Exception as e:
+            print("\nDebug information:")
+            print("Raw data shape:", self.raw_data.shape)
+            print("First few rows of raw data:")
+            print(self.raw_data.head())
+            raise ValueError(f"Error processing OBA sheet: {str(e)}")
+    
+    def get_levels(self, freq_range: tuple = None) -> np.ndarray:
+        """Get overall levels, optionally filtered by frequency range"""
+        if freq_range is None:
+            return self.overall_levels
+            
+        mask = (self.frequency_bands >= freq_range[0]) & (self.frequency_bands <= freq_range[1])
+        return self.overall_levels[mask]
+    
+    def get_rt_thirty(self, freq_range: tuple = None) -> np.ndarray:
+        """Get RT30 values if this is RT data"""
+        if self.measurement_type != 'RT_Data':
+            raise ValueError("RT30 values only available for RT_Data type")
+            
+        if freq_range is None:
+            return self.rt_thirty
+            
+        mask = (self.frequency_bands >= freq_range[0]) & (self.frequency_bands <= freq_range[1])
+        return self.rt_thirty[mask]
+    
+    def plot_data(self) -> None:
+        """Plot the measurement data"""
+        plt.figure(figsize=(10, 6))
+        plt.semilogx(self.frequency_bands, self.overall_levels, 'b-o')
+        plt.grid(True)
+        plt.xlabel('Frequency (Hz)')
+        plt.ylabel('Level (dB)' if self.measurement_type == '831_Data' else 'RT30 (s)')
+        plt.title(f'SLM {self.measurement_type} Measurements')
+
 
 
