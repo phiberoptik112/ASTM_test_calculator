@@ -300,6 +300,9 @@ class TestDataManager:
             print(f'Loading base data for test: {curr_test["Test_Label"]} ({test_type.value})')
 
         try:
+            # Clean up column names in curr_test
+            curr_test.index = curr_test.index.str.strip()
+            
             # Load base data
             if self.debug_mode:
                 print('Loading base data')
@@ -404,11 +407,16 @@ class TestDataManager:
 
     def _raw_slm_datapull(self, find_datafile: str, datatype: str) -> SLMData:
         """Pull data from SLM files and return as SLMData object"""
-        ### need to put in format_SLM data function???
         if self.debug_mode:
             print("\n=== RAW_SLM_DATAPULL ===")
             print(f"Looking for file identifier: {find_datafile}")
             print(f"Data type: {datatype}")
+
+        # Clean up input file identifier
+        if isinstance(find_datafile, str):
+            find_datafile = find_datafile.strip()  # Remove any trailing spaces
+        else:
+            raise ValueError(f"Invalid file identifier type: {type(find_datafile)}")
 
         # Get meter identifier and number
         if not find_datafile or len(find_datafile) < 2:
@@ -439,8 +447,7 @@ class TestDataManager:
         # Clean up datatype string for matching
         datatype_clean = datatype.replace('.', '').replace('-', '')  # Remove dots and hyphens
 
-        # Look for files that match the actual pattern:
-        # 831_*-*-831_Data.034.xlsx or 831_*-*-RT_Data.034.xlsx
+        # Look for files that match the actual pattern
         matching_files = []
         for filename in datafiles:
             # Check if both the data type and file number are in the filename
@@ -498,3 +505,78 @@ class TestDataManager:
                 print(f"File: {selected_file}")
                 print(f"Path attempted: {full_path}")
             raise
+
+    def _verify_dataframes(self, data_dict: Dict[str, Union[pd.DataFrame, SLMData]]) -> None:
+        """
+        Verify that all data objects in the dictionary are valid and consistent.
+        
+        Args:
+            data_dict: Dictionary containing DataFrames or SLMData objects with test data
+                Expected keys: 'srs_data', 'recive_data', 'bkgrnd_data', 'rt'
+                
+        Raises:
+            ValueError: If any data is invalid or inconsistent
+        """
+        if not data_dict:
+            raise ValueError("Empty data dictionary provided")
+        
+        required_keys = {'srs_data', 'recive_data', 'bkgrnd_data', 'rt'}
+        missing_keys = required_keys - set(data_dict.keys())
+        if missing_keys:
+            raise ValueError(f"Missing required data keys: {missing_keys}")
+
+        # Verify each data object exists and has data
+        for key, data in data_dict.items():
+            if data is None:
+                raise ValueError(f"Missing data for {key}")
+            if not isinstance(data, (pd.DataFrame, SLMData)):
+                raise ValueError(f"Invalid data type for {key}: expected DataFrame or SLMData, got {type(data)}")
+            
+            # Check if data is empty
+            if isinstance(data, pd.DataFrame) and data.empty:
+                raise ValueError(f"Empty DataFrame for {key}")
+            elif isinstance(data, SLMData) and data.raw_data.empty:
+                raise ValueError(f"Empty SLMData for {key}")
+
+        # Verify measurement data consistency (excluding RT data which has different structure)
+        measurement_dfs = {
+            k: data.raw_data if isinstance(data, SLMData) else data 
+            for k, data in data_dict.items() 
+            if k != 'rt'
+        }
+        
+        # Get shapes of measurement DataFrames
+        shapes = {k: df.shape for k, df in measurement_dfs.items()}
+        if self.debug_mode:
+            print("\nDataFrame shapes:")
+            for k, shape in shapes.items():
+                print(f"{k}: {shape}")
+
+        # Verify all measurement DataFrames have same number of frequency bands
+        first_key = next(iter(measurement_dfs))
+        expected_rows = measurement_dfs[first_key].shape[0]
+        mismatched = [
+            (k, df.shape[0]) 
+            for k, df in measurement_dfs.items() 
+            if df.shape[0] != expected_rows
+        ]
+        
+        if mismatched:
+            raise ValueError(
+                f"Inconsistent number of frequency bands. Expected {expected_rows}, got: "
+                f"{', '.join(f'{k}: {rows}' for k, rows in mismatched)}"
+            )
+
+        # Verify RT data has expected structure
+        rt_data = data_dict['rt'].raw_data if isinstance(data_dict['rt'], SLMData) else data_dict['rt']
+        if 'Unnamed: 10' not in rt_data.columns:
+            raise ValueError("RT data missing expected column 'Unnamed: 10'")
+        
+        # Verify RT data has sufficient rows for frequency analysis
+        min_rt_rows = 41  # Based on your code showing RT data needs rows 24:41
+        if len(rt_data) < min_rt_rows:
+            raise ValueError(f"RT data has insufficient rows: {len(rt_data)} < {min_rt_rows}")
+
+        if self.debug_mode:
+            print("\nDataFrame validation successful")
+            print(f"Number of frequency bands: {expected_rows}")

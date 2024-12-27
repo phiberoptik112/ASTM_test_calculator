@@ -680,89 +680,94 @@ class SLMData:
     measurement_type: str  # '831_Data' or 'RT_Data'
     
     def __post_init__(self):
-        """Validate and process raw data after initialization"""
-        self._validate_raw_data()
-        self._process_data()
+        """Process raw data after initialization"""
+        if self.measurement_type == 'RT_Data':
+            self._validate_rt_data()
+            self._process_rt_data()
+        else:
+            self._process_oba_data()
+            self._validate_processed_data()
     
-    def _validate_raw_data(self):
-        """Validate the raw data format"""
+    def _validate_rt_data(self):
+        """Validate RT data format"""
         if self.raw_data.empty:
             raise ValueError("Empty DataFrame provided")
-        
-        if self.measurement_type == 'RT_Data':
-            if 'Unnamed: 10' not in self.raw_data.columns:
-                raise ValueError("RT data missing required column 'Unnamed: 10'")
-        else:
-            expected_cols = ['Frequency (Hz)', 'Overall 1/3 Spectra', 'Max 1/3 Spectra', 'Min 1/3 Spectra']
-            if not all(col in self.raw_data.columns for col in expected_cols):
-                raise ValueError(f"Missing required columns. Expected: {expected_cols}")
+        if 'Unnamed: 10' not in self.raw_data.columns:
+            raise ValueError("RT data missing required column 'Unnamed: 10'")
     
-    def _process_data(self):
-        """Process raw data into structured format"""
-        if self.measurement_type == 'RT_Data':
-            self.processed_data = self.raw_data.copy()
-            # Extract RT30 values (indices 24:41 for 100-4000Hz range)
-            # Convert from milliseconds to seconds and round to 3 decimal places
-            self.rt_thirty = np.array(self.raw_data['Unnamed: 10'][24:41]/1000, 
-                                    dtype=np.float64).round(3)
-            self.frequency_bands = np.array([100, 125, 160, 200, 250, 315, 400, 500, 630, 
-                                          800, 1000, 1250, 1600, 2000, 2500, 3150, 4000])
-            self.overall_levels = self.rt_thirty
-        else:
-            # Process OBA sheet data
-            self.processed_data = self._format_oba_data()
-            self.frequency_bands = self.processed_data['Frequency (Hz)'].values
-            self.overall_levels = self.processed_data['Overall 1/3 Spectra'].values
+    def _validate_processed_data(self):
+        """Validate processed data has required columns"""
+        expected_cols = ['Frequency (Hz)', 'Overall 1/3 Spectra', 'Max 1/3 Spectra', 'Min 1/3 Spectra']
+        if not all(col in self.processed_data.columns for col in expected_cols):
+            raise ValueError(f"Processing failed to create required columns: {expected_cols}")
     
-    def _format_oba_data(self) -> pd.DataFrame:
-        """Format OBA sheet data into structured format"""
+    def _process_rt_data(self):
+        """Process RT data"""
+        self.processed_data = self.raw_data.copy()
+        self.rt_thirty = np.array(self.raw_data['Unnamed: 10'][24:41]/1000, dtype=np.float64).round(3)
+        self.frequency_bands = np.array([100, 125, 160, 200, 250, 315, 400, 500, 630, 
+                                       800, 1000, 1250, 1600, 2000, 2500, 3150, 4000])
+        self.overall_levels = self.rt_thirty
+    
+    def _process_oba_data(self):
+        """Process OBA sheet data into structured format"""
         try:
-            # Find the 1/3 Octave section
-            third_oct_idx = self.raw_data.index[self.raw_data.iloc[:, 0] == '1/3 Octave'].tolist()[0]
-            
-            # Get all numeric data after the 1/3 Octave header
-            data_rows = []
-            current_row = []
-            
-            # Scan rows after 1/3 Octave header
-            for idx in range(third_oct_idx + 1, third_oct_idx + 15):  # Adjust range as needed
-                row = self.raw_data.iloc[idx]
-                # Convert row to numeric, keeping only valid numbers
-                numeric_values = pd.to_numeric(row, errors='coerce').dropna().tolist()
-                if numeric_values:
-                    data_rows.append(numeric_values)
-                    
-            # Combine all numeric values into frequency bands
-            all_values = []
-            for row in data_rows:
-                all_values.extend(row)
+            # First, find the 1/3 Octave section
+            third_oct_idx = None
+            for idx, row in self.raw_data.iterrows():
+                if '1/3 Octave' in str(row.iloc[0]):
+                    third_oct_idx = idx
+                    break
                 
-            # Standard frequency bands for 1/3 octave
-            frequencies = [12.5, 16, 20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160, 
-                          200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 
-                          2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000]
-                          
-            # Create DataFrame with the collected values
-            df = pd.DataFrame({
-                'Frequency (Hz)': frequencies[:len(all_values)],
-                'Overall 1/3 Spectra': all_values,
-                'Max 1/3 Spectra': all_values,  # Using same values for now
-                'Min 1/3 Spectra': all_values   # Using same values for now
+            if third_oct_idx is None:
+                # If no 1/3 Octave section, try using 1/1 Octave section
+                freq_row = self.raw_data.iloc[0]  # First row contains frequencies
+                data_row = self.raw_data.iloc[1]  # Second row contains Overall spectra
+            else:
+                # Use 1/3 Octave section
+                freq_row = self.raw_data.iloc[third_oct_idx + 1]
+                data_row = self.raw_data.iloc[third_oct_idx + 2]
+
+            # Extract frequencies and values
+            frequencies = []
+            values = []
+            
+            # Iterate through columns to collect data
+            for col in self.raw_data.columns:
+                freq = pd.to_numeric(freq_row[col], errors='coerce')
+                val = pd.to_numeric(data_row[col], errors='coerce')
+                
+                if pd.notna(freq) and pd.notna(val):
+                    frequencies.append(freq)
+                    values.append(val)
+
+            # Create processed DataFrame
+            self.processed_data = pd.DataFrame({
+                'Frequency (Hz)': frequencies,
+                'Overall 1/3 Spectra': values,
+                'Max 1/3 Spectra': values,  # Using same values for now
+                'Min 1/3 Spectra': values   # Using same values for now
             })
             
-            # Debug output
-            print("\nProcessed OBA Data:")
-            print(f"Found {len(all_values)} values")
-            print(f"Frequency range: {df['Frequency (Hz)'].min()} - {df['Frequency (Hz)'].max()} Hz")
-            print(f"Data shape: {df.shape}")
+            # Store frequency bands and levels
+            self.frequency_bands = np.array(frequencies)
+            self.overall_levels = np.array(values)
             
-            return df
+            print("\nProcessed OBA Data:")
+            print(f"Found {len(values)} frequency bands")
+            print(f"Frequency range: {min(frequencies)} - {max(frequencies)} Hz")
+            print("Data shape:", self.processed_data.shape)
+            print("\nFirst few rows:")
+            print(self.processed_data.head())
             
         except Exception as e:
             print("\nDebug information:")
             print("Raw data shape:", self.raw_data.shape)
             print("First few rows of raw data:")
             print(self.raw_data.head())
+            print("\nDetailed error:")
+            print(f"Error type: {type(e).__name__}")
+            print(f"Error message: {str(e)}")
             raise ValueError(f"Error processing OBA sheet: {str(e)}")
     
     def get_levels(self, freq_range: tuple = None) -> np.ndarray:
