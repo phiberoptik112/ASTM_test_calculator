@@ -508,14 +508,7 @@ class TestDataManager:
 
     def _verify_dataframes(self, data_dict: Dict[str, Union[pd.DataFrame, SLMData]]) -> None:
         """
-        Verify that all data objects in the dictionary are valid and consistent.
-        
-        Args:
-            data_dict: Dictionary containing DataFrames or SLMData objects with test data
-                Expected keys: 'srs_data', 'recive_data', 'bkgrnd_data', 'rt'
-                
-        Raises:
-            ValueError: If any data is invalid or inconsistent
+        Verify and align data objects in the dictionary, ensuring required frequency coverage.
         """
         if not data_dict:
             raise ValueError("Empty data dictionary provided")
@@ -538,45 +531,173 @@ class TestDataManager:
             elif isinstance(data, SLMData) and data.raw_data.empty:
                 raise ValueError(f"Empty SLMData for {key}")
 
-        # Verify measurement data consistency (excluding RT data which has different structure)
+        # Define required frequency range and tolerance
+        REQUIRED_MIN_FREQ = 63.0    # Hz
+        REQUIRED_MAX_FREQ = 5000.0  # Hz
+        EXPECTED_BINS = 20          # Number of 1/3 octave bands
+        FREQ_TOLERANCE = 0.1        # Tolerance for float comparison
+        
+        # Define required 1/3 octave bands with exact values
+        REQUIRED_FREQS = [
+            63.0, 80.0,  # Stored as floats in Excel
+            100, 125, 160, 200, 250, 315, 400, 500,
+            630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000
+        ]
+
+        def is_freq_match(freq1: float, freq2: float) -> bool:
+            """Compare two frequencies within tolerance"""
+            return abs(freq1 - freq2) <= FREQ_TOLERANCE
+
+        # Separate RT data from measurement data
+        rt_data = data_dict['rt'].raw_data if isinstance(data_dict['rt'], SLMData) else data_dict['rt']
         measurement_dfs = {
             k: data.raw_data if isinstance(data, SLMData) else data 
             for k, data in data_dict.items() 
             if k != 'rt'
         }
         
-        # Get shapes of measurement DataFrames
-        shapes = {k: df.shape for k, df in measurement_dfs.items()}
         if self.debug_mode:
-            print("\nDataFrame shapes:")
-            for k, shape in shapes.items():
-                print(f"{k}: {shape}")
+            print("\nOriginal DataFrame shapes:")
+            for k, df in measurement_dfs.items():
+                print(f"{k}: {df.shape}")
+                # Check columns and print available ones
+                print(f"Available columns: {df.columns.tolist()}")
+                
+                # Safely check for frequency data
+                freq_col = None
+                if 'Frequency (Hz)' in df.columns:
+                    freq_col = 'Frequency (Hz)'
+                elif df.columns.size > 0:  # If we have any columns, assume first one is frequency
+                    freq_col = df.columns[0]
+                
+                if freq_col is not None:
+                    print(f"Frequency range: {df[freq_col].min()} - {df[freq_col].max()} Hz")
+                else:
+                    print("Warning: No frequency column found")
+            
+            print(f"\nRT data shape: {rt_data.shape}")
+            if rt_data.shape[1] > 0:  # Check if we have any columns
+                print(f"RT frequency range: {rt_data.iloc[0, 0]} - {rt_data.iloc[-1, 0]} Hz")
+                print(f"RT data columns: {rt_data.columns.tolist()}")
 
-        # Verify all measurement DataFrames have same number of frequency bands
-        first_key = next(iter(measurement_dfs))
-        expected_rows = measurement_dfs[first_key].shape[0]
-        mismatched = [
-            (k, df.shape[0]) 
-            for k, df in measurement_dfs.items() 
-            if df.shape[0] != expected_rows
-        ]
+        # Validate RT data first
+        rt_freqs = rt_data.iloc[:, 0].astype(float)  # First column contains frequencies
+        rt_min_freq = rt_freqs.min()
+        rt_max_freq = rt_freqs.max()
         
-        if mismatched:
+        if rt_min_freq > (REQUIRED_MIN_FREQ + FREQ_TOLERANCE):
             raise ValueError(
-                f"Inconsistent number of frequency bands. Expected {expected_rows}, got: "
-                f"{', '.join(f'{k}: {rows}' for k, rows in mismatched)}"
+                f"RT data: Missing low frequency data. Minimum frequency is {rt_min_freq}Hz "
+                f"but {REQUIRED_MIN_FREQ}Hz is required"
+            )
+        
+        if rt_max_freq < (REQUIRED_MAX_FREQ - FREQ_TOLERANCE):
+            raise ValueError(
+                f"RT data: Missing high frequency data. Maximum frequency is {rt_max_freq}Hz "
+                f"but {REQUIRED_MAX_FREQ}Hz is required"
             )
 
-        # Verify RT data has expected structure
-        rt_data = data_dict['rt'].raw_data if isinstance(data_dict['rt'], SLMData) else data_dict['rt']
-        if 'Unnamed: 10' not in rt_data.columns:
-            raise ValueError("RT data missing expected column 'Unnamed: 10'")
+        # Validate measurement data frequency coverage
+        for key, df in measurement_dfs.items():
+            # Check for required frequency column
+            if 'Frequency (Hz)' not in df.columns:
+                # Try to identify and rename frequency column if it exists
+                if df.columns.size > 0:
+                    # Assume first column is frequency and rename it
+                    df = df.copy()  # Create a copy to avoid modifying original
+                    df.rename(columns={df.columns[0]: 'Frequency (Hz)'}, inplace=True)
+                    # Update the measurement_dfs dictionary
+                    measurement_dfs[key] = df
+                else:
+                    raise ValueError(f"{key}: Missing frequency column")
+
+            freqs = df['Frequency (Hz)'].astype(float)
+            min_freq = freqs.min()
+            max_freq = freqs.max()
+            
+            if min_freq > (REQUIRED_MIN_FREQ + FREQ_TOLERANCE):
+                raise ValueError(
+                    f"{key}: Missing low frequency data. Minimum frequency is {min_freq}Hz "
+                    f"but {REQUIRED_MIN_FREQ}Hz is required"
+                )
+            
+            if max_freq < (REQUIRED_MAX_FREQ - FREQ_TOLERANCE):
+                raise ValueError(
+                    f"{key}: Missing high frequency data. Maximum frequency is {max_freq}Hz "
+                    f"but {REQUIRED_MAX_FREQ}Hz is required"
+                )
+            
+            # Check for required frequency bands with tolerance
+            missing_freqs = []
+            for req_freq in REQUIRED_FREQS:
+                if not any(is_freq_match(freq, req_freq) for freq in freqs):
+                    missing_freqs.append(req_freq)
+            
+            if missing_freqs:
+                raise ValueError(
+                    f"{key}: Missing required frequency bands: "
+                    f"{[f'{f:g}Hz' for f in missing_freqs]}"  # :g removes trailing zeros
+                )
+
+        # Find common frequency bands across measurement DataFrames
+        common_freqs = None
+        for df in measurement_dfs.values():
+            curr_freqs = set(df['Frequency (Hz)'].astype(float))
+            if common_freqs is None:
+                common_freqs = curr_freqs
+            else:
+                # Match frequencies within tolerance
+                matched_freqs = set()
+                for freq1 in common_freqs:
+                    for freq2 in curr_freqs:
+                        if is_freq_match(freq1, freq2):
+                            matched_freqs.add(freq1)
+                            break
+                common_freqs = matched_freqs
         
-        # Verify RT data has sufficient rows for frequency analysis
-        min_rt_rows = 41  # Based on your code showing RT data needs rows 24:41
-        if len(rt_data) < min_rt_rows:
-            raise ValueError(f"RT data has insufficient rows: {len(rt_data)} < {min_rt_rows}")
+        common_freqs = sorted(list(common_freqs))
+        
+        # Validate common frequency bands
+        common_required_freqs = [
+            f for f in common_freqs 
+            if REQUIRED_MIN_FREQ - FREQ_TOLERANCE <= f <= REQUIRED_MAX_FREQ + FREQ_TOLERANCE
+        ]
+        
+        if len(common_required_freqs) != EXPECTED_BINS:
+            raise ValueError(
+                f"Insufficient common frequency bands in required range. "
+                f"Expected {EXPECTED_BINS} bands, found {len(common_required_freqs)}. "
+                f"Available bands: {[f'{f:g}Hz' for f in common_required_freqs]}"
+            )
+        
+        if self.debug_mode:
+            print(f"\nFound {len(common_freqs)} common frequency bands")
+            print(f"Range: {min(common_freqs):g} - {max(common_freqs):g} Hz")
+            print("Required frequency bands present:", [f'{f:g}Hz' for f in common_required_freqs])
+
+        # Align all DataFrames to common frequency bands
+        aligned_dfs = {}
+        for key, df in measurement_dfs.items():
+            # Match frequencies within tolerance
+            mask = df['Frequency (Hz)'].apply(
+                lambda x: any(is_freq_match(x, f) for f in common_freqs)
+            )
+            aligned_df = df[mask].copy()
+            aligned_df.reset_index(drop=True, inplace=True)
+            aligned_dfs[key] = aligned_df
+            
+            if self.debug_mode:
+                print(f"\nAligned {key}:")
+                print(f"Original shape: {df.shape}")
+                print(f"Aligned shape: {aligned_df.shape}")
+
+        # Update the original data objects with aligned data
+        for key, data in data_dict.items():
+            if key != 'rt':
+                if isinstance(data, SLMData):
+                    data.raw_data = aligned_dfs[key]
+                else:
+                    data_dict[key] = aligned_dfs[key]
 
         if self.debug_mode:
-            print("\nDataFrame validation successful")
-            print(f"Number of frequency bands: {expected_rows}")
+            print("\nData alignment complete")
