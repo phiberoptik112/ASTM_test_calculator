@@ -572,23 +572,26 @@ class TestDataManager:
                     header_row_idx = None
                     for idx, row in df.iterrows():
                         if 'T30 (ms)' in row.values and 'Frequency (Hz)' in row.values:
-                            header_row_idx = idx
+                            header_row_idx = int(idx)  # Ensure integer type
+                            freq_col_idx = int(row.tolist().index('Frequency (Hz)'))  # Ensure integer type
+                            rt_col_idx = int(row.tolist().index('T30 (ms)'))  # Add this line to get RT column index
+                            if self.debug_mode:
+                                print(f"Found header row at index: {header_row_idx}")
+                                print("Header row contents:", row.tolist())
+                                print(f"Frequency column index: {freq_col_idx}")
+                                print(f"RT column index: {rt_col_idx}")
                             break
                     
                     if header_row_idx is None:
                         raise ValueError("Could not find RT data headers ('T30 (ms)' and 'Frequency (Hz)')")
                         
-                    if self.debug_mode:
-                        print(f"Found header row at index: {header_row_idx}")
-                        print("Header row contents:", df.iloc[header_row_idx].tolist())
-                    
-                    # Use the header row to find the correct columns
-                    header_row = df.iloc[header_row_idx]
-                    freq_col_idx = header_row[header_row == 'Frequency (Hz)'].index[0]
-                    rt_col_idx = header_row[header_row == 'T30 (ms)'].index[0]
-                    
                     # Extract data starting from the row after headers
                     data_start_idx = header_row_idx + 1
+                    
+                    # Validate indices before using them
+                    if not isinstance(data_start_idx, int) or not isinstance(freq_col_idx, int) or not isinstance(rt_col_idx, int):
+                        raise ValueError(f"Invalid indices: data_start_idx={data_start_idx}, freq_col_idx={freq_col_idx}, rt_col_idx={rt_col_idx}")
+                        
                     freq_data = df.iloc[data_start_idx:, freq_col_idx]
                     rt_values = df.iloc[data_start_idx:, rt_col_idx]
                     
@@ -633,72 +636,91 @@ class TestDataManager:
                 # Find the header row containing 'Frequency (Hz)' in the 1/3 octave section
                 header_row_idx = None
                 found_1_3_octave = False
+
+                if self.debug_mode:
+                    print("\nSearching for frequency data:")
+                    print(f"DataFrame shape: {df.shape}")
+
                 for idx, row in df.iterrows():
                     # Look for the '1/3 Octave' marker first
                     if '1/3 Octave' in str(row.iloc[0]):
                         found_1_3_octave = True
+                        if self.debug_mode:
+                            print(f"Found '1/3 Octave' marker at row {idx}")
                         continue
                     
                     # After finding '1/3 Octave', look for the frequency header
                     if found_1_3_octave and 'Frequency (Hz)' in row.values:
-                        header_row_idx = idx
+                        header_row_idx = int(idx)  # Ensure integer
+                        freq_col_idx = int(row.tolist().index('Frequency (Hz)'))  # Find column index
                         if self.debug_mode:
-                            print(f"Found 1/3 octave header row at index {idx}")
+                            print(f"Found 'Frequency (Hz)' at row {header_row_idx}, column {freq_col_idx}")
                             print("Header row values:", row.tolist())
                         break
 
                 if header_row_idx is None:
                     if self.debug_mode:
-                        print(f"Could not find '1/3 octave Frequency (Hz)' header in {key}")
+                        print(f"Could not find frequency header in {key}")
                         print("First few rows:")
                         print(df.head())
                     raise ValueError(f"Could not find frequency header in {key}")
 
-                # Extract data starting from the header row
-                df = df.iloc[header_row_idx:].copy()
-                
-                # Use the header row as column names and remove it from the data
-                df.columns = df.iloc[0]
-                df = df.iloc[1:].reset_index(drop=True)
-                
-                # Find the rows containing our required data types
-                required_rows = ['Overall 1/3 Spectra', 'Max 1/3 Spectra', 'Min 1/3 Spectra']
-                data_rows = {}
-                
-                for idx, row in df.iterrows():
-                    first_val = str(row.iloc[0]).strip()
-                    if first_val in required_rows:
-                        data_rows[first_val] = row.iloc[1:].astype(float)
-                
-                # Check if we found all required rows
-                missing_rows = set(required_rows) - set(data_rows.keys())
-                if missing_rows:
+                try:
+                    # Extract data starting from the header row
+                    df = df.iloc[header_row_idx:].copy()
+                    df.reset_index(drop=True, inplace=True)  # Reset index after slicing
+                    
+                    # Use the header row as column names and remove it from the data
+                    df.columns = df.iloc[0]
+                    df = df.iloc[1:].reset_index(drop=True)
+                    
+                    # Find the rows containing our required data types
+                    required_rows = ['Overall 1/3 Spectra', 'Max 1/3 Spectra', 'Min 1/3 Spectra']
+                    data_rows = {}
+                    
+                    for idx, row in df.iterrows():
+                        first_val = str(row.iloc[0]).strip()
+                        if first_val in required_rows:
+                            data_rows[first_val] = row.iloc[1:].astype(float)
+                    
+                    # Check if we found all required rows
+                    missing_rows = set(required_rows) - set(data_rows.keys())
+                    if missing_rows:
+                        if self.debug_mode:
+                            print(f"Missing required rows: {missing_rows}")
+                            print("Available first column values:")
+                            print(df.iloc[:, 0].tolist())
+                        raise ValueError(f"Missing required data rows in {key}: {missing_rows}")
+                    
+                    # Create new DataFrame with proper structure
+                    freq_values = [float(col) for col in df.columns[1:] if pd.notna(col)]
+                    new_df = pd.DataFrame({
+                        'Frequency (Hz)': freq_values,
+                        'Overall 1/3 Spectra': data_rows['Overall 1/3 Spectra'],
+                        'Max 1/3 Spectra': data_rows['Max 1/3 Spectra'],
+                        'Min 1/3 Spectra': data_rows['Min 1/3 Spectra']
+                    })
+                    
+                    # Remove any rows with NaN values
+                    new_df = new_df.dropna()
+                    
                     if self.debug_mode:
-                        print(f"Missing required rows: {missing_rows}")
-                        print("Available first column values:")
-                        print(df.iloc[:, 0].tolist())
-                    raise ValueError(f"Missing required data rows in {key}: {missing_rows}")
-                
-                # Create new DataFrame with proper structure
-                freq_values = [float(col) for col in df.columns[1:] if pd.notna(col)]
-                new_df = pd.DataFrame({
-                    'Frequency (Hz)': freq_values,
-                    'Overall 1/3 Spectra': data_rows['Overall 1/3 Spectra'],
-                    'Max 1/3 Spectra': data_rows['Max 1/3 Spectra'],
-                    'Min 1/3 Spectra': data_rows['Min 1/3 Spectra']
-                })
-                
-                # Remove any rows with NaN values
-                new_df = new_df.dropna()
-                
-                if self.debug_mode:
-                    print("\nProcessed DataFrame:")
-                    print("Final shape:", new_df.shape)
-                    print("Final columns:", new_df.columns.tolist())
-                    print("Frequency range:", f"{new_df['Frequency (Hz)'].min():.1f} - {new_df['Frequency (Hz)'].max():.1f} Hz")
-                    print("Number of frequency bands:", len(new_df))
-                
-                df = new_df
+                        print("\nProcessed DataFrame:")
+                        print("Final shape:", new_df.shape)
+                        print("Final columns:", new_df.columns.tolist())
+                        print("Frequency range:", f"{new_df['Frequency (Hz)'].min():.1f} - {new_df['Frequency (Hz)'].max():.1f} Hz")
+                        print("Number of frequency bands:", len(new_df))
+                    
+                    df = new_df
+
+                except Exception as e:
+                    if self.debug_mode:
+                        print(f"\nError processing data:")
+                        print(f"Header row index: {header_row_idx}")
+                        print(f"Frequency column index: {freq_col_idx}")
+                        print(f"DataFrame shape: {df.shape}")
+                        print("Exception:", str(e))
+                    raise
 
             if self.debug_mode:
                 print(f"Processed shape: {df.shape}")
