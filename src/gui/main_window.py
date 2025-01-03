@@ -18,7 +18,7 @@ import os
 from os import listdir
 from os.path import isfile, join
 import fitz
-
+import matplotlib.pyplot as plt
 from src.core.test_data_manager import TestDataManager
 from src.gui.test_plan_input import TestPlanInputWindow
 from src.gui.analysis_dashboard import ResultsAnalysisDashboard
@@ -173,6 +173,11 @@ class MainWindow(BoxLayout):
         self.report_button.bind(on_press=self.generate_report)
         button_layout.add_widget(self.report_button)
         
+        # Add Plot Data button
+        self.plot_button = Button(text='Raw Loaded Data Plot')
+        self.plot_button.bind(on_press=self.show_plot_selection)
+        button_layout.add_widget(self.plot_button)
+        
         test_controls.add_widget(button_layout)
         self.add_widget(test_controls)
 
@@ -303,6 +308,10 @@ class MainWindow(BoxLayout):
                     print("\nProcessing test data...")
                 self.test_data_manager.process_test_data()
                 self.status_label.text = 'Status: All test data loaded successfully'
+                
+                # Show plot selection popup after successful load
+                self.show_plot_selection(instance)
+                
                 return True
                 
             except Exception as e:
@@ -494,6 +503,133 @@ class MainWindow(BoxLayout):
             
         except Exception as e:
             self._show_error(f'Error generating report: {str(e)}')
+
+    def show_plot_selection(self, instance):
+        """Show popup with buttons to plot data for each test"""
+        # Create content layout
+        content = BoxLayout(orientation='vertical', spacing=10, padding=10)
+        
+        # Add title label
+        content.add_widget(Label(
+            text='Select a test to plot:',
+            size_hint_y=None,
+            height=40
+        ))
+        
+        # Create scrollable button list
+        scroll = ScrollView(size_hint=(1, 0.8))
+        button_layout = GridLayout(
+            cols=1,
+            spacing=5,
+            size_hint_y=None
+        )
+        button_layout.bind(minimum_height=button_layout.setter('height'))
+        
+        # Add button for each test
+        for test_label in self.test_data_manager.test_data_collection:
+            btn = Button(
+                text=f'Plot Test {test_label}',
+                size_hint_y=None,
+                height=40
+            )
+            btn.bind(on_press=lambda x, label=test_label: self.plot_test_data(label))
+            button_layout.add_widget(btn)
+        
+        scroll.add_widget(button_layout)
+        content.add_widget(scroll)
+        
+        # Create close button
+        close_btn = Button(
+            text='Close',
+            size_hint_y=None,
+            height=40
+        )
+        
+        # Create popup
+        plot_popup = Popup(
+            title='Plot Test Data',
+            content=content,
+            size_hint=(0.8, 0.8)
+        )
+        
+        # Bind close button
+        close_btn.bind(on_press=plot_popup.dismiss)
+        content.add_widget(close_btn)
+        
+        plot_popup.open()
+
+    def plot_test_data(self, test_label):
+        """Create plot for a specific test's data"""
+        try:
+            # Get test data
+            test_data = self.test_data_manager.test_data_collection[test_label]
+            
+            # Create figure
+            plt.figure(figsize=(10, 6))
+            
+            # Plot each data series
+            data_types = {
+                'Source Room': 'srs_data',
+                'Receive Room': 'recive_data',
+                'Background': 'bkgrnd_data'
+            }
+            
+            for test_type, test_info in test_data.items():
+                if 'test_data' in test_info:
+                    test_obj = test_info['test_data']
+                    
+                    for label, attr in data_types.items():
+                        if hasattr(test_obj, attr):
+                            data = getattr(test_obj, attr)
+                            if hasattr(data, 'raw_data'):
+                                df = data.raw_data
+                                if 'Frequency (Hz)' in df.columns and 'Overall 1/3 Spectra' in df.columns:
+                                    plt.semilogx(
+                                        df['Frequency (Hz)'],
+                                        df['Overall 1/3 Spectra'],
+                                        label=f'{label} - {test_type.value}'
+                                    )
+            
+            # Configure plot
+            plt.title(f'Raw Data for Test {test_label}')
+            plt.xlabel('Frequency (Hz)')
+            plt.ylabel('Sound Pressure Level (dB)')
+            plt.grid(True)
+            plt.legend()
+            
+            # Add vertical gridlines at standard frequencies
+            standard_freqs = [63, 125, 250, 500, 1000, 2000, 4000]
+            plt.gca().set_xticks(standard_freqs)
+            plt.gca().set_xticklabels([str(f) for f in standard_freqs])
+            plt.grid(True, which='both', linestyle='--', alpha=0.7)
+            
+            # Show plot in a popup
+            plot_popup = Popup(
+                title=f'Test {test_label} Data Plot',
+                size_hint=(0.9, 0.9)
+            )
+            
+            # Save plot to a temporary file
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
+                plt.savefig(temp_file.name, dpi=300, bbox_inches='tight')
+                
+                # Create scrollable image view
+                scroll = ScrollView(size_hint=(1, 1))
+                image = KivyImage(
+                    source=temp_file.name,
+                    size_hint=(1, None)
+                )
+                image.height = image.texture_size[1]
+                scroll.add_widget(image)
+                
+                # Add to popup
+                plot_popup.content = scroll
+            
+            plot_popup.open()
+            plt.close()
+            
+        except Exception as e:
+            self._show_error(f'Error plotting test data: {str(e)}')
 
 class MainApp(App):
     def build(self):
