@@ -10,7 +10,10 @@ from kivy.uix.scrollview import ScrollView
 from kivy.core.window import Window
 from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelItem
 from kivy.uix.image import Image as KivyImage
-
+from kivy.uix.widget import Widget
+from kivy.graphics import Color, Rectangle
+from kivy.graphics.instructions import Canvas
+from enum import Enum
 from typing import Dict, List, Optional, Union
 import pandas as pd
 import tempfile
@@ -505,37 +508,142 @@ class MainWindow(BoxLayout):
             self._show_error(f'Error generating report: {str(e)}')
 
     def show_plot_selection(self, instance):
-        """Show popup with buttons to plot data for each test"""
+        """Show popup with buttons to plot data for each test, with test type selection"""
         # Create content layout
         content = BoxLayout(orientation='vertical', spacing=10, padding=10)
         
         # Add title label
         content.add_widget(Label(
-            text='Select a test to plot:',
+            text='Select tests and types to plot:',
             size_hint_y=None,
             height=40
         ))
         
-        # Create scrollable button list
+        # Create scrollable list
         scroll = ScrollView(size_hint=(1, 0.8))
-        button_layout = GridLayout(
+        main_layout = GridLayout(
             cols=1,
-            spacing=5,
+            spacing=10,
             size_hint_y=None
         )
-        button_layout.bind(minimum_height=button_layout.setter('height'))
+        main_layout.bind(minimum_height=main_layout.setter('height'))
         
-        # Add button for each test
+        # Dictionary to store checkbox states for each test
+        self.test_type_checkboxes = {}
+        
+        # Add section for each test
         for test_label in self.test_data_manager.test_data_collection:
-            btn = Button(
-                text=f'Plot Test {test_label}',
+            # Debug print
+            print(f"\nProcessing test: {test_label}")
+            test_data = self.test_data_manager.test_data_collection[test_label]
+            print(f"Test data keys: {test_data.keys()}")
+            
+            # Create container for this test
+            test_container = BoxLayout(
+                orientation='vertical',
+                size_hint_y=None,
+                height=120,
+                padding=[10, 5]
+            )
+            
+            # Add test label
+            test_container.add_widget(Label(
+                text=f'Test {test_label}',
+                size_hint_y=None,
+                height=30,
+                bold=True
+            ))
+            
+            # Create horizontal layout for checkboxes
+            checkbox_layout = GridLayout(
+                cols=3,
+                spacing=10,
                 size_hint_y=None,
                 height=40
             )
-            btn.bind(on_press=lambda x, label=test_label: self.plot_test_data(label))
-            button_layout.add_widget(btn)
+            
+            # Store checkboxes for this test
+            self.test_type_checkboxes[test_label] = {}
+            
+            # Check for available test types using the enum values
+            available_types = []
+            
+            if TestType.AIIC in test_data:
+                available_types.append(('AIIC', TestType.AIIC))
+            if TestType.ASTC in test_data:
+                available_types.append(('ASTC', TestType.ASTC))
+            if TestType.NIC in test_data:
+                available_types.append(('NIC', TestType.NIC))
+            if TestType.DTC in test_data:
+                available_types.append(('DTC', TestType.DTC))
+                
+            # Debug print available types
+            print(f"Available test types for {test_label}: {[t[0] for t in available_types]}")
+            
+            for type_name, test_type in available_types:
+                # Create checkbox container
+                type_container = BoxLayout(
+                    orientation='horizontal',
+                    size_hint_y=None,
+                    height=30,
+                    spacing=5
+                )
+                
+                # Create checkbox
+                checkbox = CheckBox(
+                    size_hint_x=None,
+                    width=30,
+                    active=False
+                )
+                self.test_type_checkboxes[test_label][test_type] = checkbox
+                
+                # Create label
+                label = Label(
+                    text=type_name,
+                    size_hint_x=None,
+                    width=70,
+                    halign='left'
+                )
+                
+                # Add widgets to container
+                type_container.add_widget(checkbox)
+                type_container.add_widget(label)
+                
+                # Add container to checkbox layout
+                checkbox_layout.add_widget(type_container)
+            
+            test_container.add_widget(checkbox_layout)
+            
+            # Add plot button
+            plot_btn = Button(
+                text='Plot Selected',
+                size_hint_y=None,
+                height=30
+            )
+            plot_btn.bind(
+                on_press=lambda x, label=test_label: self.plot_selected_test_data(label)
+            )
+            test_container.add_widget(plot_btn)
+            
+            # Add separator
+            separator = Widget(
+                size_hint_y=None,
+                height=2
+            )
+            with separator.canvas:
+                Color(0.5, 0.5, 0.5, 1)
+                Rectangle(pos=separator.pos, size=separator.size)
+            
+            def update_rect(instance, value):
+                instance.canvas.children[-1].pos = instance.pos
+                instance.canvas.children[-1].size = instance.size
+            
+            separator.bind(pos=update_rect, size=update_rect)
+            test_container.add_widget(separator)
+            
+            main_layout.add_widget(test_container)
         
-        scroll.add_widget(button_layout)
+        scroll.add_widget(main_layout)
         content.add_widget(scroll)
         
         # Create close button
@@ -558,78 +666,109 @@ class MainWindow(BoxLayout):
         
         plot_popup.open()
 
-    def plot_test_data(self, test_label):
-        """Create plot for a specific test's data"""
+    def plot_selected_test_data(self, test_label):
+        """Plot selected test types for a specific test"""
         try:
-            # Get test data
-            test_data = self.test_data_manager.test_data_collection[test_label]
+            # Get selected test types
+            selected_types = [
+                test_type for test_type, checkbox in self.test_type_checkboxes[test_label].items()
+                if checkbox.active
+            ]
+            
+            if not selected_types:
+                warning = Popup(
+                    title='Warning',
+                    content=Label(text='Please select at least one test type to plot'),
+                    size_hint=(0.6, 0.2)
+                )
+                warning.open()
+                return
             
             # Create figure
             plt.figure(figsize=(10, 6))
             
-            # Plot each data series
-            data_types = {
-                'Source Room': 'srs_data',
-                'Receive Room': 'recive_data',
-                'Background': 'bkgrnd_data'
-            }
+            # Get test data
+            test_data = self.test_data_manager.test_data_collection[test_label]
             
-            for test_type, test_info in test_data.items():
-                if 'test_data' in test_info:
-                    test_obj = test_info['test_data']
-                    
-                    for label, attr in data_types.items():
-                        if hasattr(test_obj, attr):
-                            data = getattr(test_obj, attr)
-                            if hasattr(data, 'raw_data'):
-                                df = data.raw_data
-                                if 'Frequency (Hz)' in df.columns and 'Overall 1/3 Spectra' in df.columns:
-                                    plt.semilogx(
-                                        df['Frequency (Hz)'],
-                                        df['Overall 1/3 Spectra'],
-                                        label=f'{label} - {test_type.value}'
-                                    )
+            # Plot data for each selected test type
+            for test_type in selected_types:
+                if test_type in test_data:
+                    test_obj = test_data[test_type].get('test_data')
+                    if test_obj:
+                        # Plot source room data
+                        if hasattr(test_obj, 'srs_data') and hasattr(test_obj.srs_data, 'raw_data'):
+                            df = test_obj.srs_data.raw_data
+                            plt.plot(
+                                df['Frequency (Hz)'],
+                                df['Overall 1/3 Spectra'],
+                                label=f'{test_type.value} - Source Room'
+                            )
+                        
+                        # Plot receive room data
+                        if hasattr(test_obj, 'recive_data') and hasattr(test_obj.recive_data, 'raw_data'):
+                            df = test_obj.recive_data.raw_data
+                            plt.plot(
+                                df['Frequency (Hz)'],
+                                df['Overall 1/3 Spectra'],
+                                label=f'{test_type.value} - Receive Room'
+                            )
+                        
+                        # Plot background data
+                        if hasattr(test_obj, 'bkgrnd_data') and hasattr(test_obj.bkgrnd_data, 'raw_data'):
+                            df = test_obj.bkgrnd_data.raw_data
+                            plt.plot(
+                                df['Frequency (Hz)'],
+                                df['Overall 1/3 Spectra'],
+                                label=f'{test_type.value} - Background'
+                            )
             
             # Configure plot
-            plt.title(f'Raw Data for Test {test_label}')
+            plt.title(f'Test {test_label} - Selected Data')
             plt.xlabel('Frequency (Hz)')
             plt.ylabel('Sound Pressure Level (dB)')
             plt.grid(True)
-            plt.legend()
+            plt.xscale('log')  # Use logarithmic scale for frequency
             
-            # Add vertical gridlines at standard frequencies
+            # Set x-axis ticks to standard frequencies
             standard_freqs = [63, 125, 250, 500, 1000, 2000, 4000]
-            plt.gca().set_xticks(standard_freqs)
-            plt.gca().set_xticklabels([str(f) for f in standard_freqs])
-            plt.grid(True, which='both', linestyle='--', alpha=0.7)
+            plt.xticks(standard_freqs, [str(f) for f in standard_freqs])
             
-            # Show plot in a popup
-            plot_popup = Popup(
-                title=f'Test {test_label} Data Plot',
-                size_hint=(0.9, 0.9)
-            )
+            # Add legend outside plot
+            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
             
-            # Save plot to a temporary file
-            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
-                plt.savefig(temp_file.name, dpi=300, bbox_inches='tight')
-                
-                # Create scrollable image view
-                scroll = ScrollView(size_hint=(1, 1))
-                image = KivyImage(
-                    source=temp_file.name,
-                    size_hint=(1, None)
-                )
-                image.height = image.texture_size[1]
-                scroll.add_widget(image)
-                
-                # Add to popup
-                plot_popup.content = scroll
+            # Adjust layout to prevent legend cutoff
+            plt.tight_layout()
             
-            plot_popup.open()
-            plt.close()
+            # Show plot in popup
+            self.show_plot_popup()
             
         except Exception as e:
-            self._show_error(f'Error plotting test data: {str(e)}')
+            print(f"Error plotting selected test data: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+    def show_plot_popup(self):
+        """Show the plot in a popup window"""
+        # Save plot to a temporary file
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
+            plt.savefig(temp_file.name, dpi=300, bbox_inches='tight')
+            
+            # Create scrollable image view
+            scroll = ScrollView(size_hint=(1, 1))
+            image = KivyImage(
+                source=temp_file.name,
+                size_hint=(1, None)
+            )
+            image.height = image.texture_size[1]
+            scroll.add_widget(image)
+            
+            # Create and show popup
+            plot_popup = Popup(
+                title='Test Data Plot',
+                content=scroll,
+                size_hint=(0.9, 0.9)
+            )
+            plot_popup.open()
 
 class MainApp(App):
     def build(self):
