@@ -41,6 +41,7 @@ from data_processor import (
     sanitize_filepath
 )
 from src.core.test_processor import TestProcessor
+import numpy as np
 
 class MainWindow(BoxLayout):
     def __init__(self, **kwargs):
@@ -509,6 +510,17 @@ class MainWindow(BoxLayout):
 
     def show_plot_selection(self, instance):
         """Show popup with buttons to plot data for each test, with test type selection"""
+        if self.debug_checkbox.active:
+            print("\n=== Show Plot Selection ===")
+            print("Test Data Collection Contents:")
+            for label, data in self.test_data_manager.test_data_collection.items():
+                print(f"\nTest: {label}")
+                print(f"Available types: {list(data.keys())}")
+                for test_type, test_data in data.items():
+                    print(f"- {test_type.value}:")
+                    print(f"  Room properties: {test_data['room_properties']}")
+                    print(f"  Test data type: {type(test_data['test_data'])}")
+
         # Create content layout
         content = BoxLayout(orientation='vertical', spacing=10, padding=10)
         
@@ -669,11 +681,15 @@ class MainWindow(BoxLayout):
     def plot_selected_test_data(self, test_label):
         """Plot selected test types for a specific test"""
         try:
-            # Get selected test types
+            # Debug prints
+            print("\n=== Plot Selected Test Data ===")
+            print(f"Test Label: {test_label}")
+            
             selected_types = [
                 test_type for test_type, checkbox in self.test_type_checkboxes[test_label].items()
                 if checkbox.active
             ]
+            print(f"Selected Types: {[t.value for t in selected_types]}")
             
             if not selected_types:
                 warning = Popup(
@@ -695,17 +711,22 @@ class MainWindow(BoxLayout):
                 if test_type in test_data:
                     test_obj = test_data[test_type].get('test_data')
                     if test_obj:
-                        # Plot source room data
+                        print(f"\nPlotting {test_type.value} data:")
+                        
+                        # Plot base data (source, receive, background)
                         if hasattr(test_obj, 'srs_data') and hasattr(test_obj.srs_data, 'raw_data'):
+                            print("- Plotting source room data")
                             df = test_obj.srs_data.raw_data
+                            # Debug print DataFrame columns
+                            print(f"Source room data columns: {df.columns.tolist()}")
                             plt.plot(
                                 df['Frequency (Hz)'],
                                 df['Overall 1/3 Spectra'],
                                 label=f'{test_type.value} - Source Room'
                             )
                         
-                        # Plot receive room data
                         if hasattr(test_obj, 'recive_data') and hasattr(test_obj.recive_data, 'raw_data'):
+                            print("- Plotting receive room data")
                             df = test_obj.recive_data.raw_data
                             plt.plot(
                                 df['Frequency (Hz)'],
@@ -713,28 +734,120 @@ class MainWindow(BoxLayout):
                                 label=f'{test_type.value} - Receive Room'
                             )
                         
-                        # Plot background data
                         if hasattr(test_obj, 'bkgrnd_data') and hasattr(test_obj.bkgrnd_data, 'raw_data'):
+                            print("- Plotting background data")
                             df = test_obj.bkgrnd_data.raw_data
                             plt.plot(
                                 df['Frequency (Hz)'],
                                 df['Overall 1/3 Spectra'],
                                 label=f'{test_type.value} - Background'
                             )
-            
+
+                        # Plot AIIC-specific data if available
+                        if test_type == TestType.AIIC:
+                            print("\nChecking AIIC-specific data:")
+                            # Plot tapping positions
+                            for i in range(1, 5):
+                                pos_attr = f'pos{i}'
+                                print(f"- Checking {pos_attr}")
+                                if hasattr(test_obj, pos_attr):
+                                    pos_data = getattr(test_obj, pos_attr)
+                                    if hasattr(pos_data, 'raw_data'):
+                                        df = pos_data.raw_data
+                                        print(f"  {pos_attr} data shape: {df.shape}")
+                                        
+                                        try:
+                                            # Get frequency values from first row (skip the column header)
+                                            freq_values = pd.to_numeric(df.iloc[0, 1:12], errors='coerce')
+                                            # Get SPL values from second row (Overall 1/1 Spectra)
+                                            spl_values = pd.to_numeric(df.iloc[1, 1:12], errors='coerce')
+                                            
+                                            # Remove any NaN values
+                                            mask = ~(freq_values.isna() | spl_values.isna())
+                                            freq_values = freq_values[mask]
+                                            spl_values = spl_values[mask]
+                                            
+                                            print(f"  Frequency values: {freq_values.tolist()}")
+                                            print(f"  SPL values: {spl_values.tolist()}")
+                                            
+                                            plt.plot(
+                                                freq_values,
+                                                spl_values,
+                                                linestyle='--',
+                                                label=f'AIIC - Tapping Position {i}'
+                                            )
+                                            print(f"  Successfully plotted {pos_attr}")
+                                            print(f"  Frequency range: {freq_values.min()} - {freq_values.max()} Hz")
+                                            print(f"  SPL range: {spl_values.min():.1f} - {spl_values.max():.1f} dB")
+                                            
+                                        except Exception as e:
+                                            print(f"  Error plotting {pos_attr}: {str(e)}")
+                                            print(f"  DataFrame head:")
+                                            print(df.head())
+                            
+                            # Plot source tap data with similar updates
+                            if hasattr(test_obj, 'source') and hasattr(test_obj.source, 'raw_data'):
+                                print("- Checking source")
+                                df = test_obj.source.raw_data
+                                try:
+                                    # Get frequency values from first row
+                                    freq_values = pd.to_numeric(df.iloc[0, 1:12], errors='coerce')
+                                    # Get SPL values from second row
+                                    spl_values = pd.to_numeric(df.iloc[1, 1:12], errors='coerce')
+                                    
+                                    # Remove any NaN values
+                                    mask = ~(freq_values.isna() | spl_values.isna())
+                                    freq_values = freq_values[mask]
+                                    spl_values = spl_values[mask]
+                                    
+                                    plt.plot(
+                                        freq_values,
+                                        spl_values,
+                                        linestyle=':',
+                                        label='AIIC - Source Tap'
+                                    )
+                                    print("  Successfully plotted source data")
+                                except Exception as e:
+                                    print(f"  Error plotting source: {str(e)}")
+                            
+                            # Plot carpet data with similar updates
+                            if hasattr(test_obj, 'carpet') and hasattr(test_obj.carpet, 'raw_data'):
+                                print("- Checking carpet")
+                                df = test_obj.carpet.raw_data
+                                try:
+                                    # Get frequency values from first row
+                                    freq_values = pd.to_numeric(df.iloc[0, 1:12], errors='coerce')
+                                    # Get SPL values from second row
+                                    spl_values = pd.to_numeric(df.iloc[1, 1:12], errors='coerce')
+                                    
+                                    # Remove any NaN values
+                                    mask = ~(freq_values.isna() | spl_values.isna())
+                                    freq_values = freq_values[mask]
+                                    spl_values = spl_values[mask]
+                                    
+                                    plt.plot(
+                                        freq_values,
+                                        spl_values,
+                                        linestyle='-.',
+                                        label='AIIC - Carpet'
+                                    )
+                                    print("  Successfully plotted carpet data")
+                                except Exception as e:
+                                    print(f"  Error plotting carpet: {str(e)}")
+
             # Configure plot
             plt.title(f'Test {test_label} - Selected Data')
             plt.xlabel('Frequency (Hz)')
             plt.ylabel('Sound Pressure Level (dB)')
             plt.grid(True)
-            plt.xscale('log')  # Use logarithmic scale for frequency
+            plt.xscale('log')
             
             # Set x-axis ticks to standard frequencies
             standard_freqs = [63, 125, 250, 500, 1000, 2000, 4000]
             plt.xticks(standard_freqs, [str(f) for f in standard_freqs])
             
-            # Add legend outside plot
-            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+            # Add legend outside plot with smaller font
+            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small')
             
             # Adjust layout to prevent legend cutoff
             plt.tight_layout()

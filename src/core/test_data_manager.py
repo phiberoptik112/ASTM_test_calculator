@@ -121,7 +121,11 @@ class TestDataManager:
                 test_label = curr_test['Test_Label']
                 if self.debug_mode:
                     print(f"\nProcessing test {test_label} (row {index})")
-                    print(f"Test data: {curr_test}")
+                    print(f"Test types enabled:")
+                    print(f"AIIC: {curr_test.get('AIIC', 0)}")
+                    print(f"ASTC: {curr_test.get('ASTC', 0)}")
+                    print(f"NIC: {curr_test.get('NIC', 0)}")
+                    print(f"DTC: {curr_test.get('DTC', 0)}")
 
                 # Create room properties
                 room_props = self._create_room_properties(curr_test)
@@ -139,21 +143,21 @@ class TestDataManager:
                             if self.debug_mode:
                                 print(f"\nProcessing {test_type.value} test")
                                 
-                            # Use the class's own load_test_data method instead of test_processor
                             test_data = self.load_test_data(
                                 curr_test=curr_test,
                                 test_type=test_type,
                                 room_props=room_props
                             )
                             
-                            curr_test_data[test_type] = {
-                                'room_properties': room_props,
-                                'test_data': test_data
-                            }
-                            
-                            if self.debug_mode:
-                                print(f"Successfully processed {test_type.value} test")
-                                
+                            if test_data:
+                                curr_test_data[test_type] = {
+                                    'room_properties': room_props,
+                                    'test_data': test_data
+                                }
+                                if self.debug_mode:
+                                    print(f"Successfully processed {test_type.value} test")
+                                    print(f"Test data type: {type(test_data)}")
+                                    print(f"Test data attributes: {dir(test_data)}")
                         except Exception as e:
                             if self.debug_mode:
                                 print(f"Error processing {test_type.value} test: {str(e)}")
@@ -163,7 +167,9 @@ class TestDataManager:
                 if curr_test_data:
                     self.test_data_collection[test_label] = curr_test_data
                     if self.debug_mode:
-                        print(f"Added test data for {test_label} with types: {list(curr_test_data.keys())}")
+                        print(f"\nAdded test data for {test_label}")
+                        print(f"Test types: {list(curr_test_data.keys())}")
+                        print(f"Data structure: {curr_test_data}")
 
             except Exception as e:
                 if self.debug_mode:
@@ -335,19 +341,48 @@ class TestDataManager:
             raise
 
     def _create_aiic_test(self, curr_test: pd.Series, room_props: RoomProperties, base_data: Dict) -> AIICTestData:
-        """Create AIIC test data instance"""
-        aiic_data = base_data.copy()
-        additional_data = {
-            'AIIC_pos1': self._raw_slm_datapull(curr_test['Position1'], '-831_Data.'),
-            'AIIC_pos2': self._raw_slm_datapull(curr_test['Position2'], '-831_Data.'),
-            'AIIC_pos3': self._raw_slm_datapull(curr_test['Position3'], '-831_Data.'),
-            'AIIC_pos4': self._raw_slm_datapull(curr_test['Position4'], '-831_Data.'),
-            'AIIC_source': self._raw_slm_datapull(curr_test['SourceTap'], '-831_Data.'),
-            'AIIC_carpet': self._raw_slm_datapull(curr_test['Carpet'], '-831_Data.')
-        }
-        self._verify_dataframes(additional_data)
-        aiic_data.update(additional_data)
-        return AIICTestData(room_properties=room_props, test_data=aiic_data)
+        """Create AIIC test data instance with additional validation"""
+        try:
+            if self.debug_mode:
+                print("\nCreating AIIC test data")
+                print("Required columns:", ['Position1', 'Position2', 'Position3', 'Position4', 'SourceTap', 'Carpet'])
+                print("Available columns:", curr_test.index.tolist())
+            
+            # Verify required columns exist
+            required_cols = ['Position1', 'Position2', 'Position3', 'Position4', 'SourceTap', 'Carpet']
+            missing_cols = [col for col in required_cols if col not in curr_test]
+            if missing_cols:
+                raise ValueError(f"Missing required AIIC columns: {missing_cols}")
+
+            aiic_data = base_data.copy()
+            additional_data = {
+                'AIIC_pos1': self._raw_slm_datapull(curr_test['Position1'], '-831_Data.'),
+                'AIIC_pos2': self._raw_slm_datapull(curr_test['Position2'], '-831_Data.'),
+                'AIIC_pos3': self._raw_slm_datapull(curr_test['Position3'], '-831_Data.'),
+                'AIIC_pos4': self._raw_slm_datapull(curr_test['Position4'], '-831_Data.'),
+                'AIIC_source': self._raw_slm_datapull(curr_test['SourceTap'], '-831_Data.'),
+                'AIIC_carpet': self._raw_slm_datapull(curr_test['Carpet'], '-831_Data.')
+            }
+
+            # Verify all data was loaded successfully
+            for key, data in additional_data.items():
+                if data is None or (hasattr(data, 'empty') and data.empty):
+                    raise ValueError(f"Failed to load {key} data")
+
+            aiic_data.update(additional_data)
+            
+            if self.debug_mode:
+                print("AIIC data loaded successfully")
+                print(f"Number of data points: {len(additional_data)}")
+            
+            return AIICTestData(room_properties=room_props, test_data=aiic_data)
+            
+        except Exception as e:
+            if self.debug_mode:
+                print(f"Error creating AIIC test: {str(e)}")
+                import traceback
+                traceback.print_exc()
+            raise
 
     def _create_dtc_test(self, curr_test: pd.Series, room_props: RoomProperties, base_data: Dict) -> DTCtestData:
         """Create DTC test data instance"""

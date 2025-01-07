@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import List, Tuple, Dict, Union
 from enum import Enum
 from pathlib import Path
-import matplotlib.pyplot as plt
+
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
