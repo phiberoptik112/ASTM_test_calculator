@@ -33,6 +33,7 @@ from data_processor import (
     NICTestData,
     DTCtestData,
     TestData,
+    calc_NR_new,
     calc_atl_val,
     calc_astc_val,
     format_SLMdata,
@@ -681,6 +682,13 @@ class MainWindow(BoxLayout):
     def plot_selected_test_data(self, test_label):
         """Plot selected test types for a specific test"""
         try:
+            # Define standard frequencies
+            standard_freqs = [63, 125, 250, 500, 1000, 2000, 4000]
+            
+            # Create figure with two subplots instead of single plot
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10), height_ratios=[3, 2])
+            plt.subplots_adjust(hspace=0.3)
+
             # Debug prints
             print("\n=== Plot Selected Test Data ===")
             print(f"Test Label: {test_label}")
@@ -700,9 +708,6 @@ class MainWindow(BoxLayout):
                 warning.open()
                 return
             
-            # Create figure
-            plt.figure(figsize=(10, 6))
-            
             # Get test data
             test_data = self.test_data_manager.test_data_collection[test_label]
             
@@ -719,7 +724,7 @@ class MainWindow(BoxLayout):
                             df = test_obj.srs_data.raw_data
                             # Debug print DataFrame columns
                             print(f"Source room data columns: {df.columns.tolist()}")
-                            plt.plot(
+                            ax1.plot(
                                 df['Frequency (Hz)'],
                                 df['Overall 1/3 Spectra'],
                                 label=f'{test_type.value} - Source Room'
@@ -728,7 +733,7 @@ class MainWindow(BoxLayout):
                         if hasattr(test_obj, 'recive_data') and hasattr(test_obj.recive_data, 'raw_data'):
                             print("- Plotting receive room data")
                             df = test_obj.recive_data.raw_data
-                            plt.plot(
+                            ax1.plot(
                                 df['Frequency (Hz)'],
                                 df['Overall 1/3 Spectra'],
                                 label=f'{test_type.value} - Receive Room'
@@ -737,7 +742,7 @@ class MainWindow(BoxLayout):
                         if hasattr(test_obj, 'bkgrnd_data') and hasattr(test_obj.bkgrnd_data, 'raw_data'):
                             print("- Plotting background data")
                             df = test_obj.bkgrnd_data.raw_data
-                            plt.plot(
+                            ax1.plot(
                                 df['Frequency (Hz)'],
                                 df['Overall 1/3 Spectra'],
                                 label=f'{test_type.value} - Background'
@@ -746,7 +751,8 @@ class MainWindow(BoxLayout):
                         # Plot AIIC-specific data if available
                         if test_type == TestType.AIIC:
                             print("\nChecking AIIC-specific data:")
-                            # Plot tapping positions
+                            average_pos = []
+
                             for i in range(1, 5):
                                 pos_attr = f'pos{i}'
                                 print(f"- Checking {pos_attr}")
@@ -755,35 +761,54 @@ class MainWindow(BoxLayout):
                                     if hasattr(pos_data, 'raw_data'):
                                         df = pos_data.raw_data
                                         print(f"  {pos_attr} data shape: {df.shape}")
+                                        print(f"  DataFrame head:\n{df.head()}")
                                         
                                         try:
-                                            # Get frequency values from first row (skip the column header)
-                                            freq_values = pd.to_numeric(df.iloc[0, 1:12], errors='coerce')
-                                            # Get SPL values from second row (Overall 1/1 Spectra)
-                                            spl_values = pd.to_numeric(df.iloc[1, 1:12], errors='coerce')
+                                            # Find the 1/3 octave section
+                                            third_octave_start = None
+                                            for idx, row in df.iterrows():
+                                                if '1/3 Octave' in str(row.iloc[0]):
+                                                    third_octave_start = idx
+                                                    break
                                             
-                                            # Remove any NaN values
-                                            mask = ~(freq_values.isna() | spl_values.isna())
+                                            if third_octave_start is None:
+                                                print(f"  Warning: No 1/3 octave section found in {pos_attr}")
+                                                continue
+                                            
+                                            # Get the frequency row (should be right after the 1/3 Octave header)
+                                            freq_row = df.iloc[third_octave_start + 1]
+                                            # Get the Overall row (should be two rows after the frequency row)
+                                            spl_row = df.iloc[third_octave_start + 3]
+                                            
+                                            # Convert to numeric, skipping the first column (which contains text)
+                                            freq_values = pd.to_numeric(freq_row.iloc[1:], errors='coerce')
+                                            spl_values = pd.to_numeric(spl_row.iloc[1:], errors='coerce')
+                                            
+                                            # Filter for frequencies between 125 and 3150 Hz
+                                            mask = (freq_values >= 125) & (freq_values <= 3150)
                                             freq_values = freq_values[mask]
                                             spl_values = spl_values[mask]
                                             
-                                            print(f"  Frequency values: {freq_values.tolist()}")
-                                            print(f"  SPL values: {spl_values.tolist()}")
+                                            print(f"  Found frequencies: {freq_values.tolist()}")
+                                            print(f"  Found SPL values: {spl_values.tolist()}")
                                             
-                                            plt.plot(
-                                                freq_values,
-                                                spl_values,
-                                                linestyle='--',
-                                                label=f'AIIC - Tapping Position {i}'
-                                            )
-                                            print(f"  Successfully plotted {pos_attr}")
-                                            print(f"  Frequency range: {freq_values.min()} - {freq_values.max()} Hz")
-                                            print(f"  SPL range: {spl_values.min():.1f} - {spl_values.max():.1f} dB")
-                                            
+                                            if len(spl_values) == 16:  # Verify we have all 16 third-octave bands
+                                                ax1.plot(
+                                                    freq_values,
+                                                    spl_values,
+                                                    linestyle='--',
+                                                    label=f'AIIC - Tapping Position {i}'
+                                                )
+                                                average_pos.append(spl_values)
+                                                print(f"  Successfully processed position {i} with {len(spl_values)} bands")
+                                            else:
+                                                print(f"  Warning: Position {i} has wrong number of bands: {len(spl_values)}")
+                                                print(f"  Expected 16 bands, found {len(spl_values)}")
+                                                
                                         except Exception as e:
-                                            print(f"  Error plotting {pos_attr}: {str(e)}")
-                                            print(f"  DataFrame head:")
-                                            print(df.head())
+                                            print(f"  Error processing {pos_attr}: {str(e)}")
+                                            print("  Full DataFrame structure:")
+                                            print(df.info())
                             
                             # Plot source tap data with similar updates
                             if hasattr(test_obj, 'source') and hasattr(test_obj.source, 'raw_data'):
@@ -800,7 +825,7 @@ class MainWindow(BoxLayout):
                                     freq_values = freq_values[mask]
                                     spl_values = spl_values[mask]
                                     
-                                    plt.plot(
+                                    ax1.plot(
                                         freq_values,
                                         spl_values,
                                         linestyle=':',
@@ -825,7 +850,7 @@ class MainWindow(BoxLayout):
                                     freq_values = freq_values[mask]
                                     spl_values = spl_values[mask]
                                     
-                                    plt.plot(
+                                    ax1.plot(
                                         freq_values,
                                         spl_values,
                                         linestyle='-.',
@@ -835,20 +860,153 @@ class MainWindow(BoxLayout):
                                 except Exception as e:
                                     print(f"  Error plotting carpet: {str(e)}")
 
-            # Configure plot
-            plt.title(f'Test {test_label} - Selected Data')
-            plt.xlabel('Frequency (Hz)')
-            plt.ylabel('Sound Pressure Level (dB)')
-            plt.grid(True)
-            plt.xscale('log')
-            
-            # Set x-axis ticks to standard frequencies
-            standard_freqs = [63, 125, 250, 500, 1000, 2000, 4000]
-            plt.xticks(standard_freqs, [str(f) for f in standard_freqs])
-            
-            # Add legend outside plot with smaller font
-            plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small')
-            
+                        # After plotting positions, add calculation and visualization
+                        print("\nAttempting AIIC calculations:")
+                        try:
+                            # Get required data
+                            srs_data = test_obj.srs_data.raw_data['Overall 1/3 Spectra'].values
+                            bkgrnd = test_obj.bkgrnd_data.raw_data['Overall 1/3 Spectra'].values
+                            rt = test_obj.rt.rt_thirty
+                            room_vol = test_obj.room_properties.receive_vol
+
+                            # Process tapping positions like in get_test_results
+                            positions = {
+                                1: test_obj.pos1,
+                                2: test_obj.pos2,
+                                3: test_obj.pos3,
+                                4: test_obj.pos4
+                            }
+                            
+                            print("\nProcessing tapping positions:")
+                            average_pos = []
+                            for i in range(1, 5):
+                                if positions[i] is not None:
+                                    try:
+                                        df = positions[i].raw_data
+                                        print(f"\nProcessing position {i}:")
+                                        print(f"DataFrame shape: {df.shape}")
+                                        
+                                        # Find the row index for "Overall 1/3 Spectra"
+                                        third_octave_row = df[df['1/1 Octave'] == 'Overall 1/3 Spectra'].index
+                                        if len(third_octave_row) == 0:
+                                            print(f"Warning: No 1/3 octave data found in position {i}")
+                                            continue
+                                            
+                                        # Get frequency values
+                                        freq_values = pd.to_numeric(df.iloc[0, 1:], errors='coerce')
+                                        # Get SPL values from 1/3 octave row
+                                        spl_values = pd.to_numeric(df.iloc[third_octave_row[0], 1:], errors='coerce')
+                                        
+                                        # Filter for frequencies between 125 and 3150 Hz
+                                        mask = (freq_values >= 125) & (freq_values <= 3150)
+                                        freq_values = freq_values[mask]
+                                        spl_values = spl_values[mask]
+                                        
+                                        print(f"Frequencies found: {freq_values.tolist()}")
+                                        print(f"SPL values: {spl_values.tolist()}")
+                                        
+                                        if len(spl_values) == 16:  # We expect 16 values for 1/3 octave bands
+                                            average_pos.append(spl_values)
+                                            print(f"Position {i} data shape: {spl_values.shape}")
+                                        else:
+                                            print(f"Warning: Position {i} has wrong number of values: {len(spl_values)}")
+                                            
+                                    except Exception as e:
+                                        print(f"Warning: Failed to process position {i}: {str(e)}")
+                                        print("DataFrame head:")
+                                        print(df.head())
+
+                            if not average_pos:
+                                raise ValueError("No valid position data could be processed")
+
+                            # Calculate average of positions using log average
+                            print("\nCalculating position average:")
+                            print(f"Number of positions: {len(average_pos)}")
+                            print(f"Shape of first position: {average_pos[0].shape}")
+                            onethird_rec_Total = np.array(calculate_onethird_Logavg(average_pos), dtype=np.float64)
+                            print(f'AIIC onethird_rec_Total: {onethird_rec_Total}')
+                            print(f'AIIC onethird_rec_Total shape: {onethird_rec_Total.shape}')
+
+                            # Get other required data in correct format
+                            srs_data = test_obj.srs_data.raw_data['Overall 1/3 Spectra'].values
+                            bkgrnd = test_obj.bkgrnd_data.raw_data['Overall 1/3 Spectra'].values
+                            rt = test_obj.rt.rt_thirty
+
+                            # Filter source and background data for 125-3150 Hz
+                            freq_mask = (test_obj.srs_data.raw_data['Frequency (Hz)'] >= 125) & \
+                                        (test_obj.srs_data.raw_data['Frequency (Hz)'] <= 3150)
+                            srs_data = srs_data[freq_mask]
+                            bkgrnd = bkgrnd[freq_mask]
+
+                            print("\nData shapes before calc_NR_new:")
+                            print(f"Source data: {srs_data.shape}")
+                            print(f"Receive data: {onethird_rec_Total.shape}")
+                            print(f"Background: {bkgrnd.shape}")
+                            print(f"RT: {rt.shape}")
+
+                            # Now calculate NR values with the properly processed data
+                            print("\nCalculating NR values:")
+                            print(f"Source data shape: {srs_data.shape}")
+                            print(f"Receive data shape: {onethird_rec_Total.shape}")
+                            print(f"Background shape: {bkgrnd.shape}")
+                            print(f"RT shape: {rt.shape}")
+                            print(f"Room volume: {room_vol}")
+
+                            NR_val, NIC_final_val, sabines, AIIC_recieve_corr, _, AIIC_Normalized_recieve = calc_NR_new(
+                                srs_data, onethird_rec_Total, None, bkgrnd, room_vol, rt
+                            )
+
+                            print("\nCalculation results:")
+                            print(f"NR values shape: {NR_val.shape if NR_val is not None else 'None'}")
+                            print(f"NIC final value: {NIC_final_val}")
+                            print(f"Sabines shape: {sabines.shape}")
+
+                            # Plot NR values on second subplot
+                            if NR_val is not None:
+                                ax2.plot(standard_freqs[:len(NR_val)], NR_val, 
+                                        label=f'Noise Reduction (NIC = {NIC_final_val})', 
+                                        color='blue', marker='o')
+                                
+                                # Add NIC reference curve
+                                if NIC_final_val is not None:
+                                    ref_curve = np.array([-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]) + NIC_final_val
+                                    ax2.plot(standard_freqs[:len(ref_curve)], ref_curve, 
+                                           label='NIC Reference Curve', 
+                                           color='red', linestyle='--')
+                                print("Successfully plotted NR analysis")
+
+                                # Add results text box
+                                textstr = (f'NIC: {NIC_final_val}\n'
+                                       f'Sabines: {np.mean(sabines):.1f}\n'
+                                       f'Room Volume: {room_vol:.1f} m³')
+                                props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+                                ax2.text(0.05, 0.95, textstr, transform=ax2.transAxes, 
+                                        verticalalignment='top', bbox=props)
+
+                        except Exception as e:
+                            print(f"Error in AIIC calculations: {str(e)}")
+                            import traceback
+                            traceback.print_exc()
+
+            # Configure plots after all data is added
+            ax1.set_title(f'Test {test_label} - Raw Data')
+            ax1.set_xlabel('Frequency (Hz)')
+            ax1.set_ylabel('Sound Pressure Level (dB)')
+            ax1.grid(True)
+            ax1.set_xscale('log')
+            ax1.set_xticks(standard_freqs)
+            ax1.set_xticklabels([str(f) for f in standard_freqs])
+            ax1.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small')
+
+            ax2.set_title('Noise Reduction Analysis')
+            ax2.set_xlabel('Frequency (Hz)')
+            ax2.set_ylabel('Noise Reduction (dB)')
+            ax2.grid(True)
+            ax2.set_xscale('log')
+            ax2.set_xticks(standard_freqs)
+            ax2.set_xticklabels([str(f) for f in standard_freqs])
+            ax2.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small')
+
             # Adjust layout to prevent legend cutoff
             plt.tight_layout()
             
