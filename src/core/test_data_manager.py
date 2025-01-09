@@ -607,26 +607,17 @@ class TestDataManager:
                     header_row_idx = None
                     for idx, row in df.iterrows():
                         if 'T30 (ms)' in row.values and 'Frequency (Hz)' in row.values:
-                            header_row_idx = int(idx)  # Ensure integer type
-                            freq_col_idx = int(row.tolist().index('Frequency (Hz)'))  # Ensure integer type
-                            rt_col_idx = int(row.tolist().index('T30 (ms)'))  # Add this line to get RT column index
-                            if self.debug_mode:
-                                print(f"Found header row at index: {header_row_idx}")
-                                print("Header row contents:", row.tolist())
-                                print(f"Frequency column index: {freq_col_idx}")
-                                print(f"RT column index: {rt_col_idx}")
+                            header_row_idx = int(idx)
+                            freq_col_idx = int(row.tolist().index('Frequency (Hz)'))
+                            rt_col_idx = int(row.tolist().index('T30 (ms)'))
                             break
                     
                     if header_row_idx is None:
-                        raise ValueError("Could not find RT data headers ('T30 (ms)' and 'Frequency (Hz)')")
+                        raise ValueError("Could not find RT data headers")
                         
                     # Extract data starting from the row after headers
                     data_start_idx = header_row_idx + 1
                     
-                    # Validate indices before using them
-                    if not isinstance(data_start_idx, int) or not isinstance(freq_col_idx, int) or not isinstance(rt_col_idx, int):
-                        raise ValueError(f"Invalid indices: data_start_idx={data_start_idx}, freq_col_idx={freq_col_idx}, rt_col_idx={rt_col_idx}")
-                        
                     freq_data = df.iloc[data_start_idx:, freq_col_idx]
                     rt_values = df.iloc[data_start_idx:, rt_col_idx]
                     
@@ -653,12 +644,17 @@ class TestDataManager:
                         'RT60': rt_values
                     })
                     
+                    # Store the frequency data in the original object
+                    if isinstance(data_dict['rt'], SLMData):
+                        data_dict['rt'].frequencies = freq_data.values
+                        data_dict['rt'].raw_data = df
+                    
                     if self.debug_mode:
                         print("\nProcessed RT data:")
                         print(f"Final shape: {df.shape}")
-                        print("First few rows:")
-                        print(df.head())
-                        
+                        print(f"Frequencies: {freq_data.tolist()}")
+                        print(f"RT values: {rt_values.tolist()}")
+                    
                 except Exception as e:
                     raise ValueError(f"Error processing RT data: {str(e)}\nDataFrame info:\n{df.info()}")
             else:

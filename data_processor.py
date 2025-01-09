@@ -798,5 +798,43 @@ class SLMData:
         plt.ylabel('Level (dB)' if self.measurement_type == '831_Data' else 'RT30 (s)')
         plt.title(f'SLM {self.measurement_type} Measurements')
 
+    def process_rt_data(self, df):
+        """Process RT data and store both RT values and frequencies"""
+        try:
+            # Find header row
+            header_row_idx = None
+            for idx, row in df.iterrows():
+                if 'T30 (ms)' in row.values and 'Frequency (Hz)' in row.values:
+                    header_row_idx = int(idx)
+                    freq_col_idx = int(row.tolist().index('Frequency (Hz)'))
+                    rt_col_idx = int(row.tolist().index('T30 (ms)'))
+                    break
+
+            if header_row_idx is None:
+                raise ValueError("Could not find RT data headers")
+
+            # Extract and clean data
+            data_start_idx = header_row_idx + 1
+            freq_data = df.iloc[data_start_idx:, freq_col_idx]
+            rt_values = df.iloc[data_start_idx:, rt_col_idx]
+
+            # Clean and convert
+            freq_data = freq_data.astype(str).str.replace('Hz', '').str.strip()
+            freq_data = pd.to_numeric(freq_data, errors='coerce')
+            rt_values = pd.to_numeric(rt_values, errors='coerce')
+
+            # Store both values
+            self.frequencies = freq_data.values
+            self.rt_thirty = rt_values.values
+
+            # Store in raw_data as well
+            self.raw_data = pd.DataFrame({
+                'Frequency (Hz)': freq_data,
+                'RT60': rt_values
+            })
+
+        except Exception as e:
+            raise ValueError(f"Error processing RT data: {str(e)}")
+
 
 

@@ -751,48 +751,75 @@ class MainWindow(BoxLayout):
                         # Plot AIIC-specific data if available
                         if test_type == TestType.AIIC:
                             print("\nChecking AIIC-specific data:")
+                            print(f"Test object type: {type(test_obj)}")
                             average_pos = []
+
+                            # Debug raw data structure
+                            for attr in ['pos1', 'pos2', 'pos3', 'pos4', 'source', 'carpet']:
+                                if hasattr(test_obj, attr):
+                                    pos_data = getattr(test_obj, attr)
+                                    if hasattr(pos_data, 'raw_data'):
+                                        print(f"\nRaw data structure for {attr}:")
+                                        print(f"DataFrame shape: {pos_data.raw_data.shape}")
+                                        print(f"Columns: {pos_data.raw_data.columns.tolist()}")
+                                        print(f"First few rows:\n{pos_data.raw_data.head()}")
 
                             for i in range(1, 5):
                                 pos_attr = f'pos{i}'
-                                print(f"- Checking {pos_attr}")
+                                print(f"\n- Processing {pos_attr}")
                                 if hasattr(test_obj, pos_attr):
                                     pos_data = getattr(test_obj, pos_attr)
                                     if hasattr(pos_data, 'raw_data'):
                                         df = pos_data.raw_data
-                                        print(f"  {pos_attr} data shape: {df.shape}")
-                                        print(f"  DataFrame head:\n{df.head()}")
-                                        
                                         try:
                                             # Find the 1/3 octave section
                                             third_octave_start = None
                                             for idx, row in df.iterrows():
                                                 if '1/3 Octave' in str(row.iloc[0]):
                                                     third_octave_start = idx
+                                                    print(f"  Found 1/3 Octave section at row {idx}")
                                                     break
-                                            
+
                                             if third_octave_start is None:
                                                 print(f"  Warning: No 1/3 octave section found in {pos_attr}")
                                                 continue
-                                            
-                                            # Get the frequency row (should be right after the 1/3 Octave header)
+
+                                            # Get the frequency row and data row
                                             freq_row = df.iloc[third_octave_start + 1]
-                                            # Get the Overall row (should be two rows after the frequency row)
-                                            spl_row = df.iloc[third_octave_start + 3]
+                                            data_row = None
                                             
-                                            # Convert to numeric, skipping the first column (which contains text)
+                                            # Look for 'Overall 1/3 Spectra' within 5 rows after frequency row
+                                            for j in range(third_octave_start + 2, min(third_octave_start + 7, len(df))):
+                                                if 'Overall 1/3 Spectra' in str(df.iloc[j].iloc[0]):
+                                                    data_row = df.iloc[j]
+                                                    print(f"  Found Overall 1/3 Spectra at row {j}")
+                                                    break
+
+                                            if data_row is None:
+                                                print("  Warning: Could not find Overall 1/3 Spectra row")
+                                                continue
+
+                                            # Convert and clean frequency values
                                             freq_values = pd.to_numeric(freq_row.iloc[1:], errors='coerce')
-                                            spl_values = pd.to_numeric(spl_row.iloc[1:], errors='coerce')
-                                            
-                                            # Filter for frequencies between 125 and 3150 Hz
-                                            mask = (freq_values >= 125) & (freq_values <= 3150)
+                                            spl_values = pd.to_numeric(data_row.iloc[1:], errors='coerce')
+
+                                            # Remove any NaN values
+                                            mask = ~(freq_values.isna() | spl_values.isna())
                                             freq_values = freq_values[mask]
                                             spl_values = spl_values[mask]
-                                            
-                                            print(f"  Found frequencies: {freq_values.tolist()}")
-                                            print(f"  Found SPL values: {spl_values.tolist()}")
-                                            
-                                            if len(spl_values) == 16:  # Verify we have all 16 third-octave bands
+
+                                            print(f"  Raw frequencies found: {freq_values.tolist()}")
+                                            print(f"  Raw SPL values: {spl_values.tolist()}")
+
+                                            # Filter for frequencies between 63 and 4000 Hz
+                                            mask = (freq_values >= 63) & (freq_values <= 4000)
+                                            freq_values = freq_values[mask]
+                                            spl_values = spl_values[mask]
+
+                                            print(f"  Filtered frequencies: {freq_values.tolist()}")
+                                            print(f"  Filtered SPL values: {spl_values.tolist()}")
+
+                                            if len(spl_values) >= 16:  # Allow for extra frequency bands
                                                 ax1.plot(
                                                     freq_values,
                                                     spl_values,
@@ -802,14 +829,15 @@ class MainWindow(BoxLayout):
                                                 average_pos.append(spl_values)
                                                 print(f"  Successfully processed position {i} with {len(spl_values)} bands")
                                             else:
-                                                print(f"  Warning: Position {i} has wrong number of bands: {len(spl_values)}")
-                                                print(f"  Expected 16 bands, found {len(spl_values)}")
-                                                
+                                                print(f"  Warning: Position {i} has insufficient bands: {len(spl_values)}")
+
                                         except Exception as e:
                                             print(f"  Error processing {pos_attr}: {str(e)}")
-                                            print("  Full DataFrame structure:")
+                                            print("  DataFrame info:")
                                             print(df.info())
-                            
+                                            print("  DataFrame head:")
+                                            print(df.head())
+
                             # Plot source tap data with similar updates
                             if hasattr(test_obj, 'source') and hasattr(test_obj.source, 'raw_data'):
                                 print("- Checking source")
@@ -886,63 +914,76 @@ class MainWindow(BoxLayout):
                                         print(f"\nProcessing position {i}:")
                                         print(f"DataFrame shape: {df.shape}")
                                         
-                                        # Find the row index for "Overall 1/3 Spectra"
-                                        third_octave_row = df[df['1/1 Octave'] == 'Overall 1/3 Spectra'].index
-                                        if len(third_octave_row) == 0:
-                                            print(f"Warning: No 1/3 octave data found in position {i}")
-                                            continue
-                                            
-                                        # Get frequency values
-                                        freq_values = pd.to_numeric(df.iloc[0, 1:], errors='coerce')
-                                        # Get SPL values from 1/3 octave row
-                                        spl_values = pd.to_numeric(df.iloc[third_octave_row[0], 1:], errors='coerce')
+                                        # Find the 1/3 octave section
+                                        third_octave_start = None
+                                        for idx, row in df.iterrows():
+                                            if '1/3 Octave' in str(row.iloc[0]):
+                                                third_octave_start = idx
+                                                break
                                         
-                                        # Filter for frequencies between 125 and 3150 Hz
-                                        mask = (freq_values >= 125) & (freq_values <= 3150)
+                                        if third_octave_start is None:
+                                            print(f"Warning: No 1/3 octave section found in position {i}")
+                                            continue
+                                        
+                                        # Get frequency row (should be right after the 1/3 Octave header)
+                                        freq_row = df.iloc[third_octave_start + 1]
+                                        # Get the Overall row (should be two rows after the frequency row)
+                                        spl_row = df.iloc[third_octave_start + 3]
+                                        
+                                        # Convert to numeric, skipping the first column (which contains text)
+                                        freq_values = pd.to_numeric(freq_row.iloc[1:], errors='coerce')
+                                        spl_values = pd.to_numeric(spl_row.iloc[1:], errors='coerce')
+                                        
+                                        # Filter for frequencies between 100 and 3150 Hz
+                                        mask = (freq_values >= 100) & (freq_values <= 3150)
                                         freq_values = freq_values[mask]
                                         spl_values = spl_values[mask]
                                         
                                         print(f"Frequencies found: {freq_values.tolist()}")
                                         print(f"SPL values: {spl_values.tolist()}")
                                         
-                                        if len(spl_values) == 16:  # We expect 16 values for 1/3 octave bands
+                                        # Verify we have exactly 16 third-octave bands
+                                        if len(spl_values) == 16:
                                             average_pos.append(spl_values)
                                             print(f"Position {i} data shape: {spl_values.shape}")
                                         else:
                                             print(f"Warning: Position {i} has wrong number of values: {len(spl_values)}")
+                                            print("Expected frequencies: 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150")
                                             
                                     except Exception as e:
                                         print(f"Warning: Failed to process position {i}: {str(e)}")
                                         print("DataFrame head:")
                                         print(df.head())
 
-                            if not average_pos:
+                            if len(average_pos) == 0:
                                 raise ValueError("No valid position data could be processed")
 
-                            # Calculate average of positions using log average
-                            print("\nCalculating position average:")
-                            print(f"Number of positions: {len(average_pos)}")
-                            print(f"Shape of first position: {average_pos[0].shape}")
-                            onethird_rec_Total = np.array(calculate_onethird_Logavg(average_pos), dtype=np.float64)
+                            # Calculate average of positions
+                            onethird_rec_Total = np.array(calculate_onethird_Logavg(average_pos))
                             print(f'AIIC onethird_rec_Total: {onethird_rec_Total}')
                             print(f'AIIC onethird_rec_Total shape: {onethird_rec_Total.shape}')
+
+                            # After processing positions and before calc_NR_new:
+                            print("\nProcessing RT data:")
+                            rt = test_obj.rt.rt_thirty
+                            print(f"Initial RT shape: {rt.shape}")
+                            print(f"Initial RT values: {rt.tolist()}")
+
+                            # Remove the last value (4000 Hz) to match our frequency range
+                            rt = rt[:-1]
+                            print(f"Filtered RT shape: {rt.shape}")
+                            print(f"Filtered RT values: {rt.tolist()}")
 
                             # Get other required data in correct format
                             srs_data = test_obj.srs_data.raw_data['Overall 1/3 Spectra'].values
                             bkgrnd = test_obj.bkgrnd_data.raw_data['Overall 1/3 Spectra'].values
-                            rt = test_obj.rt.rt_thirty
+                            room_vol = test_obj.room_properties.receive_vol
 
-                            # Filter source and background data for 125-3150 Hz
-                            freq_mask = (test_obj.srs_data.raw_data['Frequency (Hz)'] >= 125) & \
+                            # Filter source and background data for 100-3150 Hz
+                            freq_mask = (test_obj.srs_data.raw_data['Frequency (Hz)'] >= 100) & \
                                         (test_obj.srs_data.raw_data['Frequency (Hz)'] <= 3150)
                             srs_data = srs_data[freq_mask]
                             bkgrnd = bkgrnd[freq_mask]
-
-                            print("\nData shapes before calc_NR_new:")
-                            print(f"Source data: {srs_data.shape}")
-                            print(f"Receive data: {onethird_rec_Total.shape}")
-                            print(f"Background: {bkgrnd.shape}")
-                            print(f"RT: {rt.shape}")
 
                             # Now calculate NR values with the properly processed data
                             print("\nCalculating NR values:")
@@ -950,6 +991,7 @@ class MainWindow(BoxLayout):
                             print(f"Receive data shape: {onethird_rec_Total.shape}")
                             print(f"Background shape: {bkgrnd.shape}")
                             print(f"RT shape: {rt.shape}")
+                            print(f"RT values: {rt.tolist()}")
                             print(f"Room volume: {room_vol}")
 
                             NR_val, NIC_final_val, sabines, AIIC_recieve_corr, _, AIIC_Normalized_recieve = calc_NR_new(
