@@ -573,7 +573,7 @@ def calc_astc_val(atl_val: pd.Series) -> float:
     # Since ATL values only go from 125 to 4k, we need to match array lengths
     # ATL_val is length 16, so we need to adjust STCCurve to match  
     print('ATL val: ', atl_val)
-    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]  # Length 16
+    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]  # Length 15
     
     # Convert ATL_val to numpy array if it isn't already
     if isinstance(atl_val, pd.Series):
@@ -581,7 +581,10 @@ def calc_astc_val(atl_val: pd.Series) -> float:
     
     # Ensure we're using the right slice of ATL values
     # we need to truncate the ATL_val to 16 values from 125-4000
-    ATL_val_STC = atl_val[1:17]  # must use values from 125-4000, not 100-4000
+    ATL_val_STC = atl_val[1:16]  # must use values from 125-4000, not 100-4000
+
+    print('ATL val STC: ', ATL_val_STC)
+    print('shape of ATL val STC: ', ATL_val_STC.shape)
     while (diff_negative <= 8 and new_sum <= 32):
         print('ASTC fit test value: ', ASTC_start)
         

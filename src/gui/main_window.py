@@ -1072,13 +1072,24 @@ class MainWindow(BoxLayout):
                                 float(room_props.receive_vol)      # Access directly from room_props
                             )
                             
+                            print(f'ASTC ATL val: {ATL_val}')
+                            print('Calculating NR for ASTC')
+                            NR_val, _, sabines, _, ASTC_recieve_corr, _ = calc_NR_new(
+                                srs_data,
+                                recive_data,
+                                None,
+                                bkgrnd,
+                                room_vol,
+                                rt
+                            )
+
                             # Calculate ASTC value and contour
                             ASTC_final_val = calc_astc_val(ATL_val)
                             ASTC_contour_val = [val + ASTC_final_val for val in STCCurve]
                             
-                            # Define frequencies for x-axis (100-3150 Hz)
-                            freq_values = [100, 125, 160, 200, 250, 315, 400, 500, 
-                                            630, 800, 1000, 1250, 1600, 2000, 2500, 3150]
+                            # Define frequencies for x-axis (125-4000 Hz)
+                            freq_values = [125, 160, 200, 250, 315, 400, 500, 
+                                            630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
                             
                             # Plot ATL values
                             ax2.plot(freq_values, ATL_val, 
