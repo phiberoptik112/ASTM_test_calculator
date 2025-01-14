@@ -1116,15 +1116,63 @@ class MainWindow(BoxLayout):
                             print("Successfully plotted ASTC analysis")
                                 
                         elif test_type == TestType.NIC:
-                            # Keep existing NR/NIC plotting code here
+                            print("\nCreating NIC plot:")
+                            print("\nCalculating NR values:")
+                            
+                            # Get the raw data first
+                            raw_freq = test_obj.srs_data.raw_data['Frequency (Hz)'].values
+                            raw_srs = test_obj.srs_data.raw_data['Overall 1/3 Spectra'].values
+                            raw_rec = test_obj.recive_data.raw_data['Overall 1/3 Spectra'].values
+                            raw_bkg = test_obj.bkgrnd_data.raw_data['Overall 1/3 Spectra'].values
+                            rt_data = test_obj.rt.rt_thirty  # Already in correct format (17 points)
+                            
+                            print("\nRaw data shapes:")
+                            print(f"Frequencies: {raw_freq.shape}")
+                            print(f"Source: {raw_srs.shape}")
+                            print(f"Receive: {raw_rec.shape}")
+                            print(f"Background: {raw_bkg.shape}")
+                            print(f"RT: {rt_data.shape}")
+                            
+                            # Create frequency map for the raw data
+                            freq_indices = []
+                            target_freqs = [100, 125, 160, 200, 250, 315, 400, 500, 
+                                            630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
+                            
+                            for freq in target_freqs:
+                                idx = np.where(raw_freq == freq)[0]
+                                if len(idx) > 0:
+                                    freq_indices.append(idx[0])
+                            
+                            # Extract the correct frequency points
+                            srs_data_nic = raw_srs[freq_indices]
+                            rec_data_nic = raw_rec[freq_indices]
+                            bkg_data_nic = raw_bkg[freq_indices]
+                            
+                            print("\nProcessed data shapes:")
+                            print(f"Source: {srs_data_nic.shape}")
+                            print(f"Receive: {rec_data_nic.shape}")
+                            print(f"Background: {bkg_data_nic.shape}")
+                            print(f"RT: {rt_data.shape}")
+                            
+                            # Calculate NR using the correctly filtered data
+                            NR_val, NIC_final_val, sabines, _, _, _ = calc_NR_new(
+                                srs_data_nic,
+                                None,  # No AIIC data
+                                rec_data_nic,
+                                bkg_data_nic,
+                                room_vol,
+                                rt_data  # Use full RT data
+                            )
+                            
                             if NR_val is not None:
-                                ax2.plot(standard_freqs[:len(NR_val)], NR_val, 
+                                print(f"NR values shape: {NR_val.shape}")
+                                ax2.plot(target_freqs, NR_val, 
                                         label=f'Noise Reduction (NIC = {NIC_final_val})', 
                                         color='blue', marker='o')
                                 
                                 if NIC_final_val is not None:
-                                    ref_curve = np.array([-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]) + NIC_final_val
-                                    ax2.plot(standard_freqs[:len(ref_curve)], ref_curve, 
+                                    ref_curve = np.array([-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4]) + NIC_final_val
+                                    ax2.plot(target_freqs, ref_curve, 
                                             label='NIC Reference Curve', 
                                             color='red', linestyle='--')
                                 
