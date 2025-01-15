@@ -6,7 +6,9 @@ from kivy.uix.checkbox import CheckBox
 from kivy.uix.button import Button
 from kivy.uix.scrollview import ScrollView
 from data_processor import RoomProperties, TestType
-
+import csv
+import os
+from datetime import datetime
 class TestPlanInputWindow(BoxLayout):
     def __init__(self, callback_on_save=None, **kwargs):
         super().__init__(**kwargs)
@@ -175,7 +177,37 @@ class TestPlanInputWindow(BoxLayout):
                 test_type for test_type, checkbox in self.test_type_checkboxes.items()
                 if checkbox.active
             ]
+            # Save input data to CSV as backup
+
+
+            # Create backups directory if it doesn't exist
+            backup_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'backups')
+            os.makedirs(backup_dir, exist_ok=True)
+
+            # Generate filename with timestamp
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            backup_file = os.path.join(backup_dir, f'test_plan_backup_{timestamp}.csv')
+
+            # Prepare data for CSV
+            csv_data = []
             
+            # Add room properties
+            for field_id, value in room_data.items():
+                csv_data.append(['room_property', field_id, str(value)])
+                
+            # Add selected test types
+            for test_type in selected_test_types:
+                csv_data.append(['test_type', test_type.value, 'selected'])
+
+            # Write to CSV file
+            try:
+                with open(backup_file, 'w', newline='') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(['data_type', 'field', 'value'])  # Header
+                    writer.writerows(csv_data)
+                print(f"Backup saved to {backup_file}")
+            except Exception as e:
+                print(f"Warning: Could not save backup file: {str(e)}")
             if not selected_test_types:
                 raise ValueError("Please select at least one test type")
             
