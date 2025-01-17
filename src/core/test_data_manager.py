@@ -533,8 +533,9 @@ class TestDataManager:
             if df.empty:
                 raise ValueError(f"Empty DataFrame loaded from {full_path}")
             
-            # Create SLMData object
+            # Create SLMData object with file path
             slm_data = SLMData(raw_data=df, measurement_type=measurement_type)
+            slm_data.file_path = full_path  # Add this line to store the file path
             
             if self.debug_mode:
                 print("\nSLMData object created:")
@@ -543,6 +544,7 @@ class TestDataManager:
                 print("Raw data shape:", slm_data.raw_data.shape)
                 print("First few rows of processed data:")
                 print(slm_data.raw_data.head())
+                print(f"\nFile path stored: {slm_data.file_path}")
                 
             return slm_data
             

@@ -42,7 +42,6 @@ from data_processor import (
     calc_atl_val,
     calc_astc_val,
     format_SLMdata,
-    extract_sound_levels,
     calculate_onethird_Logavg,
     sanitize_filepath
 )
@@ -846,27 +845,60 @@ class MainWindow(BoxLayout):
     def _process_single_position(self, pos_data):
         """Process a single AIIC position's data"""
         try:
+            print("\n=== Processing Single Position ===")
+            print("Input Data Structure:")
+            print(f"DataFrame shape: {pos_data.shape}")
+            print(f"Columns: {pos_data.columns.tolist()}")
+            print("\nFirst few rows of raw data:")
+            print(pos_data.head())
+            
             # Get frequency values from first row
             freq_values = pd.to_numeric(pos_data.iloc[0, 1:], errors='coerce')
+            print("\nFrequency Values (first row):")
+            print(f"Raw values: {freq_values.values}")
+            print(f"Number of frequencies: {len(freq_values)}")
+            print(f"Range: {freq_values.min()} to {freq_values.max()} Hz")
+            
             # Get SPL values from second row
             spl_values = pd.to_numeric(pos_data.iloc[1, 1:], errors='coerce')
+            print("\nSPL Values (second row):")
+            print(f"Raw values: {spl_values.values}")
+            print(f"Number of SPL values: {len(spl_values)}")
+            print(f"Range: {spl_values.min()} to {spl_values.max()} dB")
             
             # Remove any NaN values
             mask = ~(freq_values.isna() | spl_values.isna())
+            print("\nNaN Removal:")
+            print(f"Number of NaN values in frequencies: {freq_values.isna().sum()}")
+            print(f"Number of NaN values in SPL: {spl_values.isna().sum()}")
+            print(f"Valid data points after NaN removal: {mask.sum()}")
+            
             freq_values = freq_values[mask]
             spl_values = spl_values[mask]
             
             # Filter for frequencies between 100 and 3150 Hz
             freq_mask = (freq_values >= 100) & (freq_values <= 3150)
+            print("\nFrequency Filtering (100-3150 Hz):")
+            print(f"Number of values in range: {freq_mask.sum()}")
+            print("Frequency-SPL pairs in range:")
+            for f, s in zip(freq_values[freq_mask], spl_values[freq_mask]):
+                print(f"{f:.1f} Hz: {s:.1f} dB")
+            
             spl_values = spl_values[freq_mask]
             
             if len(spl_values) >= 16:  # Should have 16 points (100-3150 Hz)
+                print("\nFinal SPL Values:")
+                print(f"Number of values: {len(spl_values)}")
+                print(f"Values: {spl_values.values}")
                 return spl_values
-            print(f"  Warning: Insufficient frequency bands: {len(spl_values)}")
+                
+            print(f"\nWarning: Insufficient frequency bands: {len(spl_values)}")
+            print(f"Required: 16, Found: {len(spl_values)}")
             return None
             
         except Exception as e:
-            print(f"Error processing position data: {str(e)}")
+            print(f"\nError processing position data: {str(e)}")
+            print("Detailed error information:")
             traceback.print_exc()
             return None
 
@@ -902,26 +934,49 @@ class MainWindow(BoxLayout):
     def _process_aiic_plot(self, ax1, ax2, test_obj):
         """Create AIIC-specific plots for both raw data and analysis"""
         try:
-            print("\nProcessing AIIC data:")
+            print("\n=== START: AIIC PROCESSING ===")
             
             # Get raw data
+            print("\n--- Getting Raw Data ---")
             raw_data = self._get_aiic_raw_data(test_obj)
             if not raw_data:
                 return False
             
+            print("\nRaw Data Validation:")
+            print(f"Source range: {np.min(raw_data['source'])} to {np.max(raw_data['source'])}")
+            print(f"Background range: {np.min(raw_data['background'])} to {np.max(raw_data['background'])}")
+            print(f"RT range: {np.min(raw_data['rt'])} to {np.max(raw_data['rt'])}")
+            for i, pos in enumerate(raw_data['positions']):
+                print(f"Position {i+1} range: {np.min(pos)} to {np.max(pos)}")
+            
             # Process frequency data
+            print("\n--- Processing Frequencies ---")
             freq_data = self._process_aiic_frequencies(raw_data)
             if not freq_data:
                 return False
             
+            print("\nFrequency Data Validation:")
+            print(f"Average position range: {np.min(freq_data['avg_pos'])} to {np.max(freq_data['avg_pos'])}")
+            print("Position by frequency:")
+            for freq, avg in zip(freq_data['target_freqs'], freq_data['avg_pos']):
+                print(f"{freq} Hz: {avg:.1f} dB")
+            
             # Calculate AIIC
+            print("\n--- Calculating AIIC Values ---")
             aiic_results = self._calculate_aiic_values(test_obj, freq_data)
             if not aiic_results:
                 return False
             
+            print("\nAIIC Results Validation:")
+            if aiic_results['AIIC_Normalized_recieve'] is not None:
+                print("Normalized Receive by frequency:")
+                for freq, val in zip(freq_data['target_freqs'], aiic_results['AIIC_Normalized_recieve']):
+                    print(f"{freq} Hz: {val:.1f} dB")
+            
             # Create plots
+            print("\n--- Creating Plots ---")
             self._create_aiic_analysis_plot(ax1, ax2, freq_data, aiic_results)
-            print("Successfully processed AIIC data")
+            print("\n=== END: AIIC PROCESSING ===")
             return True
             
         except Exception as e:
@@ -932,22 +987,47 @@ class MainWindow(BoxLayout):
     def _get_aiic_raw_data(self, test_obj):
         """Extract raw data for AIIC calculations"""
         try:
-            # Get frequencies and data for 100-3150 Hz range
-            freq_indices = slice(0, 16)  # Same slice as in get_test_results
+            print("\n=== AIIC Raw Data Processing ===")
             
-            print("\nDebug - Raw Data Loading:")
-            print(f"Frequency indices: {freq_indices}")
+            # Debug test object structure and file paths
+            print("\nTest Object Information:")
+            print(f"Test Name: {getattr(test_obj, 'test_name', 'Unknown')}")
+            print(f"Test Date: {getattr(test_obj, 'test_date', 'Unknown')}")
+            print(f"Test Directory: {getattr(test_obj, 'test_dir', 'Unknown')}")
+            
+            freq_indices = slice(12, 28)
+            
+            # Source room data with detailed file info
+            print("\nSource Room Data:")
+            if hasattr(test_obj.srs_data, 'file_path'):
+                print(f"Source File: {os.path.basename(test_obj.srs_data.file_path)}")
+                print(f"Full Path: {test_obj.srs_data.file_path}")
+            print(f"Data Shape: {test_obj.srs_data.raw_data.shape}")
+            
+            # Background data with detailed file info
+            print("\nBackground Data:")
+            if hasattr(test_obj.bkgrnd_data, 'file_path'):
+                print(f"Background File: {os.path.basename(test_obj.bkgrnd_data.file_path)}")
+                print(f"Full Path: {test_obj.bkgrnd_data.file_path}")
+            print(f"Data Shape: {test_obj.bkgrnd_data.raw_data.shape}")
+            
+            # RT data with detailed file info
+            print("\nRT Data:")
+            if hasattr(test_obj.rt, 'file_path'):
+                print(f"RT File: {os.path.basename(test_obj.rt.file_path)}")
+                print(f"Full Path: {test_obj.rt.file_path}")
+            print(f"RT30 Values Shape: {test_obj.rt.rt_thirty.shape}")
             
             raw_data = {
                 'freq': test_obj.srs_data.raw_data['Frequency (Hz)'].values,
                 'source': test_obj.srs_data.raw_data['Overall 1/3 Spectra'].values[freq_indices],
                 'background': test_obj.bkgrnd_data.raw_data['Overall 1/3 Spectra'].values[freq_indices],
-                'rt': test_obj.rt.rt_thirty[:-1],  # Remove 4000 Hz for AIIC
+                'rt': test_obj.rt.rt_thirty[:-1],
                 'room_props': test_obj.room_properties,
                 'positions': []
             }
             
-            # Process tapping positions exactly as in get_test_results
+            # Process tapping positions with detailed file info
             positions = {
                 1: test_obj.pos1,
                 2: test_obj.pos2,
@@ -955,43 +1035,49 @@ class MainWindow(BoxLayout):
                 4: test_obj.pos4
             }
             
-            print("\nProcessing position data:")
-            for i in range(1, 5):
-                if positions[i] is not None:
+            print("\nTapping Position Files:")
+            for pos_num, pos in positions.items():
+                if pos is not None:
+                    print(f"\nPosition {pos_num}:")
+                    if hasattr(pos, 'file_path'):
+                        print(f"Position File: {os.path.basename(pos.file_path)}")
+                        print(f"Full Path: {pos.file_path}")
+                    print(f"Data Shape: {pos.raw_data.shape}")
                     try:
-                        # Find the row where '1/1 Octave' column contains 'Overall 1/3 Spectra'
-                        pos_data = positions[i].raw_data.loc[positions[i].raw_data['1/1 Octave'] == 'Overall 1/3 Spectra']
+                        # Process position data
+                        pos_data = pos.raw_data.loc[pos.raw_data['1/1 Octave'] == 'Overall 1/3 Spectra']
                         if not pos_data.empty:
                             pos_values = pos_data.iloc[0, 1:].values[freq_indices]
                             pos_values = np.array(pos_values, dtype=np.float64).round(1)
                             if len(pos_values) == 16:
                                 raw_data['positions'].append(pos_values)
-                                print(f"Position {i} data shape: {pos_values.shape}")
-                                print(f"Position {i} values: {pos_values}")
+                                print(f"Successfully processed")
+                                print(f"First few values: {pos_values[:5]}...")
                             else:
-                                print(f"Warning: Position {i} data wrong length: {len(pos_values)}")
+                                print(f"Warning: Wrong number of values: {len(pos_values)}")
                         else:
-                            print(f"Warning: No '1/3 Spectra' row found for position {i}")
-                            print("Available rows in '1/1 Octave' column:")
-                            print(positions[i].raw_data['1/1 Octave'].unique())
+                            print("Warning: No '1/3 Spectra' row found")
+                            print("Available rows in file:")
+                            print(pos.raw_data['1/1 Octave'].unique())
                     except Exception as e:
-                        print(f"Warning: Failed to process position {i}: {str(e)}")
-                        print(f"Position {i} data structure:")
-                        print(f"  Raw data shape: {positions[i].raw_data.shape}")
-                        print(f"  First few rows:\n{positions[i].raw_data.head()}")
-                        print(f"  Column names: {positions[i].raw_data.columns.tolist()}")
+                        print(f"Error processing position: {str(e)}")
+                else:
+                    print(f"\nPosition {pos_num}: Not provided")
             
-            # Convert arrays to proper format
-            raw_data['source'] = np.array(raw_data['source'], dtype=np.float64).round(1)
-            raw_data['background'] = np.array(raw_data['background'], dtype=np.float64).round(1)
-            raw_data['rt'] = np.array(raw_data['rt'], dtype=np.float64).round(3)
+            # Room properties with detailed file info
+            print("\nRoom Properties:")
+            if hasattr(test_obj.room_properties, 'file_path'):
+                print(f"Properties File: {os.path.basename(test_obj.room_properties.file_path)}")
+                print(f"Full Path: {test_obj.room_properties.file_path}")
+            print(f"Receive Volume: {test_obj.room_properties.receive_vol}")
             
-            print("\nRaw data shapes:")
-            print(f"Frequencies: {raw_data['freq'].shape}")
-            print(f"Source: {raw_data['source'].shape}")
-            print(f"Background: {raw_data['background'].shape}")
-            print(f"RT: {raw_data['rt'].shape}")
-            print(f"Number of positions: {len(raw_data['positions'])}")
+            # Final data validation
+            print("\nFinal Data Summary:")
+            print(f"Number of frequencies: {len(raw_data['freq'])}")
+            print(f"Source data points: {len(raw_data['source'])}")
+            print(f"Background data points: {len(raw_data['background'])}")
+            print(f"RT data points: {len(raw_data['rt'])}")
+            print(f"Number of valid positions: {len(raw_data['positions'])}")
             
             if not raw_data['positions']:
                 raise ValueError("No valid position data could be processed")
@@ -999,7 +1085,7 @@ class MainWindow(BoxLayout):
             return raw_data
             
         except Exception as e:
-            print(f"Error getting AIIC raw data: {str(e)}")
+            print(f"\nError getting AIIC raw data: {str(e)}")
             traceback.print_exc()
             return None
 
@@ -1042,7 +1128,7 @@ class MainWindow(BoxLayout):
             print("\nCalculating AIIC values:")
             
             # Calculate NR using the averaged position data
-            NR_val, NIC_final_val, sabines, AIIC_recieve_corr, ASTC_recieve_corr, AIIC_Normalized_recieve = calc_NR_new(
+            NR_val, _, sabines, AIIC_recieve_corr, ASTC_recieve_corr, AIIC_Normalized_recieve = calc_NR_new(
                 freq_data['source'],
                 freq_data['avg_pos'],
                 None,  # No receive data for AIIC
