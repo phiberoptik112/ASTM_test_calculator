@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 from src.core.test_data_manager import TestDataManager
 from src.gui.test_plan_input import TestPlanInputWindow
 from src.gui.analysis_dashboard import ResultsAnalysisDashboard
+
 import logging
 logging.getLogger('matplotlib.font_manager').disabled = True
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
@@ -47,6 +48,7 @@ from data_processor import (
 )
 from src.core.test_processor import TestProcessor
 import numpy as np
+from base_test_reporter import *
 
 class MainWindow(BoxLayout):
     def __init__(self, **kwargs):
@@ -496,22 +498,68 @@ class MainWindow(BoxLayout):
         popup.open()
 
     def generate_report(self, test_data: TestData):
-        """Generate PDF report for test"""
+        """Generate PDF report for test data"""
         try:
-            from src.reports.base_report import BaseReport
+            if not hasattr(self, 'test_data_manager') or not self.test_data_manager:
+                raise ValueError("No test data loaded. Please load data first.")
+
+            # Get test collection from manager
+            test_collection = self.test_data_manager.get_test_collection()
             
-            report = BaseReport(
-                test_data=test_data,
-                output_folder=self.output_path.text,
-                test_type=test_data.test_type
-            )
+            for test_label, test_data_dict in test_collection.items():
+                if self.debug_checkbox.active:
+                    print(f'Generating reports for test: {test_label}')
+                
+                for test_type, data in test_data_dict.items():
+                    self.status_label.text = f'Status: Generating {test_type.value} report for {test_label}...'
+                    
+                    try:
+                        # Get appropriate report class
+                        report_class = {
+                            TestType.ASTC: ASTCTestReport,
+                            TestType.AIIC: AIICTestReport,
+                            TestType.NIC: NICTestReport,
+                            TestType.DTC: DTCTestReport
+                        }.get(test_type)
+                        
+                        if report_class:
+                            # Generate report
+                            report = report_class.create_report(
+                                test_data=data.test_data,
+                                output_folder=self.output_path.text,
+                                test_type=test_type
+                            )
+                            
+                            # Get PDF path
+                            pdf_path = os.path.join(
+                                self.output_path.text,
+                                f"{test_label}_{test_type.value}_Report.pdf"
+                            )
+                            
+                            if self.debug_checkbox.active:
+                                print(f'Generated {test_type.value} report for test {test_label}')
+                            
+                            # Show preview
+                            self.preview_pdf(pdf_path)
+                            
+                    except Exception as e:
+                        error_msg = f"Error generating {test_type.value} report for {test_label}: {str(e)}"
+                        print(error_msg)
+                        if self.debug_checkbox.active:
+                            traceback.print_exc()
+                        continue
             
-            pdf_path = report.generate()
-            self.preview_pdf(pdf_path)
-            self.status_label.text = 'Status: Report generated successfully'
+            self.status_label.text = 'Status: All reports generated successfully'
+            return True
             
         except Exception as e:
-            self._show_error(f'Error generating report: {str(e)}')
+            error_msg = f"Error generating reports: {str(e)}"
+            if self.debug_checkbox.active:
+                print(f"\nERROR: {error_msg}")
+                traceback.print_exc()
+            self._show_error(error_msg)
+            self.status_label.text = f"Status: {error_msg}"
+            return False
 
     def show_plot_selection(self, instance):
         """Show popup with buttons to plot data for each test, with test type selection"""
@@ -995,6 +1043,8 @@ class MainWindow(BoxLayout):
             print(f"Test Date: {getattr(test_obj, 'test_date', 'Unknown')}")
             print(f"Test Directory: {getattr(test_obj, 'test_dir', 'Unknown')}")
             
+            # 1/3 octave bands from 100 to 3150 Hz
+            # still a hardcoded value... is there a better way to do this?
             freq_indices = slice(12, 28)
             
             # Source room data with detailed file info
@@ -1012,6 +1062,7 @@ class MainWindow(BoxLayout):
             print(f"Data Shape: {test_obj.bkgrnd_data.raw_data.shape}")
             
             # RT data with detailed file info
+            # still a hardcoded value... is there a better way to do this?
             print("\nRT Data:")
             if hasattr(test_obj.rt, 'file_path'):
                 print(f"RT File: {os.path.basename(test_obj.rt.file_path)}")
@@ -1022,7 +1073,7 @@ class MainWindow(BoxLayout):
                 'freq': test_obj.srs_data.raw_data['Frequency (Hz)'].values,
                 'source': test_obj.srs_data.raw_data['Overall 1/3 Spectra'].values[freq_indices],
                 'background': test_obj.bkgrnd_data.raw_data['Overall 1/3 Spectra'].values[freq_indices],
-                'rt': test_obj.rt.rt_thirty[:-1],
+                'rt': test_obj.rt.rt_thirty[:-1], # this also is still hardcoded 
                 'room_props': test_obj.room_properties,
                 'positions': []
             }

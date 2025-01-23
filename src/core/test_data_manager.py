@@ -7,6 +7,7 @@ from os.path import isfile, join
 
 from data_processor import (
     TestType,
+    TestData,
     RoomProperties,
     AIICTestData,
     ASTCTestData,
@@ -868,3 +869,9 @@ class TestDataManager:
 
         if self.debug_mode:
             print("\nData verification and alignment complete")
+
+    def get_test_collection(self) -> Dict[str, Dict[TestType, TestData]]:
+        """Return the processed test data collection"""
+        if not hasattr(self, '_test_collection'):
+            raise ValueError("No test data loaded")
+        return self._test_collection
