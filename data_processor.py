@@ -219,22 +219,78 @@ def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd
     try:
         # Determine test type and expected length based on input
         if AIIC_rec_overalloct is not None:
-            # AIIC Test (16 values: 100-3150 Hz)
-            expected_length = 16
+            test_type = "AIIC"
+            expected_length = 16  # 100-3150 Hz
+            freq_range = "100-3150 Hz"
             STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
         else:
-            # ASTC/NIC Test (17 values: 100-4000 Hz)
-            expected_length = 17
+            test_type = "ASTC/NIC"
+            expected_length = 17  # 100-4000 Hz
+            freq_range = "100-4000 Hz"
             STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4]
+
+        print(f"\n=== Processing {test_type} Test Data ===")
+        print(f"Expected: {expected_length} values ({freq_range})")
+        
+        # Debug input data types and shapes
+        print("\nInput Data Analysis:")
+        print(f"Source data type: {type(srs_overalloct)}")
+        print(f"Source length: {len(srs_overalloct) if hasattr(srs_overalloct, '__len__') else 'no length'}")
+        if isinstance(srs_overalloct, pd.Series):
+            print(f"Source index: {srs_overalloct.index.tolist()}")
+        
+        print(f"\nBackground data type: {type(bkgrnd_overalloct)}")
+        print(f"Background length: {len(bkgrnd_overalloct) if hasattr(bkgrnd_overalloct, '__len__') else 'no length'}")
+        if isinstance(bkgrnd_overalloct, pd.Series):
+            print(f"Background index: {bkgrnd_overalloct.index.tolist()}")
+        
+        print(f"\nRT thirty data type: {type(rt_thirty)}")
+        print(f"RT thirty length: {len(rt_thirty) if hasattr(rt_thirty, '__len__') else 'no length'}")
+        if isinstance(rt_thirty, pd.Series):
+            print(f"RT thirty index: {rt_thirty.index.tolist()}")
+        
+        if AIIC_rec_overalloct is not None:
+            print(f"\nAIIC receive data type: {type(AIIC_rec_overalloct)}")
+            print(f"AIIC receive length: {len(AIIC_rec_overalloct) if hasattr(AIIC_rec_overalloct, '__len__') else 'no length'}")
+        
+        if ASTC_rec_overalloct is not None:
+            print(f"\nASTC receive data type: {type(ASTC_rec_overalloct)}")
+            print(f"ASTC receive length: {len(ASTC_rec_overalloct) if hasattr(ASTC_rec_overalloct, '__len__') else 'no length'}")
+
+        # Verify array lengths before processing
+        input_lengths = {
+            'Source': len(srs_overalloct) if hasattr(srs_overalloct, '__len__') else None,
+            'Background': len(bkgrnd_overalloct) if hasattr(bkgrnd_overalloct, '__len__') else None,
+            'RT thirty': len(rt_thirty) if hasattr(rt_thirty, '__len__') else None,
+            'AIIC receive': len(AIIC_rec_overalloct) if AIIC_rec_overalloct is not None and hasattr(AIIC_rec_overalloct, '__len__') else None,
+            'ASTC receive': len(ASTC_rec_overalloct) if ASTC_rec_overalloct is not None and hasattr(ASTC_rec_overalloct, '__len__') else None
+        }
+
+        # Check for length mismatches
+        length_issues = {name: length for name, length in input_lengths.items() 
+                        if length is not None and length != expected_length}
+        
+        if length_issues:
+            error_msg = f"\nLength mismatch detected for {test_type} test:\n"
+            error_msg += f"Expected length: {expected_length}\n"
+            error_msg += "Actual lengths:\n"
+            print(f"srs_overalloct: {srs_overalloct}")
+            print(f"AIIC_rec_overalloct: {AIIC_rec_overalloct}")
+            print(f"ASTC_rec_overalloct: {ASTC_rec_overalloct}")
+            print(f"bkgrnd_overalloct: {bkgrnd_overalloct}")
+            print(f"rt_thirty: {rt_thirty}")
+            for name, length in length_issues.items():
+                error_msg += f"- {name}: {length}\n"
+            raise ValueError(error_msg)
+        
+
+        # If we get here, proceed with the calculation
+        print("\nAll input arrays verified with correct length. Proceeding with calculations...")
 
         # Convert inputs to numpy arrays without additional slicing
         bkgrnd_overalloct = pd.to_numeric(bkgrnd_overalloct).to_numpy() if isinstance(bkgrnd_overalloct, pd.Series) else np.array(bkgrnd_overalloct)
         rt_thirty = rt_thirty.to_numpy() if isinstance(rt_thirty, pd.Series) else np.array(rt_thirty)
         srs_overalloct = pd.to_numeric(srs_overalloct).to_numpy() if isinstance(srs_overalloct, pd.Series) else np.array(srs_overalloct)
-
-        # Verify array lengths
-        if not all(len(arr) == expected_length for arr in [bkgrnd_overalloct, rt_thirty, srs_overalloct]):
-            raise ValueError(f"Input arrays must have length {expected_length}")
 
         # Calculate sabines
         sabines = 0.049 * recieve_roomvol/rt_thirty

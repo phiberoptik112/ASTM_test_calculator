@@ -180,8 +180,8 @@ class MainWindow(BoxLayout):
         self.view_button.bind(on_press=self.view_test_data)
         button_layout.add_widget(self.view_button)
         
-        self.report_button = Button(text='Generate Report')
-        self.report_button.bind(on_press=self.generate_report)
+        self.report_button = Button(text='Generate Reports')
+        self.report_button.bind(on_press=self.generate_reports)
         button_layout.add_widget(self.report_button)
         
         # Add Plot Data button
@@ -318,6 +318,16 @@ class MainWindow(BoxLayout):
                 if debug_mode:
                     print("\nProcessing test data...")
                 self.test_data_manager.process_test_data()
+                
+                # Add debug output to verify data was loaded
+                if debug_mode:
+                    test_collection = self.test_data_manager.get_test_collection()
+                    print("\nLoaded test collection:")
+                    print(f"Number of tests: {len(test_collection)}")
+                    for test_label, test_data in test_collection.items():
+                        print(f"\nTest: {test_label}")
+                        print(f"Test types: {list(test_data.keys())}")
+                
                 self.status_label.text = 'Status: All test data loaded successfully'
                 
                 # Show plot selection popup after successful load
@@ -497,23 +507,24 @@ class MainWindow(BoxLayout):
         )
         popup.open()
 
-    def generate_report(self, test_data: TestData):
+    def generate_reports(self, test_data: TestData):
         """Generate PDF report for test data"""
         try:
-            if not hasattr(self, 'test_data_manager') or not self.test_data_manager:
-                raise ValueError("No test data loaded. Please load data first.")
-
-            # Get test collection from manager
+            if not test_data:
+                raise ValueError("No test data provided")
+            
             test_collection = self.test_data_manager.get_test_collection()
             
-            for test_label, test_data_dict in test_collection.items():
-                if self.debug_checkbox.active:
-                    print(f'Generating reports for test: {test_label}')
+            for test_label, test_types in test_collection.items():
+                print(f"\nGenerating reports for test: {test_label}")
                 
-                for test_type, data in test_data_dict.items():
-                    self.status_label.text = f'Status: Generating {test_type.value} report for {test_label}...'
-                    
+                for test_type, data in test_types.items():
                     try:
+                        self.status_label.text = f'Status: Generating {test_type.value} report for {test_label}...'
+                        
+                        # Convert the data to the expected format
+                        converted_test_data = self.convert_to_test_data(data)
+                        
                         # Get appropriate report class
                         report_class = {
                             TestType.ASTC: ASTCTestReport,
@@ -523,9 +534,9 @@ class MainWindow(BoxLayout):
                         }.get(test_type)
                         
                         if report_class:
-                            # Generate report
+                            # Generate report using the converted test data
                             report = report_class.create_report(
-                                test_data=data.test_data,
+                                test_data=converted_test_data,
                                 output_folder=self.output_path.text,
                                 test_type=test_type
                             )
@@ -763,6 +774,17 @@ class MainWindow(BoxLayout):
             # Get test data
             test_data = self.test_data_manager.test_data_collection[test_label]
             
+            # Initialize frequency data dictionary for calculations
+            self.freq_data = {
+                'room_props': None,
+                'source': None,
+                'receive': None,
+                'avg_pos': None,
+                'positions': None,
+                'background': None,
+                'rt': None
+            }
+            
             # Plot data for each selected test type
             for test_type in selected_types:
                 if test_type in test_data:
@@ -770,7 +792,10 @@ class MainWindow(BoxLayout):
                     if test_obj:
                         print(f"\nPlotting {test_type.value} data:")
                         
-                        # Plot base data (source, receive, background) for all test types
+                        # Store room properties for calculations
+                        self.freq_data['room_props'] = test_obj.room_properties
+                        
+                        # Process and store data for calculations while plotting
                         if hasattr(test_obj, 'srs_data') and hasattr(test_obj.srs_data, 'raw_data'):
                             print("- Plotting source room data")
                             df = test_obj.srs_data.raw_data
@@ -779,6 +804,9 @@ class MainWindow(BoxLayout):
                                 df['Overall 1/3 Spectra'],
                                 label=f'{test_type.value} - Source Room'
                             )
+                            # Store for calculations - using static method call
+                            formatted_df = TestDataManager.format_slm_data(test_obj.srs_data.raw_data)
+                            self.freq_data['source'] = formatted_df['Overall 1/3 Spectra'].values[0:17]
                         
                         if hasattr(test_obj, 'recive_data') and hasattr(test_obj.recive_data, 'raw_data'):
                             print("- Plotting receive room data")
@@ -788,6 +816,9 @@ class MainWindow(BoxLayout):
                                 df['Overall 1/3 Spectra'],
                                 label=f'{test_type.value} - Receive Room'
                             )
+                            # Store for calculations
+                            formatted_df = TestDataManager.format_slm_data(test_obj.recive_data.raw_data)
+                            self.freq_data['receive'] = formatted_df['Overall 1/3 Spectra'].values[0:17]
                         
                         if hasattr(test_obj, 'bkgrnd_data') and hasattr(test_obj.bkgrnd_data, 'raw_data'):
                             print("- Plotting background data")
@@ -797,9 +828,24 @@ class MainWindow(BoxLayout):
                                 df['Overall 1/3 Spectra'],
                                 label=f'{test_type.value} - Background'
                             )
+                            # Store for calculations
+                            formatted_df = TestDataManager.format_slm_data(test_obj.bkgrnd_data.raw_data)
+                            self.freq_data['background'] = formatted_df['Overall 1/3 Spectra'].values[0:17]
+                        
+                        # Store RT data for calculations
+                        if hasattr(test_obj, 'rt'):
+                            if hasattr(test_obj.rt, 'rt_thirty'):
+                                rt_data = test_obj.rt.rt_thirty[:17]
+                            else:
+                                rt_data = test_obj.rt['Unnamed: 10'][24:41]/1000
+                            self.freq_data['rt'] = np.array(rt_data, dtype=np.float64).round(3)
 
                         # Process test-specific data
                         if test_type == TestType.AIIC:
+                            positions, avg_pos = self._process_aiic_positions(test_obj)
+                            if positions is not None:
+                                self.freq_data['positions'] = positions
+                                self.freq_data['avg_pos'] = avg_pos
                             self._process_aiic_plot(ax1, ax2, test_obj)
                         elif test_type == TestType.ASTC:
                             self._process_astc_plot(ax1, ax2, test_obj)
@@ -828,49 +874,163 @@ class MainWindow(BoxLayout):
             # Adjust layout to prevent legend cutoff
             plt.tight_layout()
             
-            # Show plot in popup
-            self.show_plot_popup()
+            # Save plot to a temporary file
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
+                plt.savefig(temp_file.name, dpi=300, bbox_inches='tight')
+                
+                # Create scrollable image view
+                scroll = ScrollView(size_hint=(1, 0.9))  # Reduced height to make room for button
+                image = KivyImage(
+                    source=temp_file.name,
+                    size_hint=(1, None)
+                )
+                image.height = image.texture_size[1]
+                scroll.add_widget(image)
+                
+                # Create button layout at bottom
+                button_layout = BoxLayout(
+                    size_hint_y=None, 
+                    height='48dp',
+                    spacing='10dp',
+                    padding='10dp'
+                )
+                
+                # Add store values button
+                store_button = Button(
+                    text='Store Calculated Values',
+                    size_hint_x=None,
+                    width='200dp'
+                )
+                store_button.bind(on_press=lambda x: self._store_calculated_values(test_label))
+                
+                button_layout.add_widget(store_button)
+                
+                # Add both to main layout
+                layout = BoxLayout(orientation='vertical')
+                layout.add_widget(scroll)
+                layout.add_widget(button_layout)
+                
+                # Show in popup
+                plot_popup = Popup(
+                    title=f'Test Data Plot - {test_label}',
+                    content=layout,
+                    size_hint=(0.9, 0.9)
+                )
+                plot_popup.open()
             
         except Exception as e:
-            print(f"Error plotting selected test data: {str(e)}")
+            print(f"Error plotting test data: {str(e)}")
             traceback.print_exc()
 
-    def show_plot_popup(self):
-        """Show the plot in a popup window"""
-        # Save plot to a temporary file
-        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
-            plt.savefig(temp_file.name, dpi=300, bbox_inches='tight')
+    def _store_calculated_values(self, test_label):
+        """Store calculated values for all processed test types"""
+        try:
+            print(f"\n=== Storing Calculated Values for Test {test_label} ===")
             
-            # Create scrollable image view
-            scroll = ScrollView(size_hint=(1, 1))
-            image = KivyImage(
-                source=temp_file.name,
-                size_hint=(1, None)
-            )
-            image.height = image.texture_size[1]
-            scroll.add_widget(image)
+            # Get test data
+            test_data = self.test_data_manager.test_data_collection[test_label]
+            print(f"Available test types: {list(test_data.keys())}")
             
-            # Create and show popup
-            plot_popup = Popup(
-                title='Test Data Plot',
-                content=scroll,
-                size_hint=(0.9, 0.9)
+            for test_type in test_data.keys():
+                print(f"\nProcessing {test_type} test:")
+                
+                # Debug input data
+                print(f"Input test data structure:")
+                print(f"- Keys available: {test_data[test_type].keys()}")
+                print(f"- Test data type: {type(test_data[test_type]['test_data'])}")
+                
+                if test_type == TestType.AIIC:
+                    print("\nAIIC Calculation Input:")
+                    print(f"Freq data available: {hasattr(self, 'freq_data')}")
+                    if hasattr(self, 'freq_data'):
+                        print(f"Freq data keys: {self.freq_data.keys()}")
+                    calculated_values = self._calculate_aiic_values(
+                        test_data[test_type]['test_data'],
+                        self.freq_data
+                    )
+                    print("\nAIIC Calculated Values:")
+                    if calculated_values:
+                        print(f"- Keys: {calculated_values.keys()}")
+                        for key, value in calculated_values.items():
+                            if hasattr(value, 'shape'):
+                                print(f"- {key} shape: {value.shape}")
+                            elif isinstance(value, (list, np.ndarray)):
+                                print(f"- {key} length: {len(value)}")
+                
+                elif test_type == TestType.ASTC:
+                    print("\nASTC Calculation Input:")
+                    calculated_values = self._calculate_astc_values(
+                        test_data[test_type]['test_data'],
+                        self.freq_data
+                    )
+                    print("\nASTC Calculated Values:")
+                    if calculated_values:
+                        print(f"- Keys: {calculated_values.keys()}")
+                        for key, value in calculated_values.items():
+                            if hasattr(value, 'shape'):
+                                print(f"- {key} shape: {value.shape}")
+                            elif isinstance(value, (list, np.ndarray)):
+                                print(f"- {key} length: {len(value)}")
+                
+                elif test_type == TestType.NIC:
+                    print("\nNIC Calculation Input:")
+                    calculated_values = self._calculate_nic_values(
+                        test_data[test_type]['test_data'],
+                        self.freq_data
+                    )
+                    print("\nNIC Calculated Values:")
+                    if calculated_values:
+                        print(f"- Keys: {calculated_values.keys()}")
+                        for key, value in calculated_values.items():
+                            if hasattr(value, 'shape'):
+                                print(f"- {key} shape: {value.shape}")
+                            elif isinstance(value, (list, np.ndarray)):
+                                print(f"- {key} length: {len(value)}")
+                
+                if calculated_values:
+                    print(f"\nStoring values for {test_type}:")
+                    print("Calling store_calculated_values with:")
+                    print(f"- test_label: {test_label}")
+                    print(f"- test_type: {test_type}")
+                    self.test_data_manager.test_processor.store_calculated_values(
+                        test_label,
+                        test_type,
+                        calculated_values
+                    )
+            
+            # Show success message
+            success_popup = Popup(
+                title='Success',
+                content=Label(text='Calculated values stored successfully'),
+                size_hint=(None, None),
+                size=(300, 150)
             )
-            plot_popup.open()
+            success_popup.open()
+            
+        except Exception as e:
+            error_msg = f"Error storing calculated values: {str(e)}"
+            print(f"\nError details:")
+            print(f"- Error type: {type(e)}")
+            print(f"- Error message: {str(e)}")
+            traceback.print_exc()
+            self._show_error(error_msg)
+
+    def _process_single_position(self, raw_data, pos_name):
+        """Process a single AIIC position's data"""
+        try:
+            print(f"Processing {pos_name} data")
+            # Use TestDataManager's format_slm_data method
+            formatted_df = TestDataManager.format_slm_data(raw_data)
+            # Get the Overall 1/3 Spectra values for the first 17 frequencies
+            return formatted_df['Overall 1/3 Spectra'].values[0:17]
+        except Exception as e:
+            print(f"Error processing {pos_name}: {str(e)}")
+            return None
 
     def _process_aiic_positions(self, test_obj):
         """Process AIIC position data and return averaged results"""
         print("\nProcessing AIIC position data:")
         average_pos = []
-
-        # Debug raw data structure
-        for attr in ['pos1', 'pos2', 'pos3', 'pos4', 'source', 'carpet']:
-            if hasattr(test_obj, attr):
-                pos_data = getattr(test_obj, attr)
-                if hasattr(pos_data, 'raw_data'):
-                    print(f"\nRaw data structure for {attr}:")
-                    print(f"DataFrame shape: {pos_data.raw_data.shape}")
-                    print(f"Columns: {pos_data.raw_data.columns.tolist()}")
 
         # Process each position
         for i in range(1, 5):
@@ -889,66 +1049,6 @@ class MainWindow(BoxLayout):
             print(f"Successfully processed {len(average_pos)} positions")
             return average_pos, onethird_rec_Total
         return None, None
-
-    def _process_single_position(self, pos_data):
-        """Process a single AIIC position's data"""
-        try:
-            print("\n=== Processing Single Position ===")
-            print("Input Data Structure:")
-            print(f"DataFrame shape: {pos_data.shape}")
-            print(f"Columns: {pos_data.columns.tolist()}")
-            print("\nFirst few rows of raw data:")
-            print(pos_data.head())
-            
-            # Get frequency values from first row
-            freq_values = pd.to_numeric(pos_data.iloc[0, 1:], errors='coerce')
-            print("\nFrequency Values (first row):")
-            print(f"Raw values: {freq_values.values}")
-            print(f"Number of frequencies: {len(freq_values)}")
-            print(f"Range: {freq_values.min()} to {freq_values.max()} Hz")
-            
-            # Get SPL values from second row
-            spl_values = pd.to_numeric(pos_data.iloc[1, 1:], errors='coerce')
-            print("\nSPL Values (second row):")
-            print(f"Raw values: {spl_values.values}")
-            print(f"Number of SPL values: {len(spl_values)}")
-            print(f"Range: {spl_values.min()} to {spl_values.max()} dB")
-            
-            # Remove any NaN values
-            mask = ~(freq_values.isna() | spl_values.isna())
-            print("\nNaN Removal:")
-            print(f"Number of NaN values in frequencies: {freq_values.isna().sum()}")
-            print(f"Number of NaN values in SPL: {spl_values.isna().sum()}")
-            print(f"Valid data points after NaN removal: {mask.sum()}")
-            
-            freq_values = freq_values[mask]
-            spl_values = spl_values[mask]
-            
-            # Filter for frequencies between 100 and 3150 Hz
-            freq_mask = (freq_values >= 100) & (freq_values <= 3150)
-            print("\nFrequency Filtering (100-3150 Hz):")
-            print(f"Number of values in range: {freq_mask.sum()}")
-            print("Frequency-SPL pairs in range:")
-            for f, s in zip(freq_values[freq_mask], spl_values[freq_mask]):
-                print(f"{f:.1f} Hz: {s:.1f} dB")
-            
-            spl_values = spl_values[freq_mask]
-            
-            if len(spl_values) >= 16:  # Should have 16 points (100-3150 Hz)
-                print("\nFinal SPL Values:")
-                print(f"Number of values: {len(spl_values)}")
-                print(f"Values: {spl_values.values}")
-                return spl_values
-                
-            print(f"\nWarning: Insufficient frequency bands: {len(spl_values)}")
-            print(f"Required: 16, Found: {len(spl_values)}")
-            return None
-            
-        except Exception as e:
-            print(f"\nError processing position data: {str(e)}")
-            print("Detailed error information:")
-            traceback.print_exc()
-            return None
 
     def _find_overall_spectra_row(self, df, start_idx):
         """Find the Overall 1/3 Spectra row in the dataframe"""
@@ -1402,7 +1502,8 @@ class MainWindow(BoxLayout):
                 'source': test_obj.srs_data.raw_data['Overall 1/3 Spectra'].values,
                 'receive': test_obj.recive_data.raw_data['Overall 1/3 Spectra'].values,
                 'background': test_obj.bkgrnd_data.raw_data['Overall 1/3 Spectra'].values,
-                'rt': test_obj.rt.rt_thirty  # Already in correct format (17 points)
+                'rt': test_obj.rt.rt_thirty,  # Already in correct format (17 points)
+                'room_props': test_obj.room_properties
             }
             
             print("\nRaw data shapes:")
@@ -1433,20 +1534,34 @@ class MainWindow(BoxLayout):
                 if len(idx) > 0:
                     freq_indices.append(idx[0])
                 
+            if len(freq_indices) != len(target_freqs):
+                print(f"Error: Not all target frequencies found. Expected {len(target_freqs)}, got {len(freq_indices)}")
+                return None
+                
             # Extract correct frequency points
             processed_data = {
                 'target_freqs': target_freqs,
                 'source': raw_data['source'][freq_indices],
                 'receive': raw_data['receive'][freq_indices],
                 'background': raw_data['background'][freq_indices],
-                'rt': raw_data['rt']  # Use full RT data
+                'rt': raw_data['rt'],  # Already in correct format (17 points)
+                'room_props': raw_data['room_props']
             }
             
+            # Validate data shapes
             print("\nProcessed data shapes:")
+            print(f"Target frequencies: {len(processed_data['target_freqs'])} points")
             print(f"Source: {processed_data['source'].shape}")
             print(f"Receive: {processed_data['receive'].shape}")
             print(f"Background: {processed_data['background'].shape}")
             print(f"RT: {processed_data['rt'].shape}")
+            
+            # Verify all arrays have the correct length (17 points)
+            expected_length = 17
+            if not all(len(processed_data[key]) == expected_length 
+                      for key in ['source', 'receive', 'background', 'target_freqs']):
+                print("Error: Processed arrays don't match expected length of 17 points")
+                return None
             
             return processed_data
             
@@ -1593,6 +1708,69 @@ class MainWindow(BoxLayout):
             print(f"Error processing ASTC frequencies: {str(e)}")
             traceback.print_exc()
             return None
+
+    def convert_to_test_data(self, test_collection_data):
+        """Convert test collection data to TestData format"""
+        try:
+            # Extract the test data from the collection format
+            if not test_collection_data or 'test_data' not in test_collection_data:
+                raise ValueError("Invalid test collection data format")
+            
+            test_data = test_collection_data['test_data']
+            
+            # Convert SLMData objects to pandas DataFrames if needed
+            if hasattr(test_data, 'srs_data'):
+                test_data.srs_data = test_data.srs_data.raw_data if hasattr(test_data.srs_data, 'raw_data') else test_data.srs_data
+            
+            if hasattr(test_data, 'recive_data'):
+                test_data.recive_data = test_data.recive_data.raw_data if hasattr(test_data.recive_data, 'raw_data') else test_data.recive_data
+            
+            if hasattr(test_data, 'bkgrnd_data'):
+                test_data.bkgrnd_data = test_data.bkgrnd_data.raw_data if hasattr(test_data.bkgrnd_data, 'raw_data') else test_data.bkgrnd_data
+            
+            # Special handling for RT data
+            if hasattr(test_data, 'rt'):
+                if hasattr(test_data.rt, 'raw_data'):
+                    # If rt_thirty is already processed and stored
+                    if hasattr(test_data.rt, 'rt_thirty'):
+                        test_data.rt = test_data.rt.rt_thirty
+                    else:
+                        # Extract RT30 data from the raw data
+                        # Assuming the RT30 data is in rows 24:41 of the 'Unnamed: 10' column
+                        try:
+                            rt_data = test_data.rt.raw_data
+                            if 'Unnamed: 10' in rt_data.columns:
+                                test_data.rt = rt_data['Unnamed: 10'][24:41].values / 1000
+                            else:
+                                # Try to find the correct column containing RT30 data
+                                # This might need adjustment based on your data structure
+                                numeric_columns = rt_data.select_dtypes(include=[np.number]).columns
+                                if len(numeric_columns) > 0:
+                                    test_data.rt = rt_data[numeric_columns[0]][24:41].values / 1000
+                                else:
+                                    raise ValueError("Could not find RT30 data in the raw data")
+                        except Exception as e:
+                            print(f"Error processing RT data: {str(e)}")
+                            raise
+
+            # For AIIC tests, handle position data
+            if hasattr(test_data, 'pos1'):
+                test_data.pos1 = test_data.pos1.raw_data if hasattr(test_data.pos1, 'raw_data') else test_data.pos1
+            if hasattr(test_data, 'pos2'):
+                test_data.pos2 = test_data.pos2.raw_data if hasattr(test_data.pos2, 'raw_data') else test_data.pos2
+            if hasattr(test_data, 'pos3'):
+                test_data.pos3 = test_data.pos3.raw_data if hasattr(test_data.pos3, 'raw_data') else test_data.pos3
+            if hasattr(test_data, 'pos4'):
+                test_data.pos4 = test_data.pos4.raw_data if hasattr(test_data.pos4, 'raw_data') else test_data.pos4
+
+            print(f"Test data conversion complete. RT data type: {type(test_data.rt)}")
+            if hasattr(test_data, 'rt'):
+                print(f"RT data shape/length: {test_data.rt.shape if hasattr(test_data.rt, 'shape') else len(test_data.rt)}")
+            return test_data
+
+        except Exception as e:
+            print(f"Error converting test data: {str(e)}")
+            raise
 
 class MainApp(App):
     def build(self):

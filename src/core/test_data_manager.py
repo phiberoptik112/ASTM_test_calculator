@@ -398,6 +398,7 @@ class TestDataManager:
         dtc_data.update(additional_data)
         return DTCtestData(room_properties=room_props, test_data=dtc_data)
 
+    @staticmethod
     def format_slm_data(df: pd.DataFrame) -> pd.DataFrame:
         """
         Format raw SLM data from OBA sheet into properly structured DataFrame
@@ -870,8 +871,8 @@ class TestDataManager:
         if self.debug_mode:
             print("\nData verification and alignment complete")
 
-    def get_test_collection(self) -> Dict[str, Dict[TestType, TestData]]:
+    def get_test_collection(self) -> Dict[str, Dict[TestType, Dict]]:
         """Return the processed test data collection"""
-        if not hasattr(self, '_test_collection'):
+        if not self.test_data_collection:
             raise ValueError("No test data loaded")
-        return self._test_collection
+        return self.test_data_collection 

@@ -162,3 +162,56 @@ class TestProcessor:
         if 'Receive' in curr_test:
             return curr_test['Receive']
         return curr_test['Recieve']  # Fall back to misspelled version 
+
+    def store_calculated_values(self, test_label: str, test_type: TestType, calculated_values: dict) -> None:
+        """Store calculated test values in the test data object for later use in reporting
+        
+        Args:
+            test_label: The test identifier
+            test_type: Type of test (AIIC, ASTC, NIC)
+            calculated_values: Dictionary containing calculated results
+        """
+        try:
+            if self.debug_mode:
+                print(f"\nStoring calculated values for {test_label} ({test_type.value})")
+                print(f"Values to store: {list(calculated_values.keys())}")
+            
+            # Get the test data object
+            test_data = self.test_data_collection[test_label][test_type]['test_data']
+            
+            # Store calculated values based on test type
+            if test_type == TestType.AIIC:
+                test_data.calculated_values = {
+                    'NR_val': calculated_values['NR_val'],
+                    'AIIC_recieve_corr': calculated_values['AIIC_recieve_corr'],
+                    'AIIC_Normalized_recieve': calculated_values['AIIC_Normalized_recieve'],
+                    'positions': calculated_values['positions'],
+                    'AIIC_contour_val': calculated_values['AIIC_contour_val'],
+                    'AIIC_contour_result': calculated_values['AIIC_contour_result'],
+                    'room_vol': calculated_values['room_vol']
+                }
+                
+            elif test_type == TestType.ASTC:
+                test_data.calculated_values = {
+                    'ATL_val': calculated_values['ATL_val'],
+                    'ASTC_final_val': calculated_values['ASTC_final_val'],
+                    'ASTC_contour_val': calculated_values['ASTC_contour_val'],
+                    'sabines': calculated_values['sabines'],
+                    'room_vol': calculated_values['room_vol']
+                }
+                
+            elif test_type == TestType.NIC:
+                test_data.calculated_values = {
+                    'NR_val': calculated_values['NR_val'],
+                    'NIC_final_val': calculated_values['NIC_final_val'],
+                    'sabines': calculated_values['sabines'],
+                    'room_vol': calculated_values['room_vol']
+                }
+                
+            if self.debug_mode:
+                print(f"Successfully stored calculated values")
+                print(f"Stored values: {test_data.calculated_values}")
+                
+        except Exception as e:
+            print(f"Error storing calculated values: {str(e)}")
+            raise 

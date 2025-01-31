@@ -763,229 +763,167 @@ class AIICTestReport(BaseTestReport):
         main_elements = []
         frequencies = [100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150]
         try:
-            # Initial data loading with explicit slicing
+            # Get stored calculated values
+            calculated_values = getattr(self.test_data, 'calculated_values', None)
+            if not calculated_values:
+                raise ValueError("No calculated values found - please run calculation and storage first")
+            
+            # Use stored values instead of recalculating
+            self.NR_val = calculated_values['NR_val']
+            self.sabines = calculated_values['sabines']
+            self.AIIC_recieve_corr = calculated_values['AIIC_recieve_corr']
+            self.ASTC_recieve_corr = calculated_values.get('ASTC_recieve_corr')
+            self.AIIC_Normalized_recieve = calculated_values['AIIC_Normalized_recieve']
+            self.AIIC_contour_val = calculated_values['AIIC_contour_val']
+            self.Contour_curve_result = calculated_values['AIIC_contour_result']
+            self.ISR_contour_val = calculated_values.get('ISR_contour_val')
+            self.ISR_contour_result = calculated_values.get('ISR_contour_result')
+            
+            # Still need to load background and RT data for the report
             freq_indices = slice(0, 16)
-            # Convert to numpy arrays first, then round
-            print('__________PULLING RAW DATA__________')
-            onethird_srs = format_SLMdata(self.test_data.srs_data)[freq_indices]
-            onethird_srs = np.array(onethird_srs, dtype=np.float64).round(1)
-            print("srs data: ", onethird_srs)
-            onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
-            onethird_rec = np.array(onethird_rec, dtype=np.float64).round(1)
-            print("rec data: ", onethird_rec)
             self.onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)[freq_indices]
             self.onethird_bkgrd = np.array(self.onethird_bkgrd, dtype=np.float64).round(1)
-            print("bkgrd data: ", self.onethird_bkgrd)
-            rt_thirty = self.test_data.rt['Unnamed: 10'][24:40]/1000  ## need to ensure this pulls from 100-3150 when moving to 100hz calculations
-            rt_thirty = np.array(rt_thirty, dtype=np.float64).round(3) ## looks like rounding this number to 1 screws up sabines calculations
-            print(f'rt_thirty vals: {rt_thirty}')
-            # Debug input shapes
-            print("\nInput shapes:")
-            print(f"Background: {self.onethird_bkgrd.shape}")
-            print(f"RT thirty shape: {rt_thirty.shape}")
-            print(f"Source shape: {onethird_srs.shape}")
-            print(f"Recieve shape: {onethird_rec.shape}")
-
-            # Process tapping positions with validation
-            positions = {
-                1: self.test_data.pos1,
-                2: self.test_data.pos2,
-                3: self.test_data.pos3,
-                4: self.test_data.pos4
-            }
             
-            average_pos = []
-            for i in range(1, 5):
-                if positions[i] is not None:
+            if hasattr(self.test_data.rt, 'rt_thirty'):
+                rt_thirty = self.test_data.rt.rt_thirty[:16]
+            else:
+                rt_thirty = self.test_data.rt['Unnamed: 10'][24:40]/1000
+            rt_thirty = np.array(rt_thirty, dtype=np.float64).round(3)
+
+            # Process exceptions
+            self.AIIC_Exceptions = []
+            self.AIIC_exceptions_backcheck = []
+            rec_roomvol = float(props['receive_vol'])
+
+            # Calculate exceptions using stored values
+            for val in self.sabines:
+                val_float = float(val)
+                self.AIIC_Exceptions.append('1' if val_float > 2 * rec_roomvol**(2/3) else '0')
+
+            # Background check exceptions
+            for i, val in enumerate(self.onethird_bkgrd):
+                background_diff = float(self.AIIC_Normalized_recieve[i]) - float(val)
+                self.AIIC_exceptions_backcheck.append('0' if background_diff > 5 else '1')
+
+            self.test_data.single_number_result = self.AIIC_contour_val
+
+            # Continue with existing table creation code...
+            if self.AIIC_Normalized_recieve is not None and self.onethird_bkgrd is not None and rt_thirty is not None and self.AIIC_Exceptions is not None:
+                print(f"\nArray lengths before table creation:")
+                print(f"frequencies: {len(frequencies)}")
+                print(f"ANISPL: {len(self.AIIC_Normalized_recieve)}")
+                print(f"Background: {len(self.onethird_bkgrd)}")
+                print(f"RT30: {len(rt_thirty)}")
+                print(f"Absorption Exceptions: {len(self.AIIC_Exceptions)}")
+                print(f"Backgrnd check Exceptions: {len(self.AIIC_exceptions_backcheck)}")
+                table_data = [
+                    ['Frequency (Hz)',
+                        'Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)',
+                        'Average Receiver Background Level (dB)',
+                        'Average RT60 (seconds)',
+                        'Exceptions noted to ASTM E1007-14',
+                        'Backgrnd check Exceptions'
+                        ]
+                ]
+                print("\nTable data types:")
+                print(f"ANISPL: {type(self.AIIC_Normalized_recieve)}")
+                print(f"Background: {type(self.onethird_bkgrd)}")
+                print(f"RT30: {type(rt_thirty)}")
+                print(f"Exceptions: {type(self.AIIC_Exceptions)}")
+                print(f"Backgrnd check Exceptions: {type(self.AIIC_exceptions_backcheck)}")
+                for i in range(len(frequencies)):
                     try:
-                        pos_data = format_SLMdata(positions[i])[freq_indices]
-                        pos_data = np.array(pos_data, dtype=np.float64).round(1)
-                        if pos_data is not None and len(pos_data) == 16:
-                            average_pos.append(pos_data)
-                        else:
-                            print(f"Warning: Position {i} data invalid or wrong length")
+                        anispl_val = float(self.AIIC_Normalized_recieve[i])
+                        bkg_val = float(self.onethird_bkgrd[i])
+                        rt_val = float(rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i])
+                        exceptions_val = self.AIIC_Exceptions[i]
+                        backgrnd_check_val = self.AIIC_exceptions_backcheck[i]
+                        row = [
+                            str(frequencies[i]),
+                            f"{anispl_val:.1f}",
+                            f"{bkg_val:.1f}",
+                            f"{rt_val:.3f}",
+                            str(exceptions_val),
+                            str(backgrnd_check_val)
+                        ]
+                        table_data.append(row)
                     except Exception as e:
-                        print(f"Warning: Failed to process position {i}: {str(e)}")
+                        print(f"Error creating row {i}: {str(e)}")
+                        print(f"Values at index {i}:")
+                        print(f"  ANISPL: {anispl_val}")
+                        print(f"  Background: {bkg_val}")
+                        print(f"  RT30: {rt_val}")
+                        print(f"  Exceptions: {exceptions_val}")
+                        print(f"  Backgrnd check: {backgrnd_check_val}")
+                        continue
+                if len(table_data) > 1:
 
-            if not average_pos:
-                raise ValueError("No valid position data could be processed")
-
-            # Calculate mean of positions and ensure numpy array
-            # onethird_rec_Total = np.array(np.mean(average_pos, axis=0), dtype=np.float64)
-            onethird_rec_Total = np.array(calculate_onethird_Logavg(average_pos), dtype=np.float64)
-            print(f'AIIC onethird_rec_Total: {onethird_rec_Total}')
-            # print(f'AIIC onethird_rec_Total: {onethird_rec_Total}')
-            # Calculate NR and related values
-            print("-=-=-=-=-=-=-= Calculating NR -=-=-=-=-=-=-=-")
-            try:
-                NR_results = calc_NR_new(
-                    srs_overalloct=onethird_srs,
-                    AIIC_rec_overalloct=onethird_rec_Total,
-                    ASTC_rec_overalloct=onethird_rec,
-                    bkgrnd_overalloct=self.onethird_bkgrd,
-                    recieve_roomvol=float(props['receive_vol']),
-                    rt_thirty=rt_thirty
-                )
-                
-                # Unpack results with explicit type checking
-                self.NR_val, _, self.sabines, self.AIIC_recieve_corr, self.ASTC_recieve_corr, self.AIIC_Normalized_recieve = NR_results
-                
-                print("\nCalculation results:")
-                print(f"AIIC normalized recieve: {self.AIIC_Normalized_recieve}")
-                print(f"NR_val type: {type(self.NR_val)}, shape: {getattr(self.NR_val, 'shape', 'no shape')}")
-                print(f"AIIC_Normalized_recieve type: {type(self.AIIC_Normalized_recieve)}, shape: {getattr(self.AIIC_Normalized_recieve, 'shape', 'no shape')}")
-
-                # Only proceed with contour calculations if AIIC_Normalized_recieve is valid
-                if self.AIIC_Normalized_recieve is not None and isinstance(self.AIIC_Normalized_recieve, np.ndarray):
-                    print("-=-=-=-=-=-=-= Calculating AIIC contour -=-=-=-=-=-=-=-")
-                    self.AIIC_contour_val, self.Contour_curve_result = calc_AIIC_val_claude(self.AIIC_Normalized_recieve)
-                    print("-=-=-=-=-=-=-= Calculating ISR contour -=-=-=-=-=-=-=-")
-                    self.ISR_contour_val, self.ISR_contour_result = calc_AIIC_val_claude(self.ASTC_recieve_corr)
-                else:
-                    raise ValueError("AIIC_Normalized_recieve is invalid or None")
-                self.test_data.single_number_result = self.AIIC_contour_val
-                # Process exceptions
-                self.AIIC_Exceptions = []
-                self.AIIC_exceptions_backcheck = []
-                rec_roomvol = float(props['receive_vol'])
-                print(f"rec_roomvol: {rec_roomvol}")
-
-                # Fix for sabines exceptions
-                for val in self.sabines:
-                    # Convert val to float to ensure scalar comparison
-                    val_float = float(val)
-                    self.AIIC_Exceptions.append('1' if val_float > 2 * rec_roomvol**(2/3) else '0')
-
-                # Fix for background check exceptions
-                for i, val in enumerate(self.onethird_bkgrd):
-                    # Use explicit indexing and convert to float for comparison
-                    background_diff = float(onethird_rec_Total[i]) - float(val)
-                    self.AIIC_exceptions_backcheck.append('0' if background_diff > 5 else '1')
-
-                
-                # Create table only if we have valid data
-                if self.AIIC_Normalized_recieve is not None and self.onethird_bkgrd is not None and rt_thirty is not None and self.AIIC_Exceptions is not None:
-                    print(f"\nArray lengths before table creation:")
-                    print(f"frequencies: {len(frequencies)}")
-                    print(f"ANISPL: {len(self.AIIC_Normalized_recieve)}")
-                    print(f"Background: {len(self.onethird_bkgrd)}")
-                    print(f"RT30: {len(rt_thirty)}")
-                    print(f"Absorption Exceptions: {len(self.AIIC_Exceptions)}")
-                    print(f"Backgrnd check Exceptions: {len(self.AIIC_exceptions_backcheck)}")
-                    table_data = [
-                        ['Frequency (Hz)',
-                            'Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)',
-                            'Average Receiver Background Level (dB)',
-                            'Average RT60 (seconds)',
-                            'Exceptions noted to ASTM E1007-14',
-                            'Backgrnd check Exceptions'
-                            ]
+                    # First, create shorter header texts that will be more readable when rotated
+                    header_row = [
+                        'Frequency\n(Hz)',
+                        'Absorption\nNormalized\nImpact Sound\nPressure Level,\nANISPL (dB)',
+                        'Average\nReceiver\nBackground\nLevel (dB)',
+                        'Average\nRT60\n(seconds)',
+                        'Exceptions\nnoted to\nASTM\nE1007-14',
+                        'Backgrnd check\nExceptions'
                     ]
-                    print("\nTable data types:")
-                    print(f"ANISPL: {type(self.AIIC_Normalized_recieve)}")
-                    print(f"Background: {type(self.onethird_bkgrd)}")
-                    print(f"RT30: {type(rt_thirty)}")
-                    print(f"Exceptions: {type(self.AIIC_Exceptions)}")
-                    print(f"Backgrnd check Exceptions: {type(self.AIIC_exceptions_backcheck)}")
-                    for i in range(len(frequencies)):
-                        try:
-                            anispl_val = float(self.AIIC_Normalized_recieve[i])
-                            bkg_val = float(self.onethird_bkgrd[i])
-                            rt_val = float(rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i])
-                            exceptions_val = self.AIIC_Exceptions[i]
-                            backgrnd_check_val = self.AIIC_exceptions_backcheck[i]
-                            row = [
-                                str(frequencies[i]),
-                                f"{anispl_val:.1f}",
-                                f"{bkg_val:.1f}",
-                                f"{rt_val:.3f}",
-                                str(exceptions_val),
-                                str(backgrnd_check_val)
-                            ]
-                            table_data.append(row)
-                        except Exception as e:
-                            print(f"Error creating row {i}: {str(e)}")
-                            print(f"Values at index {i}:")
-                            print(f"  ANISPL: {anispl_val}")
-                            print(f"  Background: {bkg_val}")
-                            print(f"  RT30: {rt_val}")
-                            print(f"  Exceptions: {exceptions_val}")
-                            print(f"  Backgrnd check: {backgrnd_check_val}")
-                            continue
-                    if len(table_data) > 1:
+                    
+                    # Create paragraph style for rotated headers
+                    rotated_style = ParagraphStyle(
+                        'RotatedHeader',
+                        fontName='Helvetica-Bold',
+                        fontSize=8,  # Slightly smaller font for headers
+                        alignment=TA_CENTER,
+                        textColor=colors.black,
+                        leading=10  # Controls line spacing for multi-line text
+                    )
+                    
+                    # Create rotated header paragraphs
+                    rotated_headers = [
+                        Paragraph(f'<rotate>{text}</rotate>', rotated_style)
+                        for text in header_row
+                    ]
+                    table_data[0] = rotated_headers
 
-                        # First, create shorter header texts that will be more readable when rotated
-                        header_row = [
-                            'Frequency\n(Hz)',
-                            'Absorption\nNormalized\nImpact Sound\nPressure Level,\nANISPL (dB)',
-                            'Average\nReceiver\nBackground\nLevel (dB)',
-                            'Average\nRT60\n(seconds)',
-                            'Exceptions\nnoted to\nASTM\nE1007-14',
-                            'Backgrnd check\nExceptions'
-                        ]
+                    # Create and style the table with adjusted dimensions
+                    Test_result_table = Table(
+                        table_data, 
+                        colWidths=[65, 85, 65, 45, 45, 45],  # Narrower columns
+                        rowHeights=[60] + [10]*(len(table_data)-1),  # Shorter rows overall
+                        hAlign='LEFT'
+                    )
+                    
+                    Test_result_table.setStyle(TableStyle([
+                        # Header row styling
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, 0), 8),  # Smaller font for header
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
                         
-                        # Create paragraph style for rotated headers
-                        rotated_style = ParagraphStyle(
-                            'RotatedHeader',
-                            fontName='Helvetica-Bold',
-                            fontSize=8,  # Slightly smaller font for headers
-                            alignment=TA_CENTER,
-                            textColor=colors.black,
-                            leading=10  # Controls line spacing for multi-line text
-                        )
+                        # Data rows styling
+                        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                        ('FONTSIZE', (0, 1), (-1, -1), 8),  # Smaller font for data
                         
-                        # Create rotated header paragraphs
-                        rotated_headers = [
-                            Paragraph(f'<rotate>{text}</rotate>', rotated_style)
-                            for text in header_row
-                        ]
-                        table_data[0] = rotated_headers
-
-                        # Create and style the table with adjusted dimensions
-                        Test_result_table = Table(
-                            table_data, 
-                            colWidths=[65, 85, 65, 45, 45, 45],  # Narrower columns
-                            rowHeights=[60] + [10]*(len(table_data)-1),  # Shorter rows overall
-                            hAlign='LEFT'
-                        )
-                        
-                        Test_result_table.setStyle(TableStyle([
-                            # Header row styling
-                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                            ('FONTSIZE', (0, 0), (-1, 0), 8),  # Smaller font for header
-                            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                            
-                            # Data rows styling
-                            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                            ('FONTSIZE', (0, 1), (-1, -1), 8),  # Smaller font for data
-                            
-                            # General table styling
-                            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
-                            ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
-                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                            ('TOPPADDING', (0, 1), (-1, -1), 2),  # Reduced padding for data rows
-                            ('BOTTOMPADDING', (0, 1), (-1, -1), 2),
-                            ('LEFTPADDING', (0, 0), (-1, -1), 4),
-                            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                        ]))
-                        
-                        main_elements.append(Test_result_table)
-                        main_elements.append(Spacer(1, 10))  # Reduced spacer after table
-                        print(f"Table created with {len(table_data)} rows")
-                    else:
-                        print("Warning: No data rows were created for the table")
-            except Exception as e:
-                print(f"Error in AIIC processing: {str(e)}")
-                raise
-
-            return main_elements
-
+                        # General table styling
+                        ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
+                        ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('TOPPADDING', (0, 1), (-1, -1), 2),  # Reduced padding for data rows
+                        ('BOTTOMPADDING', (0, 1), (-1, -1), 2),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                    ]))
+                    
+                    main_elements.append(Test_result_table)
+                    main_elements.append(Spacer(1, 10))  # Reduced spacer after table
+                    print(f"Table created with {len(table_data)} rows")
+                else:
+                    print("Warning: No data rows were created for the table")
         except Exception as e:
-            print(f"Error in AIIC test results: {str(e)}")
-            print(f"Error type: {type(e)}")
-            # print(f"Traceback:\n{traceback.format_exc()}")
+            print(f"Error in AIIC processing: {str(e)}")
             raise
+
+        return main_elements
 
     def get_test_results_table_notes(self):
         return "The results stated in this report represent only the specific construction and acoustical conditions present at the time of the test. Measurements performed in accordance with this test method on nominally identical constructions and acoustical conditions may produce different results."
@@ -1059,230 +997,182 @@ class ASTCTestReport(BaseTestReport):
             print('-=-=-=-=-=-=-= Getting ASTC test results-=-=-=-=-=-=-=-=-')
             props = vars(self.test_data.room_properties)
             main_elements = []
-                                
-            # Ensure STCCurve matches our data length
-            # STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]  # Length 15
-            # will have to change this to 4k at some point ## - extra 4 on the end
-            # 4k code
-            STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4]  # Length 17
-
-            # Define standard frequencies - ensure length matches data
-            frequencies = [100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
-            # need to add back in 4k at some point ##
-            # Initial data loading and slicing - all length 16
-            print('__________PULLING RAW DATA__________')
-            freq_indices = slice(0, 17)
-            onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
-            onethird_rec = np.array(onethird_rec, dtype=np.float64).round(1)
-            print(f'onethird_rec: {onethird_rec}')
+            
+            # Get stored calculated values
+            calculated_values = getattr(self.test_data, 'calculated_values', None)
+            if not calculated_values:
+                raise ValueError("No calculated values found - please run calculation and storage first")
+            
+            # Use stored values instead of recalculating
+            self.ATL_val = calculated_values['ATL_val']
+            self.NR_val = calculated_values['NR_val']
+            self.sabines = calculated_values['sabines']
+            self.ASTC_recieve_corr = calculated_values.get('ASTC_recieve_corr')
+            self.ASTC_final_val = calculated_values['ASTC_final_val']
+            self.ASTC_contour_val = calculated_values['ASTC_contour_val']
+            
+            # Still need to load raw data for the report
+            freq_indices = slice(0, 17)  # Include 4kHz
             onethird_srs = format_SLMdata(self.test_data.srs_data)[freq_indices]
             onethird_srs = np.array(onethird_srs, dtype=np.float64).round(1)
-            print(f'onethird_srs: {onethird_srs}')
+            
+            onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
+            onethird_rec = np.array(onethird_rec, dtype=np.float64).round(1)
+            
             onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)[freq_indices]
             onethird_bkgrd = np.array(onethird_bkgrd, dtype=np.float64).round(1)
-            print(f'onethird_bkgrd: {onethird_bkgrd}')
-            ##### RT 30 is 41 for 4k data 
-            rt_thirty = self.test_data.rt['Unnamed: 10'][24:41]/1000#
-            rt_thirty = np.array(rt_thirty, dtype=np.float64).round(7) ## looks like rounding this number to 1 screws up sabines calculations
-            print(f'rt_thirty: {rt_thirty}')
-            # Calculate ATL first
-            print("\nInput shapes:")
-            print(f"Background: {onethird_bkgrd.shape}")
-            print(f"RT thirty shape: {rt_thirty.shape}")
-            print(f"Source shape: {onethird_srs.shape}")
-            print(f"Recieve shape: {onethird_rec.shape}")
-            print('__________CALCULATING ATL__________')
-            try:
-                self.ATL_val, self.sabines = calc_atl_val(
-                    onethird_srs, 
-                    onethird_rec, 
-                    onethird_bkgrd,
-                    rt_thirty,
-                    float(props['partition_area']),
-                    float(props['receive_vol'])
-                )
-                print(f"\nATL val: {self.ATL_val}")
-                
-            except Exception as e:
-                print(f"Error in ATL calculation: {str(e)}")
-                raise
+            
+            if hasattr(self.test_data.rt, 'rt_thirty'):
+                rt_thirty = self.test_data.rt.rt_thirty  # Use all values for ASTC
+            else:
+                rt_thirty = self.test_data.rt['Unnamed: 10'][24:41]/1000
+            rt_thirty = np.array(rt_thirty, dtype=np.float64).round(3)
 
-            # Calculate NR with same arrays
-            print('__________CALCULATING NR__________')
-            try:
-                self.NR_val, _, self.sabines, _, self.ASTC_recieve_corr, _ = calc_NR_new(
-                    srs_overalloct=onethird_srs,
-                    AIIC_rec_overalloct=None,
-                    ASTC_rec_overalloct=onethird_rec,
-                    bkgrnd_overalloct=onethird_bkgrd,
-                    recieve_roomvol=float(props['receive_vol']),
-                    rt_thirty=rt_thirty
-                )
-                print(f'NR_val: {self.NR_val}')
-                # Calculate ASTC - Fixed array length handling
-                print('__________CALCULATING ASTC__________')
-                try:
-                    # Calculate ASTC value
-                    self.ASTC_final_val = calc_astc_val(self.ATL_val)
-                    print(f"ASTC calculation complete - final value: {self.ASTC_final_val}")
-                    self.test_data.single_number_result = self.ASTC_final_val
-                    # Create ASTC contour based on final value
-                    self.ASTC_contour_val = [val + self.ASTC_final_val for val in STCCurve]
-                    print(f"ASTC contour: {self.ASTC_contour_val}")
-                    self.ASTC_exceptions_backcheck = []
-                    for i, val in enumerate(onethird_bkgrd):
-                        # Use explicit indexing and convert to float for comparison
-                        background_diff = float(onethird_rec[i]) - float(val)
-                        self.ASTC_exceptions_backcheck.append('0' if background_diff > 5 else '1')
-                    if self.NR_val is not None and self.ASTC_recieve_corr is not None:
-                        # Verify lengths before creating table
-                        print(f"\nArray lengths before table creation:")
-                        print(f"frequencies: {len(frequencies)}")
-                        print(f"NR_val: {len(self.NR_val)}")
-                        print(f"Background: {len(onethird_bkgrd)}")
-                        print(f"Source room level: {len(onethird_srs)}")
-                        print(f"RT30: {len(rt_thirty)}")
-                        print(f"Average corrected receiver room level: {len(self.ASTC_recieve_corr)}")
-                        print(f"ASTC exceptions backcheck: {len(self.ASTC_exceptions_backcheck)}")
-                        # Create table data
-                        table_data = [
-                            ['Frequency (Hz)',
-                             'L1, Average Source Room Level (dB)',
-                             'L2, Average Corrected Receiver Room Level (dB)',
-                             'Average Receiver Background Level (dB)',
-                             'Average RT60 (seconds)',
-                             'Noise Reduction, NR (dB)', 
-                             'Apparent Transmission Loss, ATL (dB)',
-                             'Backgrnd check\nExceptions'
-                             ]
+            # Calculate background check exceptions
+            self.ASTC_exceptions_backcheck = []
+            for i, val in enumerate(onethird_bkgrd):
+                background_diff = float(onethird_rec[i]) - float(val)
+                self.ASTC_exceptions_backcheck.append('0' if background_diff > 5 else '1')
+
+            # Set single number result
+            self.test_data.single_number_result = self.ASTC_final_val
+
+            # Define frequencies including 4kHz
+            frequencies = [100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
+
+            # Verify data for table creation
+            if self.NR_val is not None and self.ASTC_recieve_corr is not None:
+                print(f"\nArray lengths before table creation:")
+                print(f"frequencies: {len(frequencies)}")
+                print(f"NR_val: {len(self.NR_val)}")
+                print(f"Background: {len(onethird_bkgrd)}")
+                print(f"Source room level: {len(onethird_srs)}")
+                print(f"RT30: {len(rt_thirty)}")
+                print(f"Average corrected receiver room level: {len(self.ASTC_recieve_corr)}")
+                print(f"ASTC exceptions backcheck: {len(self.ASTC_exceptions_backcheck)}")
+
+                # Rest of the existing table creation code remains unchanged...
+                table_data = [
+                    ['Frequency (Hz)',
+                     'L1, Average Source Room Level (dB)',
+                     'L2, Average Corrected Receiver Room Level (dB)',
+                     'Average Receiver Background Level (dB)',
+                     'Average RT60 (seconds)',
+                     'Noise Reduction, NR (dB)', 
+                     'Apparent Transmission Loss, ATL (dB)',
+                     'Backgrnd check\nExceptions'
+                    ]
+                ]
+
+                # Continue with existing table creation code...
+                for i in range(len(frequencies)):
+                    try:
+                        # Access numpy array values directly
+                        srs_val = float(onethird_srs.iloc[i] if hasattr(onethird_srs, 'iloc') else onethird_srs[i])
+                        corr_rec_val = float(self.ASTC_recieve_corr[i])
+                        bkg_val = float(onethird_bkgrd.iloc[i] if hasattr(onethird_bkgrd, 'iloc') else onethird_bkgrd[i])
+                        rt_val = float(rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i])
+                        NR_table_val = float(self.NR_val[i])
+                        atl_val = float(self.ATL_val[i])
+                        backgrnd_check_val = self.ASTC_exceptions_backcheck[i]
+                        row = [
+                            str(frequencies[i]),
+                            f"{srs_val:.1f}",
+                            f"{corr_rec_val:.1f}",
+                            f"{bkg_val:.1f}",
+                            f"{rt_val:.3f}",
+                            f"{NR_table_val:.1f}",
+                            f"{atl_val:.1f}",
+                            str(backgrnd_check_val)
                         ]
+                        print(f"Created row {i}: {row}")  # Debug output
+                        table_data.append(row)
                         
-                        # Debug data types
-                        print("\nData types:")
-                        print(f"NR_val type: {type(self.NR_val)}")
-                        print(f"Background type: {type(onethird_bkgrd)}")
-                        print(f"RT30 type: {type(rt_thirty)}")
-                        print(f"Average corrected receiver room level type: {type(self.ASTC_recieve_corr)}")
-                        
-                        for i in range(len(frequencies)):
-                            try:
-                                # Access numpy array values directly
-                                srs_val = float(onethird_srs.iloc[i] if hasattr(onethird_srs, 'iloc') else onethird_srs[i])
-                                corr_rec_val = float(self.ASTC_recieve_corr[i])
-                                bkg_val = float(onethird_bkgrd.iloc[i] if hasattr(onethird_bkgrd, 'iloc') else onethird_bkgrd[i])
-                                rt_val = float(rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i])
-                                NR_table_val = float(self.NR_val[i])
-                                atl_val = float(self.ATL_val[i])
-                                backgrnd_check_val = self.ASTC_exceptions_backcheck[i]
-                                row = [
-                                    str(frequencies[i]),
-                                    f"{srs_val:.1f}",
-                                    f"{corr_rec_val:.1f}",
-                                    f"{bkg_val:.1f}",
-                                    f"{rt_val:.3f}",
-                                    f"{NR_table_val:.1f}",
-                                    f"{atl_val:.1f}",
-                                    str(backgrnd_check_val)
-                                ]
-                                print(f"Created row {i}: {row}")  # Debug output
-                                table_data.append(row)
-                                
-                            except Exception as e:
-                                print(f"Error creating row {i}: {str(e)}")
-                                print(f"Values at index {i}:")
-                                print(f"  NR_val: {self.NR_val[i] if i < len(self.NR_val) else 'index error'}")
-                                print(f"  Background: {onethird_bkgrd.iloc[i] if hasattr(onethird_bkgrd, 'iloc') else onethird_bkgrd[i] if i < len(onethird_bkgrd) else 'index error'}")
-                                print(f"  RT30: {rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i] if i < len(rt_thirty) else 'index error'}")
-                                continue
+                    except Exception as e:
+                        print(f"Error creating row {i}: {str(e)}")
+                        print(f"Values at index {i}:")
+                        print(f"  NR_val: {self.NR_val[i] if i < len(self.NR_val) else 'index error'}")
+                        print(f"  Background: {onethird_bkgrd.iloc[i] if hasattr(onethird_bkgrd, 'iloc') else onethird_bkgrd[i] if i < len(onethird_bkgrd) else 'index error'}")
+                        print(f"  RT30: {rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i] if i < len(rt_thirty) else 'index error'}")
+                        continue
 
-                        # Create and style the table
-                        if len(table_data) > 1:
-                                 # First, create shorter header texts that will be more readable when rotated
-                            header_row = [
-                            'Frequency\n(Hz)',
-                            'L1,\nAverage\nSource\nRoom\nLevel\n(dB)',
-                            'L2,\nAverage\nCorrected\nReceiver\nRoom\nLevel\n(dB)',
-                            'Average\nReceiver\nBackground\nLevel\n(dB)',
-                            'Average\nRT60\n(seconds)',
-                            'Noise\nReduction,\nNR\n(dB)',
-                            'Apparent\nTransmission\nLoss,\nATL\n(dB)',
-                            'Exceptions\nnoted\nin\nASTM\nE336-16'
-                            ]
-                        
-                        # Create paragraph style for rotated headers
-                            rotated_style = ParagraphStyle(
-                            'RotatedHeader',
-                            fontName='Helvetica-Bold',
-                            fontSize=8,  # Slightly smaller font for headers
-                            alignment=TA_CENTER,
-                            textColor=colors.black,
-                            leading=10  # Controls line spacing for multi-line text
-                            )
-                        
-                        # Create rotated header paragraphs
-                            rotated_headers = [
-                            Paragraph(f'<rotate>{text}</rotate>', rotated_style)
-                            for text in header_row
-                            ]
-                            table_data[0] = rotated_headers
+                # Create and style the table
+                if len(table_data) > 1:
+                         # First, create shorter header texts that will be more readable when rotated
+                    header_row = [
+                    'Frequency\n(Hz)',
+                    'L1,\nAverage\nSource\nRoom\nLevel\n(dB)',
+                    'L2,\nAverage\nCorrected\nReceiver\nRoom\nLevel\n(dB)',
+                    'Average\nReceiver\nBackground\nLevel\n(dB)',
+                    'Average\nRT60\n(seconds)',
+                    'Noise\nReduction,\nNR\n(dB)',
+                    'Apparent\nTransmission\nLoss,\nATL\n(dB)',
+                    'Exceptions\nnoted\nin\nASTM\nE336-16'
+                    ]
+                
+                # Create paragraph style for rotated headers
+                    rotated_style = ParagraphStyle(
+                    'RotatedHeader',
+                    fontName='Helvetica-Bold',
+                    fontSize=8,  # Slightly smaller font for headers
+                    alignment=TA_CENTER,
+                    textColor=colors.black,
+                    leading=10  # Controls line spacing for multi-line text
+                    )
+                
+                # Create rotated header paragraphs
+                    rotated_headers = [
+                    Paragraph(f'<rotate>{text}</rotate>', rotated_style)
+                    for text in header_row
+                    ]
+                    table_data[0] = rotated_headers
 
-                        # Create and style the table with adjusted dimensions
-                            Test_result_table = Table(
-                            table_data, 
-                            colWidths=[65, 85, 65, 45, 65, 65, 65, 65],  # Narrower columns
-                            rowHeights=[60] + [10]*(len(table_data)-1),  # Shorter rows overall
-                            hAlign='LEFT'
-                            )
-                        
-                        Test_result_table.setStyle(TableStyle([
-                            # Header row styling
-                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                            ('FONTSIZE', (0, 0), (-1, 0), 8),  # Smaller font for header
-                            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                            
-                            # Data rows styling
-                            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                            ('FONTSIZE', (0, 1), (-1, -1), 8),  # Smaller font for data
-                            
-                            # General table styling
-                            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
-                            ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
-                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                            ('TOPPADDING', (0, 1), (-1, -1), 2),  # Reduced padding for data rows
-                            ('BOTTOMPADDING', (0, 1), (-1, -1), 2),
-                            ('LEFTPADDING', (0, 0), (-1, -1), 4),
-                            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                        ]))
-                        main_elements.append(Test_result_table)
-                        main_elements.append(Spacer(1, 20))
-                        print(f"Table created with {len(table_data)} rows")
-                    else:
-                            print("Warning: No data rows were created for the table")
+                # Create and style the table with adjusted dimensions
+                    Test_result_table = Table(
+                    table_data, 
+                    colWidths=[65, 85, 65, 45, 65, 65, 65, 65],  # Narrower columns
+                    rowHeights=[60] + [10]*(len(table_data)-1),  # Shorter rows overall
+                    hAlign='LEFT'
+                    )
+                
+                Test_result_table.setStyle(TableStyle([
+                    # Header row styling
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 8),  # Smaller font for header
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                    
+                    # Data rows styling
+                    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 1), (-1, -1), 8),  # Smaller font for data
+                    
+                    # General table styling
+                    ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
+                    ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('TOPPADDING', (0, 1), (-1, -1), 2),  # Reduced padding for data rows
+                    ('BOTTOMPADDING', (0, 1), (-1, -1), 2),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                ]))
+                main_elements.append(Test_result_table)
+                main_elements.append(Spacer(1, 20))
+                print(f"Table created with {len(table_data)} rows")
+            else:
+                print("Warning: No data rows were created for the table")
 
-                    return main_elements
-
-                except Exception as e:
-                    print(f"Error in ASTC calculation: {str(e)}")
-                    print(f"ATL_val shape: {getattr(self.ATL_val, 'shape', 'no shape')}")
-                    print(f"STCCurve length: {len(STCCurve)}")
-                    raise
-
-                # return main_elements
-
-            except Exception as e:
-                print(f"Error in NR calculation: {str(e)}")
-                raise
+            return main_elements
 
         except Exception as e:
-            print(f"Error in ASTC test results: {str(e)}")
-            print(f"Error type: {type(e)}")
-            print(f"Array lengths at error:")
-
-            print(f"ASTC_recieve_corr: {len(self.ASTC_recieve_corr) if hasattr(self, 'ASTC_recieve_corr') else 'not created'}")
-            # traceback.print_exc()
+            print(f"Error in ASTC calculation: {str(e)}")
+            print(f"ATL_val shape: {getattr(self.ATL_val, 'shape', 'no shape')}")
+            # print(f"STCCurve length: {len(STCCurve)}")
             raise
-    
+
+        except Exception as e:
+            print(f"Error in NR calculation: {str(e)}")
+            raise
+
     def get_test_results_paragraph(self):
         return (
             f"The Apparent Sound Transmission Class (ASTC) of {self.ASTC_final_val} was calculated. The ASTC rating is based on Apparent Transmission Loss (ATL), and includes the effects of noise flanking. The ASTC reference contour is shown on the next page, and has been fit to the Apparent Transmission Loss values, in accordance with the procedure of "+standards_text[0][0]
@@ -1338,178 +1228,170 @@ class NICTestReport(BaseTestReport):
     def get_test_instrumentation(self):
         return super().get_test_instrumentation()
 
-    def get_test_results(self):
-        try:        
-            print('-=-=-=-=-=-=-= Getting NIC test results-=-=-=-=-=-=-=-=-')
-            props = vars(self.test_data.room_properties)
-            main_elements = []
-
-            ## obtain SLM data from overall dataframe
-            ## need to convert all of this to use the dataclasses and the data_processor.py functions 
-            freq_indices = slice(0, 17)
-            onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
+    def get_test_results(self):        
+        print('-=-=-=-=-=-=-= Getting NIC test results-=-=-=-=-=-=-=-=-')
+        props = vars(self.test_data.room_properties)
+        main_elements = []
+        
+        try:
+            # Get stored calculated values
+            calculated_values = getattr(self.test_data, 'calculated_values', None)
+            if not calculated_values:
+                raise ValueError("No calculated values found - please run calculation and storage first")
+            
+            # Use stored values instead of recalculating
+            self.NR_val = calculated_values['NR_val']
+            self.sabines = calculated_values['sabines']
+            self.ASTC_recieve_corr = calculated_values.get('ASTC_recieve_corr')
+            self.NIC_final_val = calculated_values['NIC_final_val']
+            self.NIC_contour_val = calculated_values['NIC_contour_val']
+            
+            # Still need to load raw data for the report
+            freq_indices = slice(0, 17)  # Include 4kHz
             onethird_srs = format_SLMdata(self.test_data.srs_data)[freq_indices]
+            onethird_srs = np.array(onethird_srs, dtype=np.float64).round(1)
+            
+            onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
+            onethird_rec = np.array(onethird_rec, dtype=np.float64).round(1)
+            
             onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)[freq_indices]
-            ##### RT 30 is 41 for 4k data 
-            rt_thirty = self.test_data.rt['Unnamed: 10'][24:41]/1000 ### MAKE SURE THIS CHANGES TO 4k for later changes 
-        # Calculate NR with same arrays
-            try:
-                self.NR_val, _, self.sabines, _, self.ASTC_recieve_corr, _ = calc_NR_new(
-                    srs_overalloct=onethird_srs,
-                    AIIC_rec_overalloct=None,
-                    ASTC_rec_overalloct=onethird_rec,
-                    bkgrnd_overalloct=onethird_bkgrd,
-                    recieve_roomvol=float(props['receive_vol']),
-                    rt_thirty=rt_thirty
-                )
+            onethird_bkgrd = np.array(onethird_bkgrd, dtype=np.float64).round(1)
+            
+            if hasattr(self.test_data.rt, 'rt_thirty'):
+                rt_thirty = self.test_data.rt.rt_thirty  # Use all values for NIC
+            else:
+                rt_thirty = self.test_data.rt['Unnamed: 10'][24:41]/1000
+            rt_thirty = np.array(rt_thirty, dtype=np.float64).round(3)
 
-                # Calculate ASTC - Fixed array length handling
-                try:
-                    # Define standard frequencies - ensure length matches data
-                    frequencies = [100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
-                    ## need to add 4k data here 
-                    # frequencies = frequencies.append(pd.Series([4000]))
-                    
-                    # Ensure STCCurve matches our data length
-                    # 4k code
-                    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4]  # Length 17
-                    # Calculate ASTC value
-                    self.NIC_final_val = calc_astc_val(self.NR_val)
-                    print(f"NIC calculation complete - final value: {self.NIC_final_val}")
-                    self.test_data.single_number_result = self.NIC_final_val
-                    # Create ASTC contour based on final value
+            # Set single number result
+            self.test_data.single_number_result = self.NIC_final_val
 
-                    self.NIC_contour_val = [val + self.NIC_final_val for val in STCCurve]
+            # Define frequencies including 4kHz
+            frequencies = [100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
 
-                    if self.NR_val is not None and self.ASTC_recieve_corr is not None:
-                        # Verify lengths before creating table
-                        print(f"\nArray lengths before table creation:")
-                        print(f"frequencies: {len(frequencies)}")
-                        print(f"Noise Reduction: {len(self.NR_val)}")
-                        print(f"Background: {len(onethird_bkgrd)}")
-                        print(f"Source room level: {len(onethird_srs)}")
-                        print(f"RT30: {len(rt_thirty)}")
-                        print(f"Average corrected receiver room level: {len(self.ASTC_recieve_corr)}")
-                        
-                        # Create table data
-                        table_data = [
-                            ['Frequency (Hz)',
-                                'L1, Average Source Room Level (dB)',
-                                'L2, Average Corrected Receiver Room Level (dB)',
-                                'Average Receiver Background Level (dB)',
-                                'Average RT60 (seconds)',
-                                'Noise Reduction, NR (dB)'
-                                ]
+            # Verify data for table creation
+            if self.NR_val is not None and self.ASTC_recieve_corr is not None:
+                print(f"\nArray lengths before table creation:")
+                print(f"frequencies: {len(frequencies)}")
+                print(f"Noise Reduction: {len(self.NR_val)}")
+                print(f"Background: {len(onethird_bkgrd)}")
+                print(f"Source room level: {len(onethird_srs)}")
+                print(f"RT30: {len(rt_thirty)}")
+                print(f"Average corrected receiver room level: {len(self.ASTC_recieve_corr)}")
+                
+                # Create table data
+                table_data = [
+                    ['Frequency (Hz)',
+                        'L1, Average Source Room Level (dB)',
+                        'L2, Average Corrected Receiver Room Level (dB)',
+                        'Average Receiver Background Level (dB)',
+                        'Average RT60 (seconds)',
+                        'Noise Reduction, NR (dB)'
+                    ]
+                ]
+
+                # Continue with existing table creation code...
+                for i in range(len(frequencies)):
+                    try:
+                        # Access numpy array values directly
+                        srs_val = float(onethird_srs.iloc[i] if hasattr(onethird_srs, 'iloc') else onethird_srs[i])
+                        corr_rec_val = float(self.ASTC_recieve_corr[i])
+                        bkg_val = float(onethird_bkgrd.iloc[i] if hasattr(onethird_bkgrd, 'iloc') else onethird_bkgrd[i])
+                        rt_val = float(rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i])
+                        NR_table_val = float(self.NR_val[i])
+                        row = [
+                            str(frequencies[i]),
+                            f"{srs_val:.1f}",
+                            f"{corr_rec_val:.1f}",
+                            f"{bkg_val:.1f}",
+                            f"{rt_val:.3f}",
+                            f"{NR_table_val:.1f}"
                         ]
+                        print(f"Created row {i}: {row}")  # Debug output
+                        table_data.append(row)
                         
-                        # Debug data types
-                        print("\nData types:")
-                        print(f"NR_val type: {type(self.NR_val)}")
-                        print(f"Background type: {type(onethird_bkgrd)}")
-                        print(f"RT30 type: {type(rt_thirty)}")
-                        print(f"Average corrected receiver room level type: {type(self.ASTC_recieve_corr)}")
-                        
-                        for i in range(len(frequencies)):
-                            try:
-                                # Access numpy array values directly
-                                srs_val = float(onethird_srs.iloc[i] if hasattr(onethird_srs, 'iloc') else onethird_srs[i])
-                                corr_rec_val = float(self.ASTC_recieve_corr[i])
-                                bkg_val = float(onethird_bkgrd.iloc[i] if hasattr(onethird_bkgrd, 'iloc') else onethird_bkgrd[i])
-                                rt_val = float(rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i])
-                                NR_table_val = float(self.NR_val[i])
-                                row = [
-                                    str(frequencies[i]),
-                                    f"{srs_val:.1f}",
-                                    f"{corr_rec_val:.1f}",
-                                    f"{bkg_val:.1f}",
-                                    f"{rt_val:.3f}",
-                                    f"{NR_table_val:.1f}"
-                                ]
-                                print(f"Created row {i}: {row}")  # Debug output
-                                table_data.append(row)
-                                
-                            except Exception as e:
-                                print(f"Error creating row {i}: {str(e)}")
-                                print(f"Values at index {i}:")
-                                print(f"  NR_val: {self.NR_val[i] if i < len(self.NR_val) else 'index error'}")
-                                print(f"  Background: {onethird_bkgrd.iloc[i] if hasattr(onethird_bkgrd, 'iloc') else onethird_bkgrd[i] if i < len(onethird_bkgrd) else 'index error'}")
-                                print(f"  RT30: {rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i] if i < len(rt_thirty) else 'index error'}")
-                                continue
+                    except Exception as e:
+                        print(f"Error creating row {i}: {str(e)}")
+                        print(f"Values at index {i}:")
+                        print(f"  NR_val: {self.NR_val[i] if i < len(self.NR_val) else 'index error'}")
+                        print(f"  Background: {onethird_bkgrd.iloc[i] if hasattr(onethird_bkgrd, 'iloc') else onethird_bkgrd[i] if i < len(onethird_bkgrd) else 'index error'}")
+                        print(f"  RT30: {rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i] if i < len(rt_thirty) else 'index error'}")
+                        continue
 
-                        # Create and style the table
-                        if len(table_data) > 1:
-                            # First, create shorter header texts that will be more readable when rotated
-                            header_row = [
-                            'Frequency\n(Hz)',
-                            'L1,\nAverage\nSource\nRoom\nLevel\n(dB)',
-                            'L2,\nAverage\nCorrected\nReceiver\nRoom\nLevel\n(dB)',
-                            'Average\nReceiver\nBackground\nLevel\n(dB)',
-                            'Noise\nReduction,\nNR\n(dB)'
-                            ]
-                        
-                        # Create paragraph style for rotated headers
-                            rotated_style = ParagraphStyle(
-                            'RotatedHeader',
-                            fontName='Helvetica-Bold',
-                            fontSize=8,  # Slightly smaller font for headers
-                            alignment=TA_CENTER,
-                            textColor=colors.black,
-                            leading=10  # Controls line spacing for multi-line text
-                            )
-                        
-                        # Create rotated header paragraphs
-                            rotated_headers = [
-                            Paragraph(f'<rotate>{text}</rotate>', rotated_style)
-                            for text in header_row
-                            ]
-                            table_data[0] = rotated_headers
+                # Create and style the table
+                if len(table_data) > 1:
+                    # First, create shorter header texts that will be more readable when rotated
+                    header_row = [
+                    'Frequency\n(Hz)',
+                    'L1,\nAverage\nSource\nRoom\nLevel\n(dB)',
+                    'L2,\nAverage\nCorrected\nReceiver\nRoom\nLevel\n(dB)',
+                    'Average\nReceiver\nBackground\nLevel\n(dB)',
+                    'Noise\nReduction,\nNR\n(dB)'
+                    ]
+                
+                # Create paragraph style for rotated headers
+                    rotated_style = ParagraphStyle(
+                    'RotatedHeader',
+                    fontName='Helvetica-Bold',
+                    fontSize=8,  # Slightly smaller font for headers
+                    alignment=TA_CENTER,
+                    textColor=colors.black,
+                    leading=10  # Controls line spacing for multi-line text
+                    )
+                
+                # Create rotated header paragraphs
+                    rotated_headers = [
+                    Paragraph(f'<rotate>{text}</rotate>', rotated_style)
+                    for text in header_row
+                    ]
+                    table_data[0] = rotated_headers
 
-                        # Create and style the table with adjusted dimensions
-                            Test_result_table = Table(
-                            table_data, 
-                            colWidths=[65, 85, 65, 45, 45],  # Narrower columns
-                            rowHeights=[60] + [10]*(len(table_data)-1),  # Shorter rows overall
-                            hAlign='LEFT'
-                            )
-                        
-                        Test_result_table.setStyle(TableStyle([
-                            # Header row styling
-                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                            ('FONTSIZE', (0, 0), (-1, 0), 8),  # Smaller font for header
-                            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                            
-                            # Data rows styling
-                            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                            ('FONTSIZE', (0, 1), (-1, -1), 8),  # Smaller font for data
-                            
-                            # General table styling
-                            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
-                            ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
-                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                            ('TOPPADDING', (0, 1), (-1, -1), 2),  # Reduced padding for data rows
-                            ('BOTTOMPADDING', (0, 1), (-1, -1), 2),
-                            ('LEFTPADDING', (0, 0), (-1, -1), 4),
-                            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                        ]))
-                        
-                        main_elements.append(Test_result_table)
-                        main_elements.append(Spacer(1, 20))
-                        print(f"Table created with {len(table_data)} rows")
-                    else:
-                        print("Warning: No data rows were created for the table")
+                # Create and style the table with adjusted dimensions
+                    Test_result_table = Table(
+                    table_data, 
+                    colWidths=[65, 85, 65, 45, 45],  # Narrower columns
+                    rowHeights=[60] + [10]*(len(table_data)-1),  # Shorter rows overall
+                    hAlign='LEFT'
+                    )
+                
+                Test_result_table.setStyle(TableStyle([
+                    # Header row styling
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 8),  # Smaller font for header
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                    
+                    # Data rows styling
+                    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 1), (-1, -1), 8),  # Smaller font for data
+                    
+                    # General table styling
+                    ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.black),
+                    ('BOX', (0, 0), (-1, -1), 0.25, colors.black),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('TOPPADDING', (0, 1), (-1, -1), 2),  # Reduced padding for data rows
+                    ('BOTTOMPADDING', (0, 1), (-1, -1), 2),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                ]))
+                
+                main_elements.append(Test_result_table)
+                main_elements.append(Spacer(1, 20))
+                print(f"Table created with {len(table_data)} rows")
+            else:
+                print("Warning: No data rows were created for the table")
 
-                    return main_elements
+            return main_elements
 
-                except Exception as e:
-                    print(f"Error in NIC calculation: {str(e)}")
-                    print(f"NR_val shape: {getattr(self.NR_val, 'shape', 'no shape')}")
-                    print(f"STCCurve length: {len(STCCurve)}")
-                    raise
+        except Exception as e:
+            print(f"Error in NIC calculation: {str(e)}")
+            print(f"NR_val shape: {getattr(self.NR_val, 'shape', 'no shape')}")
+            # print(f"STCCurve length: {len(STCCurve)}")
+            raise
 
-            except Exception as e:
-                print(f"Error in NR calculation: {str(e)}")
-                raise
+        except Exception as e:
+            print(f"Error in NR calculation: {str(e)}")
+            raise
         except Exception as e:
             print(f"Error in NIC test results: {str(e)}")
             print(f"Error type: {type(e)}")
