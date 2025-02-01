@@ -931,32 +931,30 @@ class MainWindow(BoxLayout):
             test_data = self.test_data_manager.test_data_collection[test_label]
             print(f"Available test types: {list(test_data.keys())}")
             
+            # Ensure TestProcessor has access to the collection
+            self.test_data_manager.test_processor.set_test_collection(
+                self.test_data_manager.test_data_collection
+            )
+            
             for test_type in test_data.keys():
                 print(f"\nProcessing {test_type} test:")
                 
-                # Debug input data
-                print(f"Input test data structure:")
-                print(f"- Keys available: {test_data[test_type].keys()}")
-                print(f"- Test data type: {type(test_data[test_type]['test_data'])}")
+                test_obj = test_data[test_type]['test_data']
                 
                 if test_type == TestType.AIIC:
-                    print("\nAIIC Calculation Input:")
-                    print(f"Freq data available: {hasattr(self, 'freq_data')}")
-                    if hasattr(self, 'freq_data'):
-                        print(f"Freq data keys: {self.freq_data.keys()}")
-                    calculated_values = self._calculate_aiic_values(
-                        test_data[test_type]['test_data'],
-                        self.freq_data
-                    )
-                    print("\nAIIC Calculated Values:")
-                    if calculated_values:
-                        print(f"- Keys: {calculated_values.keys()}")
-                        for key, value in calculated_values.items():
-                            if hasattr(value, 'shape'):
-                                print(f"- {key} shape: {value.shape}")
-                            elif isinstance(value, (list, np.ndarray)):
-                                print(f"- {key} length: {len(value)}")
-                
+                    # First process the raw data like we do for plotting
+                    raw_data = self._get_aiic_raw_data(test_obj)
+                    if not raw_data:
+                        continue
+                        
+                    # Process frequency data
+                    freq_data = self._process_aiic_frequencies(raw_data)
+                    if not freq_data:
+                        continue
+                    
+                    # Now calculate values using properly processed data
+                    calculated_values = self._calculate_aiic_values(test_obj, freq_data)
+                    
                 elif test_type == TestType.ASTC:
                     print("\nASTC Calculation Input:")
                     calculated_values = self._calculate_astc_values(
@@ -989,9 +987,6 @@ class MainWindow(BoxLayout):
                 
                 if calculated_values:
                     print(f"\nStoring values for {test_type}:")
-                    print("Calling store_calculated_values with:")
-                    print(f"- test_label: {test_label}")
-                    print(f"- test_type: {test_type}")
                     self.test_data_manager.test_processor.store_calculated_values(
                         test_label,
                         test_type,
@@ -1277,7 +1272,13 @@ class MainWindow(BoxLayout):
         """Calculate AIIC values"""
         try:
             print("\nCalculating AIIC values:")
-            
+            print("-=-=-=-=-=-=-=-=-=-raw data:-=-=-=--=-=-=-=-=-=")
+            print(f"Source: {freq_data['source']}")
+            print(f"Avg Pos: {freq_data['avg_pos']}")
+            print(f"Background: {freq_data['background']}")
+            print(f"Room Props: {freq_data['room_props']}")
+            print(f"RT: {freq_data['rt']}")
+            print("-=-=-=-=-=-=-=-=-=-raw data:-=-=-=--=-=-=-=-=-=")
             # Calculate NR using the averaged position data
             NR_val, _, sabines, AIIC_recieve_corr, ASTC_recieve_corr, AIIC_Normalized_recieve = calc_NR_new(
                 freq_data['source'],

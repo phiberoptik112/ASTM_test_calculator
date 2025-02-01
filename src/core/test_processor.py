@@ -18,6 +18,11 @@ from data_processor import (
 class TestProcessor:
     def __init__(self, debug_mode: bool = False):
         self.debug_mode = debug_mode
+        self.test_data_collection = None  # Initialize as None
+
+    def set_test_collection(self, collection):
+        """Set the test data collection reference"""
+        self.test_data_collection = collection
 
     def load_test_data(
         self, 
@@ -176,6 +181,9 @@ class TestProcessor:
                 print(f"\nStoring calculated values for {test_label} ({test_type.value})")
                 print(f"Values to store: {list(calculated_values.keys())}")
             
+            if self.test_data_collection is None:
+                raise ValueError("Test data collection not initialized")
+                
             # Get the test data object
             test_data = self.test_data_collection[test_label][test_type]['test_data']
             
