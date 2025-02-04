@@ -1643,24 +1643,78 @@ class MainWindow(BoxLayout):
     def _process_nic_frequencies(self, raw_data):
         """Process frequency data for NIC calculations"""
         try:
-            print("Processing NIC frequency data")
+            print("\nProcessing NIC frequency data:")
+            
+            # Define target frequencies (100-4000 Hz for NIC)
+            target_freqs = [100, 125, 160, 200, 250, 315, 400, 500, 
+                           630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
+            
+            print("\nProcessing raw data:")
+            print(f"Source data type: {type(raw_data['source'])}")
+            print(f"Source data shape: {raw_data['source'].shape}")
+            print(f"Source data columns: {raw_data['source'].columns.tolist()}")
+            
+            # Extract frequency data directly from raw DataFrame
+            # Find indices for our target frequencies
+            freq_indices = []
+            for freq in target_freqs:
+                idx = raw_data['source'][raw_data['source']['Frequency (Hz)'] == freq].index
+                if len(idx) > 0:
+                    freq_indices.append(idx[0])
+            
+            print(f"\nFound indices for target frequencies: {freq_indices}")
+            
+            # Extract data for target frequencies
+            source_data = raw_data['source'].iloc[freq_indices]['Overall 1/3 Spectra'].values
+            receive_data = raw_data['receive'].iloc[freq_indices]['Overall 1/3 Spectra'].values
+            background_data = raw_data['background'].iloc[freq_indices]['Overall 1/3 Spectra'].values
+            
+            print("\nExtracted frequency data:")
+            print(f"Source data shape: {source_data.shape}")
+            print(f"Source values: {source_data}")
+            print(f"Receive data shape: {receive_data.shape}")
+            print(f"Background data shape: {background_data.shape}")
+            
+            # Create frequency data dictionary
             freq_data = {
-                'source': TestDataManager.format_slm_data(raw_data['source'])['Overall 1/3 Spectra'].values[0:17],
-                'receive': TestDataManager.format_slm_data(raw_data['receive'])['Overall 1/3 Spectra'].values[0:17],
-                'background': TestDataManager.format_slm_data(raw_data['background'])['Overall 1/3 Spectra'].values[0:17],
+                'target_freqs': target_freqs,
+                'source': source_data,
+                'receive': receive_data,
+                'background': background_data,
                 'rt': raw_data['rt'],
                 'room_props': raw_data['room_props']
             }
+            
+            print("\nProcessed frequency data:")
+            print(f"Target frequencies: {len(freq_data['target_freqs'])} points")
+            for key in ['source', 'receive', 'background', 'rt']:
+                print(f"{key} data: {len(freq_data[key])} points")
+                print(f"{key} values: {freq_data[key]}")
+            
+            # Verify all arrays have the expected length
+            expected_length = 17
+            for key in ['source', 'receive', 'background', 'rt']:
+                if len(freq_data[key]) != expected_length:
+                    raise ValueError(f"{key} data length mismatch. Expected {expected_length}, got {len(freq_data[key])}")
+            
             return freq_data
             
         except Exception as e:
             print(f"Error processing NIC frequency data: {str(e)}")
+            traceback.print_exc()
             return None
 
     def _calculate_nic_values(self, test_obj, freq_data):
         """Calculate NIC values"""
         try:
+            print("\nCalculating NIC values:")
+            print("Input data validation:")
+            for key in ['source', 'receive', 'background', 'rt']:
+                print(f"{key} data length: {len(freq_data[key])}")
+                print(f"{key} values: {freq_data[key]}")
+            
             room_vol = test_obj.room_properties.receive_vol
+            print(f"Room volume: {room_vol}")
             
             # Calculate NIC using the processed data
             NR_val, NIC_final_val, sabines, _, _, _ = calc_NR_new(
@@ -1673,14 +1727,17 @@ class MainWindow(BoxLayout):
             )
             
             if NR_val is not None:
-                print(f"NR values shape: {NR_val.shape}")
+                print(f"NR values shape: {NR_val.shape if hasattr(NR_val, 'shape') else len(NR_val)}")
+                print(f"NIC final value: {NIC_final_val}")
+                print(f"Sabines: {sabines}")
+                
                 return {
                     'NR_val': NR_val,
                     'NIC_final_val': NIC_final_val,
                     'sabines': sabines,
                     'room_vol': room_vol
                 }
-                
+            
             return None
             
         except Exception as e:
