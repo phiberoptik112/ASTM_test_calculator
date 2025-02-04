@@ -957,10 +957,18 @@ class MainWindow(BoxLayout):
                     
                 elif test_type == TestType.ASTC:
                     print("\nASTC Calculation Input:")
-                    calculated_values = self._calculate_astc_values(
-                        test_data[test_type]['test_data'],
-                        self.freq_data
-                    )
+                    # Process raw data first
+                    raw_data = self._get_astc_raw_data(test_obj)
+                    if not raw_data:
+                        continue
+                    
+                    # Process frequency data
+                    freq_data = self._process_astc_frequencies(raw_data)
+                    if not freq_data:
+                        continue
+                    
+                    # Calculate values using processed data
+                    calculated_values = self._calculate_astc_values(test_obj, freq_data)
                     print("\nASTC Calculated Values:")
                     if calculated_values:
                         print(f"- Keys: {calculated_values.keys()}")
@@ -972,10 +980,18 @@ class MainWindow(BoxLayout):
                 
                 elif test_type == TestType.NIC:
                     print("\nNIC Calculation Input:")
-                    calculated_values = self._calculate_nic_values(
-                        test_data[test_type]['test_data'],
-                        self.freq_data
-                    )
+                    # Process raw data first
+                    raw_data = self._get_nic_raw_data(test_obj)
+                    if not raw_data:
+                        continue
+                    
+                    # Process frequency data
+                    freq_data = self._process_nic_frequencies(raw_data)
+                    if not freq_data:
+                        continue
+                    
+                    # Calculate values using processed data
+                    calculated_values = self._calculate_nic_values(test_obj, freq_data)
                     print("\nNIC Calculated Values:")
                     if calculated_values:
                         print(f"- Keys: {calculated_values.keys()}")
@@ -1395,6 +1411,23 @@ class MainWindow(BoxLayout):
         """Calculate ASTC values"""
         try:
             print("\nCalculating ASTC values:")
+            print("Input data shapes:")
+            print(f"Source data: {freq_data['source'].shape if hasattr(freq_data['source'], 'shape') else len(freq_data['source'])}")
+            print(f"Receive data: {freq_data['receive'].shape if hasattr(freq_data['receive'], 'shape') else len(freq_data['receive'])}")
+            print(f"Background data: {freq_data['background'].shape if hasattr(freq_data['background'], 'shape') else len(freq_data['background'])}")
+            print(f"RT data: {freq_data['rt'].shape if hasattr(freq_data['rt'], 'shape') else len(freq_data['rt'])}")
+            
+            # Ensure all data has correct length before calculation
+            expected_length = 17  # We expect 17 frequency points
+            if any(len(data) != expected_length for data in [freq_data['source'], freq_data['receive'], 
+                                                        freq_data['background'], freq_data['rt']]):
+                print("\nData length mismatch detected:")
+                print(f"Source length: {len(freq_data['source'])}")
+                print(f"Receive length: {len(freq_data['receive'])}")
+                print(f"Background length: {len(freq_data['background'])}")
+                print(f"RT length: {len(freq_data['rt'])}")
+                raise ValueError(f"All frequency data must have length {expected_length}")
+            
             # Calculate ATL using processed data
             ATL_val, sabines = calc_atl_val(
                 freq_data['source'],
@@ -1409,7 +1442,7 @@ class MainWindow(BoxLayout):
                 print("Error: ATL calculation failed")
                 return None
             
-            print(f"ATL values shape: {ATL_val.shape}")
+            print(f"ATL values shape: {ATL_val.shape if hasattr(ATL_val, 'shape') else len(ATL_val)}")
             print(f"ATL values: {ATL_val}")
             
             # Calculate ASTC and contour
@@ -1495,80 +1528,133 @@ class MainWindow(BoxLayout):
             traceback.print_exc()
             return False
 
-    def _get_nic_raw_data(self, test_obj):
-        """Extract raw data for NIC calculations"""
+    def _get_astc_raw_data(self, test_obj):
+        """Get raw data for ASTC calculations"""
         try:
+            print("Getting ASTC raw data")
             raw_data = {
-                'freq': test_obj.srs_data.raw_data['Frequency (Hz)'].values,
-                'source': test_obj.srs_data.raw_data['Overall 1/3 Spectra'].values,
-                'receive': test_obj.recive_data.raw_data['Overall 1/3 Spectra'].values,
-                'background': test_obj.bkgrnd_data.raw_data['Overall 1/3 Spectra'].values,
-                'rt': test_obj.rt.rt_thirty,  # Already in correct format (17 points)
+                'source': test_obj.srs_data.raw_data if hasattr(test_obj, 'srs_data') else None,
+                'receive': test_obj.recive_data.raw_data if hasattr(test_obj, 'recive_data') else None,
+                'background': test_obj.bkgrnd_data.raw_data if hasattr(test_obj, 'bkgrnd_data') else None,
+                'rt': test_obj.rt.rt_thirty[:17] if hasattr(test_obj.rt, 'rt_thirty') else None,
                 'room_props': test_obj.room_properties
             }
             
-            print("\nRaw data shapes:")
-            print(f"Frequencies: {raw_data['freq'].shape}")
-            print(f"Source: {raw_data['source'].shape}")
-            print(f"Receive: {raw_data['receive'].shape}")
-            print(f"Background: {raw_data['background'].shape}")
-            print(f"RT: {raw_data['rt'].shape}")
+            # Verify all required data is present
+            if any(v is None for v in raw_data.values()):
+                missing = [k for k, v in raw_data.items() if v is None]
+                print(f"Missing ASTC data: {missing}")
+                return None
+            
+            return raw_data
+            
+        except Exception as e:
+            print(f"Error getting ASTC raw data: {str(e)}")
+            return None
+
+    def _process_astc_frequencies(self, raw_data):
+        """Process frequency data for ASTC calculations"""
+        try:
+            print("\nProcessing ASTC frequency data:")
+            
+            # Define target frequencies (100-4000 Hz for ASTC)
+            target_freqs = [100, 125, 160, 200, 250, 315, 400, 500, 
+                           630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
+            
+            print("\nProcessing raw data:")
+            print(f"Source data type: {type(raw_data['source'])}")
+            print(f"Source data shape: {raw_data['source'].shape}")
+            print(f"Source data columns: {raw_data['source'].columns.tolist()}")
+            
+            # Extract frequency data directly from raw DataFrame
+            # Find indices for our target frequencies
+            freq_indices = []
+            for freq in target_freqs:
+                idx = raw_data['source'][raw_data['source']['Frequency (Hz)'] == freq].index
+                if len(idx) > 0:
+                    freq_indices.append(idx[0])
+            
+            print(f"\nFound indices for target frequencies: {freq_indices}")
+            
+            # Extract data for target frequencies
+            source_data = raw_data['source'].iloc[freq_indices]['Overall 1/3 Spectra'].values
+            receive_data = raw_data['receive'].iloc[freq_indices]['Overall 1/3 Spectra'].values
+            background_data = raw_data['background'].iloc[freq_indices]['Overall 1/3 Spectra'].values
+            
+            print("\nExtracted frequency data:")
+            print(f"Source data shape: {source_data.shape}")
+            print(f"Source values: {source_data}")
+            print(f"Receive data shape: {receive_data.shape}")
+            print(f"Background data shape: {background_data.shape}")
+            
+            # Create frequency data dictionary
+            freq_data = {
+                'target_freqs': target_freqs,
+                'source': source_data,
+                'receive': receive_data,
+                'background': background_data,
+                'rt': raw_data['rt'],
+                'room_props': raw_data['room_props']
+            }
+            
+            print("\nProcessed frequency data:")
+            print(f"Target frequencies: {len(freq_data['target_freqs'])} points")
+            for key in ['source', 'receive', 'background', 'rt']:
+                print(f"{key} data: {len(freq_data[key])} points")
+                print(f"{key} values: {freq_data[key]}")
+            
+            # Verify all arrays have the expected length
+            expected_length = 17
+            for key in ['source', 'receive', 'background', 'rt']:
+                if len(freq_data[key]) != expected_length:
+                    raise ValueError(f"{key} data length mismatch. Expected {expected_length}, got {len(freq_data[key])}")
+            
+            return freq_data
+            
+        except Exception as e:
+            print(f"Error processing ASTC frequency data: {str(e)}")
+            traceback.print_exc()
+            return None
+
+    def _get_nic_raw_data(self, test_obj):
+        """Get raw data for NIC calculations"""
+        try:
+            print("Getting NIC raw data")
+            raw_data = {
+                'source': test_obj.srs_data.raw_data if hasattr(test_obj, 'srs_data') else None,
+                'receive': test_obj.recive_data.raw_data if hasattr(test_obj, 'recive_data') else None,
+                'background': test_obj.bkgrnd_data.raw_data if hasattr(test_obj, 'bkgrnd_data') else None,
+                'rt': test_obj.rt.rt_thirty[:17] if hasattr(test_obj.rt, 'rt_thirty') else None,
+                'room_props': test_obj.room_properties
+            }
+            
+            # Verify all required data is present
+            if any(v is None for v in raw_data.values()):
+                missing = [k for k, v in raw_data.items() if v is None]
+                print(f"Missing NIC data: {missing}")
+                return None
             
             return raw_data
             
         except Exception as e:
             print(f"Error getting NIC raw data: {str(e)}")
-            traceback.print_exc()
             return None
 
     def _process_nic_frequencies(self, raw_data):
         """Process frequency data for NIC calculations"""
         try:
-            # Define target frequencies
-            target_freqs = [100, 125, 160, 200, 250, 315, 400, 500, 
-                           630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
-            
-            # Create frequency map
-            freq_indices = []
-            for freq in target_freqs:
-                idx = np.where(raw_data['freq'] == freq)[0]
-                if len(idx) > 0:
-                    freq_indices.append(idx[0])
-                
-            if len(freq_indices) != len(target_freqs):
-                print(f"Error: Not all target frequencies found. Expected {len(target_freqs)}, got {len(freq_indices)}")
-                return None
-                
-            # Extract correct frequency points
-            processed_data = {
-                'target_freqs': target_freqs,
-                'source': raw_data['source'][freq_indices],
-                'receive': raw_data['receive'][freq_indices],
-                'background': raw_data['background'][freq_indices],
-                'rt': raw_data['rt'],  # Already in correct format (17 points)
+            print("Processing NIC frequency data")
+            freq_data = {
+                'source': TestDataManager.format_slm_data(raw_data['source'])['Overall 1/3 Spectra'].values[0:17],
+                'receive': TestDataManager.format_slm_data(raw_data['receive'])['Overall 1/3 Spectra'].values[0:17],
+                'background': TestDataManager.format_slm_data(raw_data['background'])['Overall 1/3 Spectra'].values[0:17],
+                'rt': raw_data['rt'],
                 'room_props': raw_data['room_props']
             }
-            
-            # Validate data shapes
-            print("\nProcessed data shapes:")
-            print(f"Target frequencies: {len(processed_data['target_freqs'])} points")
-            print(f"Source: {processed_data['source'].shape}")
-            print(f"Receive: {processed_data['receive'].shape}")
-            print(f"Background: {processed_data['background'].shape}")
-            print(f"RT: {processed_data['rt'].shape}")
-            
-            # Verify all arrays have the correct length (17 points)
-            expected_length = 17
-            if not all(len(processed_data[key]) == expected_length 
-                      for key in ['source', 'receive', 'background', 'target_freqs']):
-                print("Error: Processed arrays don't match expected length of 17 points")
-                return None
-            
-            return processed_data
+            return freq_data
             
         except Exception as e:
-            print(f"Error processing NIC frequencies: {str(e)}")
-            traceback.print_exc()
+            print(f"Error processing NIC frequency data: {str(e)}")
             return None
 
     def _calculate_nic_values(self, test_obj, freq_data):
@@ -1631,84 +1717,6 @@ class MainWindow(BoxLayout):
             print(f"Error creating NIC analysis plot: {str(e)}")
             traceback.print_exc()
             return False
-
-    def _get_astc_raw_data(self, test_obj):
-        """Extract raw data for ASTC calculations"""
-        try:
-            raw_data = {
-                'freq': test_obj.srs_data.raw_data['Frequency (Hz)'].values,
-                'source': test_obj.srs_data.raw_data['Overall 1/3 Spectra'].values,
-                'receive': test_obj.recive_data.raw_data['Overall 1/3 Spectra'].values,
-                'background': test_obj.bkgrnd_data.raw_data['Overall 1/3 Spectra'].values,
-                'rt': test_obj.rt.rt_thirty,  # Full RT data including 4000 Hz
-                'room_props': test_obj.room_properties
-            }
-            
-            print("\nRaw data shapes:")
-            print(f"Frequencies: {raw_data['freq'].shape}")
-            print(f"Source: {raw_data['source'].shape}")
-            print(f"Receive: {raw_data['receive'].shape}")
-            print(f"Background: {raw_data['background'].shape}")
-            print(f"RT: {raw_data['rt'].shape}")
-            
-            return raw_data
-            
-        except Exception as e:
-            print(f"Error getting ASTC raw data: {str(e)}")
-            traceback.print_exc()
-            return None
-
-    def _process_astc_frequencies(self, raw_data):
-        """Process frequency data for ASTC calculations"""
-        try:
-            # Define target frequencies (100-4000 Hz for ASTC)
-            target_freqs = [100, 125, 160, 200, 250, 315, 400, 500, 
-                           630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
-            
-            # Create frequency map
-            freq_indices = []
-            for freq in target_freqs:
-                idx = np.where(raw_data['freq'] == freq)[0]
-                if len(idx) > 0:
-                    freq_indices.append(idx[0])
-                else:
-                    print(f"Warning: Frequency {freq} Hz not found in raw data")
-                
-            if len(freq_indices) != len(target_freqs):
-                print(f"Error: Not all target frequencies found. Expected {len(target_freqs)}, got {len(freq_indices)}")
-                return None
-                
-            # Extract correct frequency points
-            processed_data = {
-                'target_freqs': target_freqs,
-                'source': raw_data['source'][freq_indices],
-                'receive': raw_data['receive'][freq_indices],
-                'background': raw_data['background'][freq_indices],
-                'rt': raw_data['rt'],  # Already in correct format (17 points)
-                'room_props': raw_data['room_props']
-            }
-            
-            # Validate data shapes
-            print("\nProcessed data shapes:")
-            print(f"Target frequencies: {len(processed_data['target_freqs'])} points")
-            print(f"Source: {processed_data['source'].shape}")
-            print(f"Receive: {processed_data['receive'].shape}")
-            print(f"Background: {processed_data['background'].shape}")
-            print(f"RT: {processed_data['rt'].shape}")
-            
-            # Verify all arrays have the correct length (17 points)
-            expected_length = 17
-            if not all(len(processed_data[key]) == expected_length 
-                      for key in ['source', 'receive', 'background', 'target_freqs']):
-                print("Error: Processed arrays don't match expected length of 17 points")
-                return None
-            
-            return processed_data
-            
-        except Exception as e:
-            print(f"Error processing ASTC frequencies: {str(e)}")
-            traceback.print_exc()
-            return None
 
     def convert_to_test_data(self, test_collection_data):
         """Convert test collection data to TestData format"""

@@ -23,6 +23,7 @@ from matplotlib import ticker
 import matplotlib.ticker as ticker
 from typing import List
 import tempfile
+import traceback
 
 @dataclass
 class RoomProperties:
@@ -449,96 +450,108 @@ def calculate_nic_curve(NIC_val_list, STCCurve, NIC_start):
 def calc_atl_val(srs_overalloct: pd.Series, rec_overalloct: pd.Series, 
                  bkgrnd_overalloct: pd.Series, rt_thirty: pd.Series, 
                  partition_area: float, receive_roomvol: float) -> pd.Series:
-    ASTC_vollimit = 883
-    if receive_roomvol > ASTC_vollimit:
-        print('Using NIC calc, room volume too large')
-    # constant = np.int32(20.047*np.sqrt(273.15+20))
-    # intermed = 30/rt_thirty ## why did i do this? not right....sabines calc is off
-    # thisval = np.int32(recieve_roomvol*intermed)
-    # sabines =thisval/constant
+    """Calculate ATL values"""
+    try:
+        print("\nATL Calculation Input Validation:")
+        print(f"Source data shape: {srs_overalloct.shape if hasattr(srs_overalloct, 'shape') else len(srs_overalloct)}")
+        print(f"Receive data shape: {rec_overalloct.shape if hasattr(rec_overalloct, 'shape') else len(rec_overalloct)}")
+        print(f"Background data shape: {bkgrnd_overalloct.shape if hasattr(bkgrnd_overalloct, 'shape') else len(bkgrnd_overalloct)}")
+        print(f"RT data shape: {rt_thirty.shape if hasattr(rt_thirty, 'shape') else len(rt_thirty)}")
+        
+        ASTC_vollimit = 883
+        if receive_roomvol > ASTC_vollimit:
+            print('Using NIC calc, room volume too large')
+        # constant = np.int32(20.047*np.sqrt(273.15+20))
+        # intermed = 30/rt_thirty ## why did i do this? not right....sabines calc is off
+        # thisval = np.int32(recieve_roomvol*intermed)
+        # sabines =thisval/constant
 
-    # RT value is right, why is this not working? - RT value MUST NOT BE ROUNDED TO 2 DECIMALS
-    # print('recieve roomvol: ',recieve_roomvol)
-    if isinstance(rt_thirty, pd.DataFrame):
-        rt_thirty = rt_thirty.values
-    print('rt_thirty: ',rt_thirty)
-    print('receive roomvol: ',receive_roomvol)
-    sabines = 0.049*receive_roomvol/rt_thirty  # this produces accurate sabines values
-    ## sabines gets this calc, but is still not accurate to spreadhseet reference, even with the right rt_thirty value
-    if isinstance(bkgrnd_overalloct, pd.DataFrame):
-        bkgrnd_overalloct = bkgrnd_overalloct.values
-    print('bkgrnd_overalloct: ',bkgrnd_overalloct)
-    sabines = np.int32(sabines) 
-    sabines = np.round(sabines)
-    # print('sabines: ',sabines)
-    
-    recieve_corr = list()
-    # print('recieve: ',rec_overalloct)
-    recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
+        # RT value is right, why is this not working? - RT value MUST NOT BE ROUNDED TO 2 DECIMALS
+        # print('recieve roomvol: ',recieve_roomvol)
+        if isinstance(rt_thirty, pd.DataFrame):
+            rt_thirty = rt_thirty.values
+        print('rt_thirty: ',rt_thirty)
+        print('receive roomvol: ',receive_roomvol)
+        sabines = 0.049*receive_roomvol/rt_thirty  # this produces accurate sabines values
+        ## sabines gets this calc, but is still not accurate to spreadhseet reference, even with the right rt_thirty value
+        if isinstance(bkgrnd_overalloct, pd.DataFrame):
+            bkgrnd_overalloct = bkgrnd_overalloct.values
+        print('bkgrnd_overalloct: ',bkgrnd_overalloct)
+        sabines = np.int32(sabines) 
+        sabines = np.round(sabines)
+        # print('sabines: ',sabines)
+        
+        recieve_corr = list()
+        # print('recieve: ',rec_overalloct)
+        recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
 
-    if isinstance(recieve_vsBkgrnd, pd.DataFrame):
-        recieve_vsBkgrnd = recieve_vsBkgrnd.values
+        if isinstance(recieve_vsBkgrnd, pd.DataFrame):
+            recieve_vsBkgrnd = recieve_vsBkgrnd.values
 
-    if isinstance(rec_overalloct, pd.DataFrame):
-        rec_overalloct = rec_overalloct.values
-    print('recieve vs  background: ',recieve_vsBkgrnd)
-    # print('recieve roomvol: ',recieve_roomvol)
-    #### something wrong with this loop #### 
-    for i, val in enumerate(recieve_vsBkgrnd):
-        if val < 5:
-            print('recieve vs background: ',val)
-            recieve_corr.append(rec_overalloct[i]-2)
-            print('less than 5, appending: ',recieve_corr[i])
-        elif val < 10:
-            print('recieve vs background: ',val)
-            recieve_corr.append(10*np.log10((10**(rec_overalloct[i]/10))-(10**(bkgrnd_overalloct[i]/10))))
-            print('less than 10, appending: ',recieve_corr[i])
-        else:
-            print('recieve vs background: ',val)
-            recieve_corr.append(rec_overalloct[i])
-            print('greater than 10, appending: ',recieve_corr[i])
+        if isinstance(rec_overalloct, pd.DataFrame):
+            rec_overalloct = rec_overalloct.values
+        print('recieve vs  background: ',recieve_vsBkgrnd)
+        # print('recieve roomvol: ',recieve_roomvol)
+        #### something wrong with this loop #### 
+        for i, val in enumerate(recieve_vsBkgrnd):
+            if val < 5:
+                print('recieve vs background: ',val)
+                recieve_corr.append(rec_overalloct[i]-2)
+                print('less than 5, appending: ',recieve_corr[i])
+            elif val < 10:
+                print('recieve vs background: ',val)
+                recieve_corr.append(10*np.log10((10**(rec_overalloct[i]/10))-(10**(bkgrnd_overalloct[i]/10))))
+                print('less than 10, appending: ',recieve_corr[i])
+            else:
+                print('recieve vs background: ',val)
+                recieve_corr.append(rec_overalloct[i])
+                print('greater than 10, appending: ',recieve_corr[i])
             
-    
-    # print('recieve correction: ',recieve_corr)
-    if isinstance(srs_overalloct, pd.DataFrame):
-        recieve_corr = recieve_corr.values
-    if isinstance(srs_overalloct, pd.DataFrame):
-        srs_overalloct = srs_overalloct.values
-    if isinstance(sabines, pd.DataFrame):
-        sabines = sabines.values
-    print('srs overalloct: ',srs_overalloct)
-    print('recieve correction: ',recieve_corr)
-    print('sabines: ',sabines)
+        
+        # print('recieve correction: ',recieve_corr)
+        if isinstance(srs_overalloct, pd.DataFrame):
+            recieve_corr = recieve_corr.values
+        if isinstance(srs_overalloct, pd.DataFrame):
+            srs_overalloct = srs_overalloct.values
+        if isinstance(sabines, pd.DataFrame):
+            sabines = sabines.values
+        print('srs overalloct: ',srs_overalloct)
+        print('recieve correction: ',recieve_corr)
+        print('sabines: ',sabines)
 
-    # ATL val initalized to 0
-    # ATL_val = []
-    print('=-=-=-=-=-=-=-ATL val initalized to 0-=-=-=-=-=-=-=-')
-    ATL_val = np.zeros(len(srs_overalloct))
-    # for i, val in enumerate(srs_overalloct):
-    #     ATL_val.append(srs_overalloct[i]-recieve_corr[i]+10*(np.log10(partition_area/sabines.iloc[i])))
+        # ATL val initalized to 0
+        # ATL_val = []
+        print('=-=-=-=-=-=-=-ATL val initalized to 0-=-=-=-=-=-=-=-')
+        ATL_val = np.zeros(len(srs_overalloct))
+        # for i, val in enumerate(srs_overalloct):
+        #     ATL_val.append(srs_overalloct[i]-recieve_corr[i]+10*(np.log10(partition_area/sabines.iloc[i])))
 
-    # Ensure all inputs are numpy arrays
-    srs_overalloct = np.array(srs_overalloct)
-    recieve_corr = np.array(recieve_corr)
-    sabines = np.array(sabines)
-    
+        # Ensure all inputs are numpy arrays
+        srs_overalloct = np.array(srs_overalloct)
+        recieve_corr = np.array(recieve_corr)
+        sabines = np.array(sabines)
+        
 
-    # Ensure all arrays have same length before calculation
-    min_length = min(len(srs_overalloct), len(recieve_corr), len(sabines))
-    srs_overalloct = srs_overalloct[:min_length]
-    recieve_corr = recieve_corr[:min_length] 
-    sabines = sabines[:min_length]
-    
-    # Vectorized calculation
-    # print('=-=-=-=-=-=-=-Vectorized calculation-=-=-=-=-=-=-=-')
-    ATL_val = srs_overalloct - recieve_corr + 10 * np.log10(partition_area / sabines)
-    # Convert ATL_val to numpy array if not already
-    # ATL_val = np.array(ATL_val)
-    # ATL_val = srs_overalloct - recieve_corr+10*(np.log(parition_area/sabines)) 
-    print('-=-=-Rounding ATL val-=-=-=')
-    ATL_val = np.round(ATL_val,1)
-    print('ATL val: ',ATL_val)
-    return ATL_val, sabines
+        # Ensure all arrays have same length before calculation
+        min_length = min(len(srs_overalloct), len(recieve_corr), len(sabines))
+        srs_overalloct = srs_overalloct[:min_length]
+        recieve_corr = recieve_corr[:min_length] 
+        sabines = sabines[:min_length]
+        
+        # Vectorized calculation
+        # print('=-=-=-=-=-=-=-Vectorized calculation-=-=-=-=-=-=-=-')
+        ATL_val = srs_overalloct - recieve_corr + 10 * np.log10(partition_area / sabines)
+        # Convert ATL_val to numpy array if not already
+        # ATL_val = np.array(ATL_val)
+        # ATL_val = srs_overalloct - recieve_corr+10*(np.log(parition_area/sabines)) 
+        print('-=-=-Rounding ATL val-=-=-=')
+        ATL_val = np.round(ATL_val,1)
+        print('ATL val: ',ATL_val)
+        return ATL_val, sabines
+    except Exception as e:
+        print(f"Error in calc_atl_val: {str(e)}")
+        raise
+
 def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=True):
     pos_diffs = list()
     diff_negative_min = 0
