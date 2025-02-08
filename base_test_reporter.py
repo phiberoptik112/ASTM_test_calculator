@@ -15,10 +15,18 @@ class BaseTestReport:
         # print(f"- Test data type: {type(test_data)}")
         # print(f"- Test data attributes: {dir(test_data)}")
         # print(f"- Has room_properties: {hasattr(test_data, 'room_properties')}")
-
         self.test_data = test_data
         self.reportOutputfolder = reportOutputfolder
         self.test_type = test_type
+        self.calculated_values = getattr(test_data, 'calculated_values', {})
+        print(f"\nInitializing {test_type} report with calculated values:")
+        print(f"Available keys: {self.calculated_values.keys()}")
+        
+        # Initialize common values from calculated_values
+        self.room_vol = self.calculated_values.get('room_vol')
+        self.sabines = self.calculated_values.get('sabines')
+        self.NR_val = self.calculated_values.get('NR_val')
+
         self.doc = None
         self.styles = getSampleStyleSheet()
         self.custom_title_style = self.styles['Heading1']
@@ -30,6 +38,22 @@ class BaseTestReport:
         self.header_height = 2 * inch
         self.footer_height = 0.5 * inch
         self.main_content_height = letter[1] - self.top_margin - self.bottom_margin - self.header_height - self.footer_height
+
+    def validate_calculated_values(self):
+        """Validate that required calculated values are present for the specific test type"""
+        if not hasattr(self, 'calculated_values'):
+            raise ValueError("No calculated values found")
+            
+        required_base_values = ['room_vol']
+        missing_base = [key for key in required_base_values 
+                       if key not in self.calculated_values]
+        
+        if missing_base:
+            raise ValueError(f"Missing required base values: {missing_base}")
+            
+        # Test type specific validation is handled in child classes
+        if hasattr(self, 'validate_test_specific_values'):
+            self.validate_test_specific_values()
 
     def setup_document(self):
         """Setup the document template with proper frames and margins"""
@@ -476,7 +500,6 @@ class BaseTestReport:
                 
                 if not output_path.exists():
                     raise ReportGenerationError(f"Failed to save report to {output_path}")
-                
                 print(f"Report saved successfully to: {output_path}")
                 return True
                 
@@ -720,6 +743,42 @@ class BaseTestReport:
             return None
 
 class AIICTestReport(BaseTestReport):
+    def __init__(self, test_data, reportOutputfolder, test_type):
+        super().__init__(test_data, reportOutputfolder, test_type)
+        
+        # Initialize AIIC-specific calculated values with defaults
+        self.calculated_values = getattr(test_data, 'calculated_values', {})
+        
+        # Store all required values with proper error handling
+        try:
+            self.AIIC_recieve_corr = self.calculated_values.get('AIIC_recieve_corr')
+            self.AIIC_Normalized_recieve = self.calculated_values.get('AIIC_Normalized_recieve')
+            self.AIIC_contour_val = self.calculated_values.get('AIIC_contour_val')
+            self.Contour_curve_result = self.calculated_values.get('AIIC_contour_result')
+            self.sabines = self.calculated_values.get('sabines')  # Add this line
+            self.NR_val = self.calculated_values.get('NR_val')    # Add this line
+            
+            # Validate required values
+            required_values = ['AIIC_recieve_corr', 'AIIC_Normalized_recieve', 
+                             'AIIC_contour_val', 'AIIC_contour_result', 'sabines']
+            missing_values = [key for key in required_values 
+                            if self.calculated_values.get(key) is None]
+            
+            if missing_values:
+                print(f"Warning: Missing required values: {missing_values}")
+                print(f"Available values: {self.calculated_values.keys()}")
+        
+        except Exception as e:
+            print(f"Error initializing AIIC report: {str(e)}")
+            print(f"Available calculated values: {self.calculated_values.keys()}")
+            raise
+        
+        # Debug logging - fixed to handle numpy arrays
+        print(f"AIIC Report Initialization:")
+        print(f"- Calculated values keys: {self.calculated_values.keys()}")
+        print(f"- AIIC normalized values present: {self.AIIC_Normalized_recieve is not None}")
+        print(f"- AIIC normalized values shape: {self.AIIC_Normalized_recieve.shape if self.AIIC_Normalized_recieve is not None else 'None'}")
+
     def get_doc_name(self):
         props = vars(self.test_data.room_properties)
         return f"{props['project_name']} AIIC Test Report_{props['test_label']}.pdf"
@@ -763,33 +822,48 @@ class AIICTestReport(BaseTestReport):
         main_elements = []
         frequencies = [100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150]
         try:
-            # Get stored calculated values
-            calculated_values = getattr(self.test_data, 'calculated_values', None)
-            if not calculated_values:
-                raise ValueError("No calculated values found - please run calculation and storage first")
+            # Validate required values are present and have correct shapes
+            required_arrays = {
+                'AIIC_recieve_corr': self.AIIC_recieve_corr,
+                'AIIC_Normalized_recieve': self.AIIC_Normalized_recieve,
+                'AIIC_contour_val': self.AIIC_contour_val
+            }
             
-            # Use stored values instead of recalculating
-            self.NR_val = calculated_values['NR_val']
-            self.sabines = calculated_values['sabines']
-            self.AIIC_recieve_corr = calculated_values['AIIC_recieve_corr']
-            self.ASTC_recieve_corr = calculated_values.get('ASTC_recieve_corr')
-            self.AIIC_Normalized_recieve = calculated_values['AIIC_Normalized_recieve']
-            self.AIIC_contour_val = calculated_values['AIIC_contour_val']
-            self.Contour_curve_result = calculated_values['AIIC_contour_result']
-            self.ISR_contour_val = calculated_values.get('ISR_contour_val')
-            self.ISR_contour_result = calculated_values.get('ISR_contour_result')
+            missing_arrays = [key for key, val in required_arrays.items() if val is None]
+            if missing_arrays:
+                raise ValueError(f"Missing required arrays: {', '.join(missing_arrays)}")
             
-            # Still need to load background and RT data for the report
-            freq_indices = slice(0, 16)
-            self.onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)[freq_indices]
-            self.onethird_bkgrd = np.array(self.onethird_bkgrd, dtype=np.float64).round(1)
+            # Debug print shapes
+            print("\nArray shapes for AIIC test results:")
+            for name, arr in required_arrays.items():
+                if hasattr(arr, 'shape'):
+                    print(f"- {name}: {arr.shape}")
+                else:
+                    print(f"- {name}: {type(arr)}")
             
-            if hasattr(self.test_data.rt, 'rt_thirty'):
-                rt_thirty = self.test_data.rt.rt_thirty[:16]
-            else:
-                rt_thirty = self.test_data.rt['Unnamed: 10'][24:40]/1000
+            # Continue with existing table creation code...
+
+            rt_thirty = self.test_data.rt[:16]
             rt_thirty = np.array(rt_thirty, dtype=np.float64).round(3)
 
+            # Load background and RT data
+            freq_indices = slice(13, 29)
+            self.onethird_bkgrd = self.test_data.bkgrnd_data[freq_indices]
+            self.onethird_bkgrd = np.array(self.onethird_bkgrd, dtype=np.float64).round(1)
+            print(f"onethird_bkgrd: {self.onethird_bkgrd}")
+            # Use stored values instead of recalculating
+            self.NR_val = self.calculated_values['NR_val']
+            self.sabines = self.calculated_values['sabines']
+            self.AIIC_recieve_corr = self.calculated_values['AIIC_recieve_corr']
+            self.ASTC_recieve_corr = self.calculated_values.get('ASTC_recieve_corr')
+            self.AIIC_Normalized_recieve = self.calculated_values['AIIC_Normalized_recieve']
+            self.AIIC_contour_val = self.calculated_values['AIIC_contour_val']
+            self.Contour_curve_result = self.calculated_values['AIIC_contour_result']
+
+            # still need to add these, but not used in current report format
+            self.ISR_contour_val = self.calculated_values.get('ISR_contour_val')
+            self.ISR_contour_result = self.calculated_values.get('ISR_contour_result')
+            
             # Process exceptions
             self.AIIC_Exceptions = []
             self.AIIC_exceptions_backcheck = []
@@ -801,9 +875,14 @@ class AIICTestReport(BaseTestReport):
                 self.AIIC_Exceptions.append('1' if val_float > 2 * rec_roomvol**(2/3) else '0')
 
             # Background check exceptions
-            for i, val in enumerate(self.onethird_bkgrd):
-                background_diff = float(self.AIIC_Normalized_recieve[i]) - float(val)
-                self.AIIC_exceptions_backcheck.append('0' if background_diff > 5 else '1')
+            print(f"AIIC_Normalized_recieve: {self.AIIC_Normalized_recieve}")
+            print(f"onethird_bkgrd: {self.onethird_bkgrd}")
+            # Calculate background difference directly
+            ### 2nd column is overall background level, first is frequencies. 
+            background_diff = self.AIIC_Normalized_recieve - self.onethird_bkgrd[:,2]
+            
+            # Create exceptions list based on difference
+            self.AIIC_exceptions_backcheck = ['0' if diff > 5 else '1' for diff in background_diff]
 
             self.test_data.single_number_result = self.AIIC_contour_val
 
@@ -834,7 +913,7 @@ class AIICTestReport(BaseTestReport):
                 for i in range(len(frequencies)):
                     try:
                         anispl_val = float(self.AIIC_Normalized_recieve[i])
-                        bkg_val = float(self.onethird_bkgrd[i])
+                        bkg_val = float(self.onethird_bkgrd[2,i])
                         rt_val = float(rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i])
                         exceptions_val = self.AIIC_Exceptions[i]
                         backgrnd_check_val = self.AIIC_exceptions_backcheck[i]
@@ -920,7 +999,8 @@ class AIICTestReport(BaseTestReport):
                 else:
                     print("Warning: No data rows were created for the table")
         except Exception as e:
-            print(f"Error in AIIC processing: {str(e)}")
+            print(f"Error in AIIC test results: {str(e)}")
+            print(f"Available calculated values: {self.calculated_values.keys()}")
             raise
 
         return main_elements
@@ -972,16 +1052,39 @@ class AIICTestReport(BaseTestReport):
         return main_elements
 
 class ASTCTestReport(BaseTestReport):
-    def get_doc_name(self):
+    def __init__(self, test_data, reportOutputfolder, test_type):
+        super().__init__(test_data, reportOutputfolder, test_type)
+        
+        # Initialize ASTC-specific calculated values with defaults
+        self.calculated_values = getattr(test_data, 'calculated_values', {})
+        
+        try:
+            # Store all required values
+            self.ATL_val = self.calculated_values.get('ATL_val')
+            self.ASTC_final_val = self.calculated_values.get('ASTC_final_val')
+            self.ASTC_contour_val = self.calculated_values.get('ASTC_contour_val')
+            self.sabines = self.calculated_values.get('sabines')
+            self.NR_val = self.calculated_values.get('NR_val')  # Add this line
+            
+            # Validate required values
+            required_values = ['ATL_val', 'ASTC_final_val', 'ASTC_contour_val', 
+                             'sabines', 'NR_val']
+            missing_values = [key for key in required_values 
+                            if self.calculated_values.get(key) is None]
+            
+            if missing_values:
+                print(f"Warning: Missing required values: {missing_values}")
+                print(f"Available values: {self.calculated_values.keys()}")
+                
+        except Exception as e:
+            print(f"Error initializing ASTC report: {str(e)}")
+            print(f"Available calculated values: {self.calculated_values.keys()}")
+            raise
 
+    def get_doc_name(self):
         props = vars(self.test_data.room_properties)
         return f"{props['project_name']} ASTC Test Report_{props['test_label']}.pdf"
-    # def get_standards_data(self):
-    #     return [
-    #         ['ASTM E336-20', 'Standard Test Method for Measurement of Airborne Sound Attenuation between Rooms in Buildings'],
-    #         ['ASTM E413-16', 'Standard Classification for Rating Sound Insulation'],
-    #         ['ASTM E2235-04(2012)', 'Standard Test Method for Determination of Decay Rates for Use in Sound Insulation Test Methods']
-    #     ]
+
     def get_test_instrumentation(self):
         equipment = super().get_test_instrumentation()
         # Add ASTC-specific equipment
@@ -990,8 +1093,10 @@ class ASTCTestReport(BaseTestReport):
             ["Noise Generator", "NTi Audio", "MR-PRO", "0162", "N/A", "N/A"],
         ]
         return equipment + astc_equipment
+
     def get_statement_of_conformance(self):
         return "Testing was conducted in accordance with ASTM E336-20, ASTM E413-16, and ASTM E2235-04(2012), with exceptions noted below. All requrements for measuring abd reporting Airborne Sound Attenuation between Rooms in Buildings (ATL) and Apparent Sound Transmission Class (ASTC) were met."
+
     def get_test_results(self):
         try:
             print('-=-=-=-=-=-=-= Getting ASTC test results-=-=-=-=-=-=-=-=-')
@@ -1012,20 +1117,20 @@ class ASTCTestReport(BaseTestReport):
             self.ASTC_contour_val = calculated_values['ASTC_contour_val']
             
             # Still need to load raw data for the report
-            freq_indices = slice(0, 17)  # Include 4kHz
-            onethird_srs = format_SLMdata(self.test_data.srs_data)[freq_indices]
+            freq_indices = slice(14, 30)  # Include 4kHz
+            onethird_srs = self.test_data.srs_data[freq_indices]
+
             onethird_srs = np.array(onethird_srs, dtype=np.float64).round(1)
             
-            onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
+            onethird_rec = self.test_data.recive_data[freq_indices]
+            onethird_rec = onethird_rec[:,2] # 2nd column is overall level, first is frequencies. 
             onethird_rec = np.array(onethird_rec, dtype=np.float64).round(1)
             
-            onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)[freq_indices]
+            onethird_bkgrd = self.test_data.bkgrnd_data[freq_indices]
             onethird_bkgrd = np.array(onethird_bkgrd, dtype=np.float64).round(1)
             
             if hasattr(self.test_data.rt, 'rt_thirty'):
-                rt_thirty = self.test_data.rt.rt_thirty  # Use all values for ASTC
-            else:
-                rt_thirty = self.test_data.rt['Unnamed: 10'][24:41]/1000
+                rt_thirty = self.test_data.rt[freq_indices]  # Use all values for ASTC
             rt_thirty = np.array(rt_thirty, dtype=np.float64).round(3)
 
             # Calculate background check exceptions
@@ -1247,20 +1352,19 @@ class NICTestReport(BaseTestReport):
             self.NIC_contour_val = calculated_values['NIC_contour_val']
             
             # Still need to load raw data for the report
-            freq_indices = slice(0, 17)  # Include 4kHz
-            onethird_srs = format_SLMdata(self.test_data.srs_data)[freq_indices]
+            freq_indices = slice(14, 30)  # Include 4kHz
+            onethird_srs = self.test_data.srs_data[freq_indices]
             onethird_srs = np.array(onethird_srs, dtype=np.float64).round(1)
             
-            onethird_rec = format_SLMdata(self.test_data.recive_data)[freq_indices]
+            onethird_rec = self.test_data.recive_data[freq_indices]
+            onethird_rec = onethird_rec[:,2] # 2nd column is overall level, first is frequencies. 
             onethird_rec = np.array(onethird_rec, dtype=np.float64).round(1)
             
-            onethird_bkgrd = format_SLMdata(self.test_data.bkgrnd_data)[freq_indices]
+            onethird_bkgrd = self.test_data.bkgrnd_data[freq_indices]
+            onethird_bkgrd = onethird_bkgrd[:,2] # 2nd column is overall level, first is frequencies. 
             onethird_bkgrd = np.array(onethird_bkgrd, dtype=np.float64).round(1)
             
-            if hasattr(self.test_data.rt, 'rt_thirty'):
-                rt_thirty = self.test_data.rt.rt_thirty  # Use all values for NIC
-            else:
-                rt_thirty = self.test_data.rt['Unnamed: 10'][24:41]/1000
+            rt_thirty = self.test_data.rt # Use all values for NIC
             rt_thirty = np.array(rt_thirty, dtype=np.float64).round(3)
 
             # Set single number result
@@ -1294,9 +1398,9 @@ class NICTestReport(BaseTestReport):
                 for i in range(len(frequencies)):
                     try:
                         # Access numpy array values directly
-                        srs_val = float(onethird_srs.iloc[i] if hasattr(onethird_srs, 'iloc') else onethird_srs[i])
+                        srs_val = float(onethird_srs.iloc[i] if hasattr(onethird_srs, 'iloc') else onethird_srs[1,i])
                         corr_rec_val = float(self.ASTC_recieve_corr[i])
-                        bkg_val = float(onethird_bkgrd.iloc[i] if hasattr(onethird_bkgrd, 'iloc') else onethird_bkgrd[i])
+                        bkg_val = float(onethird_bkgrd.iloc[i] if hasattr(onethird_bkgrd, 'iloc') else onethird_bkgrd[1,i])
                         rt_val = float(rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i])
                         NR_table_val = float(self.NR_val[i])
                         row = [

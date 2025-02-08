@@ -196,11 +196,13 @@ class TestProcessor:
                     'positions': calculated_values['positions'],
                     'AIIC_contour_val': calculated_values['AIIC_contour_val'],
                     'AIIC_contour_result': calculated_values['AIIC_contour_result'],
-                    'room_vol': calculated_values['room_vol']
+                    'room_vol': calculated_values['room_vol'],
+                    'sabines': calculated_values['sabines']
                 }
                 
             elif test_type == TestType.ASTC:
                 test_data.calculated_values = {
+                    'NR_val': calculated_values['NR_val'],
                     'ATL_val': calculated_values['ATL_val'],
                     'ASTC_final_val': calculated_values['ASTC_final_val'],
                     'ASTC_contour_val': calculated_values['ASTC_contour_val'],

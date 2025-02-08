@@ -522,8 +522,22 @@ class MainWindow(BoxLayout):
                     try:
                         self.status_label.text = f'Status: Generating {test_type.value} report for {test_label}...'
                         
+                        # Debug: Print data before conversion
+                        print("\nData before conversion:")
+                        if hasattr(data['test_data'], 'calculated_values'):
+                            print("Calculated values keys:", data['test_data'].calculated_values.keys())
+                        else:
+                            print("No calculated_values attribute found")
+                        
                         # Convert the data to the expected format
                         converted_test_data = self.convert_to_test_data(data)
+                        
+                        # Debug: Print data after conversion
+                        print("\nData after conversion:")
+                        if hasattr(converted_test_data, 'calculated_values'):
+                            print("Calculated values keys:", converted_test_data.calculated_values.keys())
+                        else:
+                            print("No calculated_values attribute found after conversion")
                         
                         # Get appropriate report class
                         report_class = {
@@ -931,6 +945,24 @@ class MainWindow(BoxLayout):
             test_data = self.test_data_manager.test_data_collection[test_label]
             print(f"Available test types: {list(test_data.keys())}")
             
+            # Debug: Print collection structure
+            print("\nTest Collection Structure:")
+            for test_type, data in test_data.items():
+                print(f"\n{test_type}:")
+                print(f"  Keys in data: {list(data.keys())}")
+                if 'test_data' in data:
+                    print(f"  Test data attributes: {[attr for attr in dir(data['test_data']) if not attr.startswith('_')]}")
+                    if hasattr(data['test_data'], 'calculated_values'):
+                        print(f"  Calculated values: {data['test_data'].calculated_values.keys()}")
+            
+            # Add debug: Print state before storage
+            print("\nBefore storage:")
+            for test_type, data in test_data.items():
+                if hasattr(data['test_data'], 'calculated_values'):
+                    print(f"{test_type}: {data['test_data'].calculated_values.keys()}")
+                else:
+                    print(f"{test_type}: No calculated values")
+            
             # Ensure TestProcessor has access to the collection
             self.test_data_manager.test_processor.set_test_collection(
                 self.test_data_manager.test_data_collection
@@ -955,6 +987,17 @@ class MainWindow(BoxLayout):
                     # Now calculate values using properly processed data
                     calculated_values = self._calculate_aiic_values(test_obj, freq_data)
                     
+                    # Add debug output to see what's being stored
+                    if calculated_values:
+                        print("\nAIIC Calculated Values being stored:")
+                        for key, value in calculated_values.items():
+                            if hasattr(value, 'shape'):
+                                print(f"  {key}: {type(value)} with shape {value.shape}")
+                                if key == 'sabines':
+                                    print(f"    values: {value}")
+                            else:
+                                print(f"  {key}: {type(value)}")
+                
                 elif test_type == TestType.ASTC:
                     print("\nASTC Calculation Input:")
                     # Process raw data first
@@ -1009,6 +1052,14 @@ class MainWindow(BoxLayout):
                         calculated_values
                     )
             
+            # Add debug: Print state after storage
+            print("\nAfter storage:")
+            for test_type, data in test_data.items():
+                if hasattr(data['test_data'], 'calculated_values'):
+                    print(f"{test_type}: {data['test_data'].calculated_values.keys()}")
+                else:
+                    print(f"{test_type}: No calculated values")
+            
             # Show success message
             success_popup = Popup(
                 title='Success',
@@ -1017,6 +1068,20 @@ class MainWindow(BoxLayout):
                 size=(300, 150)
             )
             success_popup.open()
+            
+            # Debug: Print final storage state
+            print("\nFinal Storage State:")
+            for test_type, data in test_data.items():
+                if hasattr(data['test_data'], 'calculated_values'):
+                    print(f"\n{test_type}:")
+                    print(f"  Stored values: {data['test_data'].calculated_values.keys()}")
+                    for key, value in data['test_data'].calculated_values.items():
+                        if hasattr(value, 'shape'):
+                            print(f"    {key} shape: {value.shape}")
+                        elif isinstance(value, (list, np.ndarray)):
+                            print(f"    {key} length: {len(value)}")
+                        else:
+                            print(f"    {key} type: {type(value)}")
             
         except Exception as e:
             error_msg = f"Error storing calculated values: {str(e)}"
@@ -1308,6 +1373,7 @@ class MainWindow(BoxLayout):
             print(f"AIIC_recieve_corr: {AIIC_recieve_corr}")
             print(f"AIIC_Normalized_recieve: {AIIC_Normalized_recieve}")
             print(f"NR_val: {NR_val}")
+            print(f"Calculated sabines value: {sabines}")  # Debug print
 
             if AIIC_Normalized_recieve is None:
                 print("Error: AIIC Normalized receive calculation failed")
@@ -1317,8 +1383,10 @@ class MainWindow(BoxLayout):
             print(f"AIIC_contour_val: {AIIC_contour_val}")
             print(f"AIIC_contour_result: {AIIC_contour_result}")
             
-            return {
+            # Create return dictionary
+            calculated_values = {
                 'NR_val': NR_val,
+                'sabines': sabines.copy() if hasattr(sabines, 'copy') else sabines,  # Ensure we store a copy
                 'AIIC_recieve_corr': AIIC_recieve_corr,
                 'AIIC_Normalized_recieve': AIIC_Normalized_recieve,
                 'positions': freq_data['positions'],
@@ -1326,6 +1394,17 @@ class MainWindow(BoxLayout):
                 'AIIC_contour_result': AIIC_contour_result,
                 'room_vol': float(freq_data['room_props'].receive_vol)
             }
+            
+            # Verify the dictionary contains sabines
+            print("\nVerifying calculated values before return:")
+            for key, value in calculated_values.items():
+                print(f"  {key}: {type(value)}")
+                if hasattr(value, 'shape'):
+                    print(f"    shape: {value.shape}")
+                    if key == 'sabines':
+                        print(f"    values: {value}")
+            
+            return calculated_values
             
         except Exception as e:
             print(f"Error calculating AIIC values: {str(e)}")
@@ -1427,8 +1506,14 @@ class MainWindow(BoxLayout):
                 print(f"Background length: {len(freq_data['background'])}")
                 print(f"RT length: {len(freq_data['rt'])}")
                 raise ValueError(f"All frequency data must have length {expected_length}")
-            
-            # Calculate ATL using processed data
+            NR_val, _, sabines, _, ASTC_recieve_corr, _ = calc_NR_new(
+                freq_data['source'],
+                None,
+                freq_data['receive'],  # No receive data for AIIC
+                freq_data['background'],
+                float(freq_data['room_props'].receive_vol),
+                freq_data['rt']
+            )
             ATL_val, sabines = calc_atl_val(
                 freq_data['source'],
                 freq_data['receive'],
@@ -1454,6 +1539,7 @@ class MainWindow(BoxLayout):
             
             return {
                 'ATL_val': ATL_val,
+                'NR_val': NR_val,
                 'ASTC_final_val': ASTC_final_val,
                 'ASTC_contour_val': ASTC_contour_val,
                 'sabines': sabines,
@@ -1778,6 +1864,15 @@ class MainWindow(BoxLayout):
     def convert_to_test_data(self, test_collection_data):
         """Convert test collection data to TestData format"""
         try:
+            # Debug: Print incoming data
+            print("\nConverting test data:")
+            if 'test_data' in test_collection_data:
+                test_data = test_collection_data['test_data']
+                if hasattr(test_data, 'calculated_values'):
+                    print("Input calculated values:", test_data.calculated_values.keys())
+                else:
+                    print("No calculated values in input data")
+            
             # Extract the test data from the collection format
             if not test_collection_data or 'test_data' not in test_collection_data:
                 raise ValueError("Invalid test collection data format")
