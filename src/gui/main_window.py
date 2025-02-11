@@ -1803,7 +1803,7 @@ class MainWindow(BoxLayout):
             print(f"Room volume: {room_vol}")
             
             # Calculate NIC using the processed data
-            NR_val, NIC_final_val, sabines, _, _, _ = calc_NR_new(
+            NR_val, NIC_contour_val, sabines, _, _, _ = calc_NR_new(
                 freq_data['source'],
                 None,  # No AIIC data
                 freq_data['receive'],
@@ -1811,14 +1811,16 @@ class MainWindow(BoxLayout):
                 room_vol,
                 freq_data['rt']
             )
-            
+            NIC_final_val = calc_astc_val(NR_val)
             if NR_val is not None:
                 print(f"NR values shape: {NR_val.shape if hasattr(NR_val, 'shape') else len(NR_val)}")
+                print(f"NIC contour value: {NIC_contour_val}")
                 print(f"NIC final value: {NIC_final_val}")
                 print(f"Sabines: {sabines}")
                 
                 return {
                     'NR_val': NR_val,
+                    'NIC_contour_val': NIC_contour_val,
                     'NIC_final_val': NIC_final_val,
                     'sabines': sabines,
                     'room_vol': room_vol
@@ -1836,17 +1838,17 @@ class MainWindow(BoxLayout):
         try:
             # Plot NR values
             ax.plot(freq_values, nic_results['NR_val'], 
-                    label=f"Noise Reduction (NIC = {nic_results['NIC_final_val']})", 
+                    label=f"Noise Reduction (NIC = {nic_results['NIC_contour_val']})", 
                     color='blue', marker='o')
             
             # Plot NIC reference curve
-            ref_curve = np.array([-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4]) + nic_results['NIC_final_val']
+            ref_curve = np.array([-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4]) + nic_results['NIC_contour_val']
             ax.plot(freq_values, ref_curve, 
                     label='NIC Reference Curve', 
                     color='red', linestyle='--')
             
             # Add results text box
-            textstr = (f"NIC: {nic_results['NIC_final_val']}\n"
+            textstr = (f"NIC: {nic_results['NIC_contour_val']}\n"
                       f"Sabines: {np.mean(nic_results['sabines']):.1f}\n"
                       f"Room Volume: {nic_results['room_vol']:.1f} m³")
             props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)

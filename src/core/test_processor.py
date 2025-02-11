@@ -213,7 +213,7 @@ class TestProcessor:
             elif test_type == TestType.NIC:
                 test_data.calculated_values = {
                     'NR_val': calculated_values['NR_val'],
-                    'NIC_final_val': calculated_values['NIC_final_val'],
+                    'NIC_contour_val': calculated_values['NIC_contour_val'],
                     'sabines': calculated_values['sabines'],
                     'room_vol': calculated_values['room_vol']
                 }

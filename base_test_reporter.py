@@ -910,7 +910,7 @@ class AIICTestReport(BaseTestReport):
                 print(f"RT30: {type(rt_thirty)}")
                 print(f"Exceptions: {type(self.AIIC_Exceptions)}")
                 print(f"Backgrnd check Exceptions: {type(self.AIIC_exceptions_backcheck)}")
-                for i in range(len(frequencies)):
+                for i in range(len(self.onethird_bkgrd[2,:])):
                     try:
                         anispl_val = float(self.AIIC_Normalized_recieve[i])
                         bkg_val = float(self.onethird_bkgrd[2,i])
@@ -1117,27 +1117,26 @@ class ASTCTestReport(BaseTestReport):
             self.ASTC_contour_val = calculated_values['ASTC_contour_val']
             
             # Still need to load raw data for the report
-            freq_indices = slice(14, 30)  # Include 4kHz
+            freq_indices = slice(12, 29)  # Include 100, 4kHz
             onethird_srs = self.test_data.srs_data[freq_indices]
+            print(f"ASTC onethird_srs: {onethird_srs}")
 
             onethird_srs = np.array(onethird_srs, dtype=np.float64).round(1)
             
             onethird_rec = self.test_data.recive_data[freq_indices]
-            onethird_rec = onethird_rec[:,2] # 2nd column is overall level, first is frequencies. 
+            print(f"ASTC onethird_rec: {onethird_rec}")
             onethird_rec = np.array(onethird_rec, dtype=np.float64).round(1)
             
             onethird_bkgrd = self.test_data.bkgrnd_data[freq_indices]
             onethird_bkgrd = np.array(onethird_bkgrd, dtype=np.float64).round(1)
             
-            if hasattr(self.test_data.rt, 'rt_thirty'):
-                rt_thirty = self.test_data.rt[freq_indices]  # Use all values for ASTC
+            rt_thirty = self.test_data.rt[:16]
             rt_thirty = np.array(rt_thirty, dtype=np.float64).round(3)
 
             # Calculate background check exceptions
             self.ASTC_exceptions_backcheck = []
-            for i, val in enumerate(onethird_bkgrd):
-                background_diff = float(onethird_rec[i]) - float(val)
-                self.ASTC_exceptions_backcheck.append('0' if background_diff > 5 else '1')
+            background_diff = onethird_rec[:,2] - onethird_bkgrd[:,2]
+            self.ASTC_exceptions_backcheck.append('0' if background_diff.any() > 5 else '1')
 
             # Set single number result
             self.test_data.single_number_result = self.ASTC_final_val
@@ -1150,8 +1149,8 @@ class ASTCTestReport(BaseTestReport):
                 print(f"\nArray lengths before table creation:")
                 print(f"frequencies: {len(frequencies)}")
                 print(f"NR_val: {len(self.NR_val)}")
-                print(f"Background: {len(onethird_bkgrd)}")
-                print(f"Source room level: {len(onethird_srs)}")
+                print(f"Background: {len(onethird_bkgrd[:,2])}")
+                print(f"Source room level: {len(onethird_srs[:,2])}")
                 print(f"RT30: {len(rt_thirty)}")
                 print(f"Average corrected receiver room level: {len(self.ASTC_recieve_corr)}")
                 print(f"ASTC exceptions backcheck: {len(self.ASTC_exceptions_backcheck)}")
@@ -1173,10 +1172,10 @@ class ASTCTestReport(BaseTestReport):
                 for i in range(len(frequencies)):
                     try:
                         # Access numpy array values directly
-                        srs_val = float(onethird_srs.iloc[i] if hasattr(onethird_srs, 'iloc') else onethird_srs[i])
+                        srs_val = float(onethird_srs[2,i])
                         corr_rec_val = float(self.ASTC_recieve_corr[i])
-                        bkg_val = float(onethird_bkgrd.iloc[i] if hasattr(onethird_bkgrd, 'iloc') else onethird_bkgrd[i])
-                        rt_val = float(rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i])
+                        bkg_val = float(onethird_bkgrd[2,i])
+                        rt_val = float(rt_thirty[i])
                         NR_table_val = float(self.NR_val[i])
                         atl_val = float(self.ATL_val[i])
                         backgrnd_check_val = self.ASTC_exceptions_backcheck[i]
@@ -1352,16 +1351,16 @@ class NICTestReport(BaseTestReport):
             self.NIC_contour_val = calculated_values['NIC_contour_val']
             
             # Still need to load raw data for the report
-            freq_indices = slice(14, 30)  # Include 4kHz
+            freq_indices = slice(12, 29)  # Include 100, 4kHz
             onethird_srs = self.test_data.srs_data[freq_indices]
             onethird_srs = np.array(onethird_srs, dtype=np.float64).round(1)
+            print(f"NIC onethird_srs: {onethird_srs}")
             
             onethird_rec = self.test_data.recive_data[freq_indices]
-            onethird_rec = onethird_rec[:,2] # 2nd column is overall level, first is frequencies. 
+            # onethird_rec = onethird_rec[:,2] # 2nd column is overall level, first is frequencies. 
             onethird_rec = np.array(onethird_rec, dtype=np.float64).round(1)
             
             onethird_bkgrd = self.test_data.bkgrnd_data[freq_indices]
-            onethird_bkgrd = onethird_bkgrd[:,2] # 2nd column is overall level, first is frequencies. 
             onethird_bkgrd = np.array(onethird_bkgrd, dtype=np.float64).round(1)
             
             rt_thirty = self.test_data.rt # Use all values for NIC
@@ -1398,10 +1397,10 @@ class NICTestReport(BaseTestReport):
                 for i in range(len(frequencies)):
                     try:
                         # Access numpy array values directly
-                        srs_val = float(onethird_srs.iloc[i] if hasattr(onethird_srs, 'iloc') else onethird_srs[1,i])
+                        srs_val = float(onethird_srs[:,2][i])
                         corr_rec_val = float(self.ASTC_recieve_corr[i])
-                        bkg_val = float(onethird_bkgrd.iloc[i] if hasattr(onethird_bkgrd, 'iloc') else onethird_bkgrd[1,i])
-                        rt_val = float(rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i])
+                        bkg_val = float(onethird_bkgrd[:,2][i])
+                        rt_val = float(rt_thirty[i])
                         NR_table_val = float(self.NR_val[i])
                         row = [
                             str(frequencies[i]),
