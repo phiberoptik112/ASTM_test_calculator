@@ -1542,6 +1542,7 @@ class MainWindow(BoxLayout):
                 'NR_val': NR_val,
                 'ASTC_final_val': ASTC_final_val,
                 'ASTC_contour_val': ASTC_contour_val,
+                'ASTC_recieve_corr': ASTC_recieve_corr,
                 'sabines': sabines,
                 'room_vol': float(freq_data['room_props'].receive_vol)
             }
@@ -1803,7 +1804,7 @@ class MainWindow(BoxLayout):
             print(f"Room volume: {room_vol}")
             
             # Calculate NIC using the processed data
-            NR_val, NIC_contour_val, sabines, _, _, _ = calc_NR_new(
+            NR_val, NIC_contour_val, sabines, _, NIC_recieve_corr, _ = calc_NR_new(
                 freq_data['source'],
                 None,  # No AIIC data
                 freq_data['receive'],
@@ -1812,6 +1813,7 @@ class MainWindow(BoxLayout):
                 freq_data['rt']
             )
             NIC_final_val = calc_astc_val(NR_val)
+            print(f"NIC final value: {NIC_final_val}")
             if NR_val is not None:
                 print(f"NR values shape: {NR_val.shape if hasattr(NR_val, 'shape') else len(NR_val)}")
                 print(f"NIC contour value: {NIC_contour_val}")
@@ -1822,6 +1824,7 @@ class MainWindow(BoxLayout):
                     'NR_val': NR_val,
                     'NIC_contour_val': NIC_contour_val,
                     'NIC_final_val': NIC_final_val,
+                    'NIC_recieve_corr': NIC_recieve_corr,
                     'sabines': sabines,
                     'room_vol': room_vol
                 }

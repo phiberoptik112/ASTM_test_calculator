@@ -877,9 +877,8 @@ class AIICTestReport(BaseTestReport):
             # Background check exceptions
             print(f"AIIC_Normalized_recieve: {self.AIIC_Normalized_recieve}")
             print(f"onethird_bkgrd: {self.onethird_bkgrd}")
-            # Calculate background difference directly
-            ### 2nd column is overall background level, first is frequencies. 
-            background_diff = self.AIIC_Normalized_recieve - self.onethird_bkgrd[:,2]
+            # Calculate background difference using correct column (overall level)
+            background_diff = self.AIIC_Normalized_recieve - self.onethird_bkgrd[:,1]
             
             # Create exceptions list based on difference
             self.AIIC_exceptions_backcheck = ['0' if diff > 5 else '1' for diff in background_diff]
@@ -910,13 +909,16 @@ class AIICTestReport(BaseTestReport):
                 print(f"RT30: {type(rt_thirty)}")
                 print(f"Exceptions: {type(self.AIIC_Exceptions)}")
                 print(f"Backgrnd check Exceptions: {type(self.AIIC_exceptions_backcheck)}")
-                for i in range(len(self.onethird_bkgrd[2,:])):
+
+                # Correct the loop to iterate over frequencies
+                for i in range(len(frequencies)):
                     try:
                         anispl_val = float(self.AIIC_Normalized_recieve[i])
-                        bkg_val = float(self.onethird_bkgrd[2,i])
-                        rt_val = float(rt_thirty.iloc[i] if hasattr(rt_thirty, 'iloc') else rt_thirty[i])
+                        bkg_val = float(self.onethird_bkgrd[i,1])
+                        rt_val = float(rt_thirty[i])
                         exceptions_val = self.AIIC_Exceptions[i]
                         backgrnd_check_val = self.AIIC_exceptions_backcheck[i]
+                        
                         row = [
                             str(frequencies[i]),
                             f"{anispl_val:.1f}",
@@ -925,16 +927,17 @@ class AIICTestReport(BaseTestReport):
                             str(exceptions_val),
                             str(backgrnd_check_val)
                         ]
+                        print(f"Created row {i}: {row}")
                         table_data.append(row)
+                        
                     except Exception as e:
                         print(f"Error creating row {i}: {str(e)}")
                         print(f"Values at index {i}:")
-                        print(f"  ANISPL: {anispl_val}")
-                        print(f"  Background: {bkg_val}")
-                        print(f"  RT30: {rt_val}")
-                        print(f"  Exceptions: {exceptions_val}")
-                        print(f"  Backgrnd check: {backgrnd_check_val}")
+                        print(f"  ANISPL: {self.AIIC_Normalized_recieve[i] if i < len(self.AIIC_Normalized_recieve) else 'index error'}")
+                        print(f"  Background: {self.onethird_bkgrd[i] if i < len(self.onethird_bkgrd) else 'index error'}")
+                        print(f"  RT30: {rt_thirty[i] if i < len(rt_thirty) else 'index error'}")
                         continue
+
                 if len(table_data) > 1:
 
                     # First, create shorter header texts that will be more readable when rotated
@@ -1102,7 +1105,8 @@ class ASTCTestReport(BaseTestReport):
             print('-=-=-=-=-=-=-= Getting ASTC test results-=-=-=-=-=-=-=-=-')
             props = vars(self.test_data.room_properties)
             main_elements = []
-            
+                        # Define frequencies including 4kHz
+            frequencies = [100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
             # Get stored calculated values
             calculated_values = getattr(self.test_data, 'calculated_values', None)
             if not calculated_values:
@@ -1112,7 +1116,7 @@ class ASTCTestReport(BaseTestReport):
             self.ATL_val = calculated_values['ATL_val']
             self.NR_val = calculated_values['NR_val']
             self.sabines = calculated_values['sabines']
-            self.ASTC_recieve_corr = calculated_values.get('ASTC_recieve_corr')
+            self.ASTC_recieve_corr = calculated_values['ASTC_recieve_corr']
             self.ASTC_final_val = calculated_values['ASTC_final_val']
             self.ASTC_contour_val = calculated_values['ASTC_contour_val']
             
@@ -1130,27 +1134,27 @@ class ASTCTestReport(BaseTestReport):
             onethird_bkgrd = self.test_data.bkgrnd_data[freq_indices]
             onethird_bkgrd = np.array(onethird_bkgrd, dtype=np.float64).round(1)
             
-            rt_thirty = self.test_data.rt[:16]
+            rt_thirty = self.test_data.rt[:17]
             rt_thirty = np.array(rt_thirty, dtype=np.float64).round(3)
 
             # Calculate background check exceptions
             self.ASTC_exceptions_backcheck = []
-            background_diff = onethird_rec[:,2] - onethird_bkgrd[:,2]
-            self.ASTC_exceptions_backcheck.append('0' if background_diff.any() > 5 else '1')
+            for i in range(len(onethird_rec)):
+                background_diff = onethird_rec[i,1] - onethird_bkgrd[i,1]
+                self.ASTC_exceptions_backcheck.append('0' if background_diff > 5 else '1')
 
             # Set single number result
             self.test_data.single_number_result = self.ASTC_final_val
 
-            # Define frequencies including 4kHz
-            frequencies = [100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
+
 
             # Verify data for table creation
             if self.NR_val is not None and self.ASTC_recieve_corr is not None:
                 print(f"\nArray lengths before table creation:")
                 print(f"frequencies: {len(frequencies)}")
                 print(f"NR_val: {len(self.NR_val)}")
-                print(f"Background: {len(onethird_bkgrd[:,2])}")
-                print(f"Source room level: {len(onethird_srs[:,2])}")
+                print(f"Background: {len(onethird_bkgrd[:,1])}")
+                print(f"Source room level: {len(onethird_srs[:,1])}")
                 print(f"RT30: {len(rt_thirty)}")
                 print(f"Average corrected receiver room level: {len(self.ASTC_recieve_corr)}")
                 print(f"ASTC exceptions backcheck: {len(self.ASTC_exceptions_backcheck)}")
@@ -1172,9 +1176,9 @@ class ASTCTestReport(BaseTestReport):
                 for i in range(len(frequencies)):
                     try:
                         # Access numpy array values directly
-                        srs_val = float(onethird_srs[2,i])
+                        srs_val = float(onethird_srs[i,1])
                         corr_rec_val = float(self.ASTC_recieve_corr[i])
-                        bkg_val = float(onethird_bkgrd[2,i])
+                        bkg_val = float(onethird_bkgrd[i,1])
                         rt_val = float(rt_thirty[i])
                         NR_table_val = float(self.NR_val[i])
                         atl_val = float(self.ATL_val[i])
@@ -1346,7 +1350,7 @@ class NICTestReport(BaseTestReport):
             # Use stored values instead of recalculating
             self.NR_val = calculated_values['NR_val']
             self.sabines = calculated_values['sabines']
-            self.ASTC_recieve_corr = calculated_values.get('ASTC_recieve_corr')
+            self.NIC_recieve_corr = calculated_values['NIC_recieve_corr']
             self.NIC_final_val = calculated_values['NIC_final_val']
             self.NIC_contour_val = calculated_values['NIC_contour_val']
             
@@ -1373,14 +1377,14 @@ class NICTestReport(BaseTestReport):
             frequencies = [100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
 
             # Verify data for table creation
-            if self.NR_val is not None and self.ASTC_recieve_corr is not None:
+            if self.NR_val is not None and self.NIC_recieve_corr is not None:
                 print(f"\nArray lengths before table creation:")
                 print(f"frequencies: {len(frequencies)}")
                 print(f"Noise Reduction: {len(self.NR_val)}")
                 print(f"Background: {len(onethird_bkgrd)}")
                 print(f"Source room level: {len(onethird_srs)}")
                 print(f"RT30: {len(rt_thirty)}")
-                print(f"Average corrected receiver room level: {len(self.ASTC_recieve_corr)}")
+                print(f"Average corrected receiver room level: {self.NIC_recieve_corr}")
                 
                 # Create table data
                 table_data = [
@@ -1398,7 +1402,7 @@ class NICTestReport(BaseTestReport):
                     try:
                         # Access numpy array values directly
                         srs_val = float(onethird_srs[:,2][i])
-                        corr_rec_val = float(self.ASTC_recieve_corr[i])
+                        corr_rec_val = float(self.NIC_recieve_corr[i])
                         bkg_val = float(onethird_bkgrd[:,2][i])
                         rt_val = float(rt_thirty[i])
                         NR_table_val = float(self.NR_val[i])
@@ -1521,16 +1525,21 @@ class NICTestReport(BaseTestReport):
                                 1000, 1250, 1600, 2000, 2500, 3150, 4000])
         ## need to add 4k data here 
         # freq_series = freq_series.append(pd.Series([4000]))
-
+        STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4]  # Length 17
+        NIC_ref_curve = list()
+        for i in range(len(STCCurve)):
+            NIC_ref_curve.append(STCCurve[i] + self.NIC_final_val)
         # table_freqs = freq_series[mask].tolist()
         print(f'table_freqs: {freq_series.tolist()}')
-
+        print(f"NIC contour value: {self.NIC_contour_val}")
+        print(f"NIC value: {self.NIC_final_val}")
+        print(f"NR value: {self.NR_val}")
         NICRef_label = f'NIC {self.NIC_final_val} Contour'
         Field_NIC_label = 'Absorption Normalized Impact Sound Pressure Level, ANISPL (dB)'
         NIC_plot_img = plot_curves(
             frequencies=freq_series.tolist(),
             y_label=NIC_yAxis,
-            ref_curve=self.NIC_contour_val,
+            ref_curve=NIC_ref_curve,
             field_curve=np.array(self.NR_val),
             ref_label=NICRef_label,
             field_label=Field_NIC_label

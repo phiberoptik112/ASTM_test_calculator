@@ -708,8 +708,8 @@ def plot_curves(frequencies: List[float], y_label: str, ref_curve: np.ndarray,
     # Verify input shapes
     print(f"Plot input shapes:")
     print(f"frequencies: {len(frequencies)}")
-    print(f"ref_curve: {len(ref_curve)}")
-    print(f"field_curve: {len(field_curve)}")
+    print(f"ref_curve: {ref_curve}")
+    print(f"field_curve: {field_curve}")
     
     # Create figure
     plt.figure(figsize=(10, 6))

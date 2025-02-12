@@ -206,6 +206,7 @@ class TestProcessor:
                     'ATL_val': calculated_values['ATL_val'],
                     'ASTC_final_val': calculated_values['ASTC_final_val'],
                     'ASTC_contour_val': calculated_values['ASTC_contour_val'],
+                    'ASTC_recieve_corr': calculated_values['ASTC_recieve_corr'],
                     'sabines': calculated_values['sabines'],
                     'room_vol': calculated_values['room_vol']
                 }
@@ -214,6 +215,8 @@ class TestProcessor:
                 test_data.calculated_values = {
                     'NR_val': calculated_values['NR_val'],
                     'NIC_contour_val': calculated_values['NIC_contour_val'],
+                    'NIC_final_val': calculated_values['NIC_final_val'],
+                    'NIC_recieve_corr': calculated_values['NIC_recieve_corr'],
                     'sabines': calculated_values['sabines'],
                     'room_vol': calculated_values['room_vol']
                 }
