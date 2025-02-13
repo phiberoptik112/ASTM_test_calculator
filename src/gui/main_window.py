@@ -195,7 +195,61 @@ class MainWindow(BoxLayout):
     def _create_analysis_section(self):
         """Create analysis dashboard section"""
         self.analysis_tabs = TabbedPanel(size_hint_y=0.5)
+        # Test Plan Tab
+        test_plan_tab = TabbedPanelItem(text='Test Plan')
+        test_plan_tab.do_default_tab = True  # Make this the default tab
         
+        # Create scrollable grid layout for test plan data
+        scroll = ScrollView()
+        grid = GridLayout(
+            cols=1,  # One column for the table
+            spacing=2,
+            size_hint_y=None,
+            padding=5
+        )
+        grid.bind(minimum_height=grid.setter('height'))
+        
+        # Add test plan data if available
+        if hasattr(self.test_data_manager, 'test_plan_df'):
+            # Create header row
+            header = GridLayout(
+                cols=len(self.test_data_manager.test_plan_df.columns),
+                size_hint_y=None,
+                height=40
+            )
+            for col in self.test_data_manager.test_plan_df.columns:
+                header.add_widget(Label(
+                    text=str(col),
+                    bold=True,
+                    size_hint_y=None,
+                    height=40
+                ))
+            grid.add_widget(header)
+            
+            # Add data rows
+            for _, row in self.test_data_manager.test_plan_df.iterrows():
+                data_row = GridLayout(
+                    cols=len(row),
+                    size_hint_y=None,
+                    height=30
+                )
+                for value in row:
+                    data_row.add_widget(Label(
+                        text=str(value),
+                        size_hint_y=None,
+                        height=30
+                    ))
+                grid.add_widget(data_row)
+        else:
+            grid.add_widget(Label(
+                text='No test plan data loaded',
+                size_hint_y=None,
+                height=40
+            ))
+            
+        scroll.add_widget(grid)
+        test_plan_tab.add_widget(scroll)
+        self.analysis_tabs.add_widget(test_plan_tab)
         # Results Tab
         results_tab = TabbedPanelItem(text='Results')
         self.results_dashboard = ResultsAnalysisDashboard(self.test_data_manager)
@@ -1383,12 +1437,35 @@ class MainWindow(BoxLayout):
             print(f"AIIC_contour_val: {AIIC_contour_val}")
             print(f"AIIC_contour_result: {AIIC_contour_result}")
             
+            # Process exceptions
+            AIIC_Exceptions = []
+            AIIC_exceptions_backcheck = []
+            rec_roomvol = float(freq_data['room_props'].receive_vol)
+
+            # Calculate exceptions using stored values
+            for val in sabines:
+                val_float = float(val)
+                AIIC_Exceptions.append('1' if val_float > 2 * rec_roomvol**(2/3) else '0')
+
+            # Background check exceptions
+            print(f"AIIC_Normalized_recieve: {AIIC_Normalized_recieve}")
+            print(f"onethird_bkgrd: {freq_data['background']}")
+            # Calculate background difference using correct column (overall level)
+            background_diff = AIIC_Normalized_recieve - freq_data['background']
+            
+            # Create exceptions list based on difference
+            AIIC_exceptions_backcheck = ['0' if diff > 5 else '1' for diff in background_diff]
+            print(f"AIIC_exceptions_backcheck: {AIIC_exceptions_backcheck}")
+            #########################################################
+
             # Create return dictionary
             calculated_values = {
                 'NR_val': NR_val,
                 'sabines': sabines.copy() if hasattr(sabines, 'copy') else sabines,  # Ensure we store a copy
                 'AIIC_recieve_corr': AIIC_recieve_corr,
                 'AIIC_Normalized_recieve': AIIC_Normalized_recieve,
+                'AIIC_Exceptions': AIIC_Exceptions,
+                'AIIC_exceptions_backcheck': AIIC_exceptions_backcheck,
                 'positions': freq_data['positions'],
                 'AIIC_contour_val': AIIC_contour_val,
                 'AIIC_contour_result': AIIC_contour_result,
@@ -1427,6 +1504,9 @@ class MainWindow(BoxLayout):
             # initial application of the IIC curve to the first AIIC start value 
             for vals in IIC_curve:
                 IIC_contour_final.append(vals+(110-results['AIIC_contour_val']))
+            #########################################################
+
+
             # Plot normalized receive levels on ax2
             ax2.plot(freq_data['target_freqs'], results['AIIC_Normalized_recieve'], 
                     label='Normalized Impact Sound Level', 
@@ -1436,6 +1516,12 @@ class MainWindow(BoxLayout):
             ax2.plot(freq_data['target_freqs'], IIC_contour_final, 
                     label=f'AIIC {results["AIIC_contour_val"]} Contour', 
                     color='red', linestyle='--')
+            # Plot background check exceptions
+            for i, (freq, level, exception) in enumerate(zip(freq_data['target_freqs'], 
+                                                           results['AIIC_Normalized_recieve'],
+                                                           results['AIIC_exceptions_backcheck'])):
+                if exception == '1':
+                    ax2.axvline(x=freq, color='orange', alpha=0.6, linestyle='--', label='Background Check Exception')
             
             # Update axis labels for AIIC
             ax2.set_title('AIIC Analysis')

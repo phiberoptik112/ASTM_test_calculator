@@ -864,7 +864,7 @@ class AIICTestReport(BaseTestReport):
             self.ISR_contour_val = self.calculated_values.get('ISR_contour_val')
             self.ISR_contour_result = self.calculated_values.get('ISR_contour_result')
             
-            # Process exceptions
+            ##### Process exceptions #### moving this to the debug plot in main_window.py
             self.AIIC_Exceptions = []
             self.AIIC_exceptions_backcheck = []
             rec_roomvol = float(props['receive_vol'])
@@ -882,7 +882,8 @@ class AIICTestReport(BaseTestReport):
             
             # Create exceptions list based on difference
             self.AIIC_exceptions_backcheck = ['0' if diff > 5 else '1' for diff in background_diff]
-
+            #########################################################
+            
             self.test_data.single_number_result = self.AIIC_contour_val
 
             # Continue with existing table creation code...
