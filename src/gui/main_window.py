@@ -193,74 +193,71 @@ class MainWindow(BoxLayout):
         self.add_widget(test_controls)
 
     def _create_analysis_section(self):
-        """Create analysis dashboard section"""
+        """Create analysis dashboard section with integrated update methods"""
         self.analysis_tabs = TabbedPanel(size_hint_y=0.5)
-        # Test Plan Tab
-        test_plan_tab = TabbedPanelItem(text='Test Plan')
-        test_plan_tab.do_default_tab = True  # Make this the default tab
         
-        # Create scrollable grid layout for test plan data
-        scroll = ScrollView()
-        grid = GridLayout(
-            cols=1,  # One column for the table
+        # Test Plan Tab with integrated update functionality
+        self.test_plan_tab = TabbedPanelItem(text='Test Plan')
+        self.test_plan_tab.do_default_tab = True
+        
+        self.test_plan_scroll = ScrollView()
+        self.test_plan_grid = GridLayout(
+            cols=1,
             spacing=2,
             size_hint_y=None,
             padding=5
         )
-        grid.bind(minimum_height=grid.setter('height'))
+        self.test_plan_grid.bind(minimum_height=self.test_plan_grid.setter('height'))
         
-        # Add test plan data if available
-        if hasattr(self.test_data_manager, 'test_plan_df'):
-            # Create header row
-            header = GridLayout(
-                cols=len(self.test_data_manager.test_plan_df.columns),
-                size_hint_y=None,
-                height=40
-            )
-            for col in self.test_data_manager.test_plan_df.columns:
-                header.add_widget(Label(
-                    text=str(col),
-                    bold=True,
-                    size_hint_y=None,
-                    height=40
-                ))
-            grid.add_widget(header)
-            
-            # Add data rows
-            for _, row in self.test_data_manager.test_plan_df.iterrows():
-                data_row = GridLayout(
-                    cols=len(row),
-                    size_hint_y=None,
-                    height=30
-                )
-                for value in row:
-                    data_row.add_widget(Label(
-                        text=str(value),
-                        size_hint_y=None,
-                        height=30
-                    ))
-                grid.add_widget(data_row)
-        else:
-            grid.add_widget(Label(
-                text='No test plan data loaded',
-                size_hint_y=None,
-                height=40
-            ))
-            
-        scroll.add_widget(grid)
-        test_plan_tab.add_widget(scroll)
-        self.analysis_tabs.add_widget(test_plan_tab)
-        # Results Tab
+        self.test_plan_scroll.add_widget(self.test_plan_grid)
+        self.test_plan_tab.add_widget(self.test_plan_scroll)
+        self.analysis_tabs.add_widget(self.test_plan_tab)
+        
+        # Results Tab - reuse existing dashboard
         results_tab = TabbedPanelItem(text='Results')
         self.results_dashboard = ResultsAnalysisDashboard(self.test_data_manager)
         results_tab.add_widget(self.results_dashboard)
         self.analysis_tabs.add_widget(results_tab)
         
-        # Raw Data Tab
-        raw_data_tab = TabbedPanelItem(text='Raw Data')
+        # Raw Data Tab - integrate with view_test_data functionality
+        self.raw_data_tab = TabbedPanelItem(text='Raw Data')
+        self.raw_data_layout = BoxLayout(orientation='vertical')
+        
+        # Add test selection controls
+        test_controls = BoxLayout(
+            orientation='horizontal',
+            size_hint_y=None,
+            height=40
+        )
+        self.raw_data_test_input = TextInput(
+            multiline=False,
+            hint_text='Enter test number',
+            size_hint_x=0.7
+        )
+        view_button = Button(
+            text='View Data',
+            size_hint_x=0.3
+        )
+        view_button.bind(on_press=self.view_test_data)
+        
+        test_controls.add_widget(self.raw_data_test_input)
+        test_controls.add_widget(view_button)
+        
+        self.raw_data_layout.add_widget(test_controls)
+        
+        # Scrollable data view
         self.raw_data_view = ScrollView()
-        raw_data_tab.add_widget(self.raw_data_view)
-        self.analysis_tabs.add_widget(raw_data_tab)
+        self.raw_data_grid = GridLayout(
+            cols=1,
+            spacing=2,
+            size_hint_y=None
+        )
+        self.raw_data_grid.bind(minimum_height=self.raw_data_grid.setter('height'))
+        self.raw_data_view.add_widget(self.raw_data_grid)
+        self.raw_data_layout.add_widget(self.raw_data_view)
+        
+        self.raw_data_tab.add_widget(self.raw_data_layout)
+        self.analysis_tabs.add_widget(self.raw_data_tab)
         
         self.add_widget(self.analysis_tabs)
 
@@ -364,11 +361,9 @@ class MainWindow(BoxLayout):
                 if debug_mode:
                     print("\nLoading test plan...")
                 self.test_data_manager.load_test_plan()
-            except Exception as e:
-                raise ValueError(f"Error loading test plan: {str(e)}")
-            
-            # Process test data
-            try:
+                self.update_displays()  # Add this line to update all displays
+                
+                # Process test data
                 if debug_mode:
                     print("\nProcessing test data...")
                 self.test_data_manager.process_test_data()
@@ -390,7 +385,7 @@ class MainWindow(BoxLayout):
                 return True
                 
             except Exception as e:
-                raise ValueError(f"Error processing test data: {str(e)}")
+                raise ValueError(f"Error loading test plan: {str(e)}")
                 
         except Exception as e:
             error_msg = f"Error loading data: {str(e)}"
@@ -453,15 +448,42 @@ class MainWindow(BoxLayout):
                 print(f"Error calculating test: {str(e)}")
 
     def view_test_data(self, instance):
-        """View raw data for current test"""
+        """View raw data for current test - integrated with Raw Data tab"""
         try:
-            test_number = self.test_number_input.text
+            test_number = self.raw_data_test_input.text or self.test_number_input.text
             if not test_number:
                 raise ValueError("Please enter a test number")
-                
-            # Implementation similar to ASTC_GUI_proto's view_test_data
-            # but integrated with TestDataManager
+        
+            # Clear existing data
+            self.raw_data_grid.clear_widgets()
             
+            # Get test data
+            test_data = self.test_data_manager.get_test_data(test_number)
+            if test_data:
+                # Display test information
+                self._add_data_section("Test Information", {
+                    "Test Number": test_number,
+                    "Test Type": test_data.get('test_type', 'Unknown'),
+                    "Date": test_data.get('test_date', 'Unknown')
+                })
+                
+                # Display raw measurements
+                if 'measurements' in test_data:
+                    self._add_data_section("Raw Measurements", test_data['measurements'])
+                
+                # Display calculated values
+                if 'calculated_values' in test_data:
+                    self._add_data_section("Calculated Values", test_data['calculated_values'])
+                
+                # Switch to raw data tab
+                self.raw_data_tab.state = 'down'
+            else:
+                self.raw_data_grid.add_widget(Label(
+                    text=f'No data found for test {test_number}',
+                    size_hint_y=None,
+                    height=40
+                ))
+                
         except Exception as e:
             self.status_label.text = f'Status: Error viewing test data - {str(e)}'
             if self.debug_checkbox.active:
@@ -2023,6 +2045,167 @@ class MainWindow(BoxLayout):
         except Exception as e:
             print(f"Error converting test data: {str(e)}")
             raise
+
+    def _add_data_section(self, title, data_dict):
+        """Helper method to add a section of data to the raw data view"""
+        # Add section title
+        self.raw_data_grid.add_widget(Label(
+            text=title,
+            bold=True,
+            size_hint_y=None,
+            height=40
+        ))
+        
+        # Add data rows
+        for key, value in data_dict.items():
+            row = BoxLayout(
+                orientation='horizontal',
+                size_hint_y=None,
+                height=30
+            )
+            row.add_widget(Label(
+                text=str(key),
+                size_hint_x=0.4
+            ))
+            row.add_widget(Label(
+                text=str(value),
+                size_hint_x=0.6
+            ))
+            self.raw_data_grid.add_widget(row)
+
+    def _update_test_plan_display(self):
+        """Update the test plan grid with current test plan data"""
+        # Clear existing widgets
+        self.test_plan_grid.clear_widgets()
+        
+        test_plan = self.test_data_manager.test_plan
+        
+        try:
+            # Set a fixed height for the test plan grid (adjust this value as needed)
+            self.test_plan_grid.height = 400  # This will show approximately 12-13 rows at once
+            
+            # Create a horizontal ScrollView container
+            h_scroll = ScrollView(
+                size_hint=(1, None),
+                height=400,  # Match the grid height
+                do_scroll_y=False,
+                do_scroll_x=True,
+                bar_width=10,
+                scroll_type=['bars', 'content']
+            )
+            
+            # Create main container for all content
+            content_grid = GridLayout(
+                cols=1,
+                spacing=2,
+                size_hint=(None, None),
+                padding=5
+            )
+            content_grid.bind(minimum_height=content_grid.setter('height'))
+            
+            # Set content width based on number of columns
+            column_width = 150
+            content_width = column_width * len(test_plan.columns)
+            content_grid.width = content_width
+            
+            # Create header row
+            header = GridLayout(
+                cols=len(test_plan.columns),
+                size_hint=(None, None),
+                height=40,
+                width=content_width,
+                spacing=2
+            )
+            
+            # Add column headers
+            for col in test_plan.columns:
+                header_label = Label(
+                    text=str(col),
+                    bold=True,
+                    size_hint=(None, None),
+                    width=column_width,
+                    height=40,
+                    text_size=(column_width-10, 40),
+                    halign='center',
+                    valign='middle'
+                )
+                header.add_widget(header_label)
+            content_grid.add_widget(header)
+            
+            # Create scrollable data container
+            data_grid = GridLayout(
+                cols=len(test_plan.columns),
+                size_hint=(None, None),
+                width=content_width,
+                spacing=2
+            )
+            data_grid.bind(minimum_height=data_grid.setter('height'))
+            
+            # Add data rows
+            for _, row in test_plan.iterrows():
+                for value in row:
+                    cell_label = Label(
+                        text=str(value),
+                        size_hint=(None, None),
+                        width=column_width,
+                        height=30,
+                        text_size=(column_width-10, 30),
+                        halign='center',
+                        valign='middle'
+                    )
+                    data_grid.add_widget(cell_label)
+            
+            # Create vertical scroll view for data
+            v_scroll = ScrollView(
+                size_hint=(1, None),
+                height=360,  # Grid height minus header height
+                do_scroll_x=False,
+                bar_width=10,
+                scroll_type=['bars', 'content']
+            )
+            
+            v_scroll.add_widget(data_grid)
+            content_grid.add_widget(v_scroll)
+            
+            # Add the content grid to the horizontal scroll view
+            h_scroll.add_widget(content_grid)
+            
+            # Add the horizontal scroll view to the main grid
+            self.test_plan_grid.add_widget(h_scroll)
+            
+        except Exception as e:
+            print(f"Error updating test plan display: {str(e)}")
+            traceback.print_exc()
+            self.test_plan_grid.add_widget(Label(
+                text=f'Error displaying test plan: {str(e)}',
+                size_hint_y=None,
+                height=40
+            ))
+
+    def update_displays(self):
+        """Central method to update all displays"""
+        try:
+            # Update test plan display
+            self.test_plan_grid.clear_widgets()
+            if hasattr(self.test_data_manager, 'test_plan') and self.test_data_manager.test_plan is not None:
+                self._update_test_plan_display()
+            else:
+                self.test_plan_grid.add_widget(Label(
+                    text='No test plan data loaded',
+                    size_hint_y=None,
+                    height=40
+                ))
+            
+            # Update results dashboard
+            if hasattr(self, 'results_dashboard'):
+                self.results_dashboard.update_data(self.test_data_manager)
+            
+            # Clear raw data view
+            self.raw_data_grid.clear_widgets()
+            
+        except Exception as e:
+            print(f"Error in update_displays: {str(e)}")
+            self.status_label.text = f'Status: Error updating displays - {str(e)}'
 
 class MainApp(App):
     def build(self):
