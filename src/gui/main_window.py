@@ -164,7 +164,7 @@ class MainWindow(BoxLayout):
         ))
         self.test_number_input = TextInput(
             multiline=False,
-            hint_text='Enter test number'
+            hint_text='Enter test number and test type'
         )
         test_input_layout.add_widget(self.test_number_input)
         test_controls.add_widget(test_input_layout)
@@ -231,7 +231,7 @@ class MainWindow(BoxLayout):
         )
         self.raw_data_test_input = TextInput(
             multiline=False,
-            hint_text='Enter test number',
+            hint_text='Enter test number and test type',
             size_hint_x=0.7
         )
         view_button = Button(
@@ -450,20 +450,24 @@ class MainWindow(BoxLayout):
     def view_test_data(self, instance):
         """View raw data for current test - integrated with Raw Data tab"""
         try:
-            test_number = self.raw_data_test_input.text or self.test_number_input.text
+            input_text = self.raw_data_test_input.text or self.test_number_input.text
+            test_number, test_type = input_text.split(',') if ',' in input_text else (input_text, None)
+            test_number = test_number.strip()
+            if test_type:
+                test_type = test_type.strip()
             if not test_number:
-                raise ValueError("Please enter a test number")
+                raise ValueError("Please enter a test number and test type")
         
             # Clear existing data
             self.raw_data_grid.clear_widgets()
             
             # Get test data
-            test_data = self.test_data_manager.get_test_data(test_number)
+            test_data = self.test_data_manager.get_test_data(test_number, test_type)
             if test_data:
                 # Display test information
                 self._add_data_section("Test Information", {
                     "Test Number": test_number,
-                    "Test Type": test_data.get('test_type', 'Unknown'),
+                    "Test Type": test_type,
                     "Date": test_data.get('test_date', 'Unknown')
                 })
                 
