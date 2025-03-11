@@ -2104,7 +2104,7 @@ class MainWindow(BoxLayout):
             content_grid.bind(minimum_height=content_grid.setter('height'))
             
             # Set content width based on number of columns
-            column_width = 150
+            column_width = 300
             content_width = column_width * len(test_plan.columns)
             content_grid.width = content_width
             
@@ -2124,8 +2124,8 @@ class MainWindow(BoxLayout):
                     bold=True,
                     size_hint=(None, None),
                     width=column_width,
-                    height=40,
-                    text_size=(column_width-10, 40),
+                    height=60,
+                    text_size=(column_width-10, 60),
                     halign='center',
                     valign='middle'
                 )
@@ -2148,8 +2148,8 @@ class MainWindow(BoxLayout):
                         text=str(value),
                         size_hint=(None, None),
                         width=column_width,
-                        height=30,
-                        text_size=(column_width-10, 30),
+                        height=60,
+                        text_size=(column_width-10, 60),
                         halign='center',
                         valign='middle'
                     )
@@ -2159,7 +2159,7 @@ class MainWindow(BoxLayout):
             v_scroll = ScrollView(
                 size_hint=(1, None),
                 height=360,  # Grid height minus header height
-                do_scroll_x=False,
+                do_scroll_x=True,
                 bar_width=10,
                 scroll_type=['bars', 'content']
             )
