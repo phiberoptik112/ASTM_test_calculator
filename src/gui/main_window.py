@@ -36,7 +36,7 @@ from data_processor import (
     AIICTestData,
     ASTCTestData,
     NICTestData,
-    DTCtestData,
+    DTCtestData,    
     TestData,
     calc_NR_new,
     calc_AIIC_val_claude,
@@ -214,10 +214,10 @@ class MainWindow(BoxLayout):
         self.analysis_tabs.add_widget(self.test_plan_tab)
         
         # Results Tab - reuse existing dashboard
-        results_tab = TabbedPanelItem(text='Results')
+        self.results_tab = TabbedPanelItem(text='Results Dashboard')
         self.results_dashboard = ResultsAnalysisDashboard(self.test_data_manager)
-        results_tab.add_widget(self.results_dashboard)
-        self.analysis_tabs.add_widget(results_tab)
+        self.results_tab.add_widget(self.results_dashboard)
+        self.analysis_tabs.add_widget(self.results_tab)
         
         # Raw Data Tab - integrate with view_test_data functionality
         self.raw_data_tab = TabbedPanelItem(text='Raw Data')
@@ -1025,6 +1025,14 @@ class MainWindow(BoxLayout):
             test_data = self.test_data_manager.test_data_collection[test_label]
             print(f"Available test types: {list(test_data.keys())}")
             
+            # Debug: Print test_data_manager state
+            print("\nTest Data Manager State:")
+            print(f"Type: {type(self.test_data_manager)}")
+            print(f"Has test_data_collection: {hasattr(self.test_data_manager, 'test_data_collection')}")
+            print(f"test_data_collection length: {len(self.test_data_manager.test_data_collection) if hasattr(self.test_data_manager, 'test_data_collection') else 'N/A'}")
+            print(f"Has test_plan: {hasattr(self.test_data_manager, 'test_plan')}")
+            print(f"test_plan is None: {self.test_data_manager.test_plan is None if hasattr(self.test_data_manager, 'test_plan') else 'N/A'}")
+            
             # Debug: Print collection structure
             print("\nTest Collection Structure:")
             for test_type, data in test_data.items():
@@ -1162,6 +1170,9 @@ class MainWindow(BoxLayout):
                             print(f"    {key} length: {len(value)}")
                         else:
                             print(f"    {key} type: {type(value)}")
+            
+            # Refresh the results dashboard after storing values
+            self.refresh_results_dashboard()
             
         except Exception as e:
             error_msg = f"Error storing calculated values: {str(e)}"
@@ -2211,6 +2222,40 @@ class MainWindow(BoxLayout):
             print(f"Error in update_displays: {str(e)}")
             self.status_label.text = f'Status: Error updating displays - {str(e)}'
 
+    def refresh_results_dashboard(self):
+        """Refresh the results dashboard to show updated data"""
+        try:
+            if hasattr(self, 'results_dashboard'):
+                print("Refreshing results dashboard...")
+                
+                # First update the dashboard's reference to the test data
+                if hasattr(self, 'test_data_manager') and hasattr(self.test_data_manager, 'test_data_collection'):
+                    print(f"Passing test_data_collection with {len(self.test_data_manager.test_data_collection)} items to dashboard")
+                    
+                    # Explicitly update the dashboard's reference to the manager
+                    self.results_dashboard.test_data_manager = self.test_data_manager
+                    
+                    # Also provide direct access to the collection via a dedicated property
+                    if not hasattr(self.results_dashboard, 'direct_test_collection'):
+                        # Add the property if it doesn't exist
+                        setattr(self.results_dashboard, 'direct_test_collection', {})
+                    
+                    # Update the direct collection reference
+                    self.results_dashboard.direct_test_collection = self.test_data_manager.test_data_collection
+                    print(f"Direct collection reference set with {len(self.test_data_manager.test_data_collection)} items")
+                
+                # Then refresh the display
+                if hasattr(self.results_dashboard, 'refresh_results'):
+                    self.results_dashboard.refresh_results()
+                
+                # Also select the results tab to show updated data
+                if hasattr(self, 'results_tab') and hasattr(self, 'analysis_tabs'):
+                    self.analysis_tabs.switch_to(self.results_tab)
+                    print("Switched to Results Dashboard tab")
+        except Exception as e:
+            print(f"Error refreshing results dashboard: {str(e)}")
+            traceback.print_exc()
+            
 class MainApp(App):
     def build(self):
         return MainWindow()
