@@ -229,12 +229,12 @@ class ResultsAnalysisDashboard(BoxLayout):
             
             if test_type == TestType.AIIC:
                 # Look for AIIC values
-                if 'AIIC_contour_result' in calculated_values:
-                    print(f"Found AIIC result: {calculated_values['AIIC_contour_result']}")
-                    return f"AIIC {calculated_values['AIIC_contour_result']}"
-                elif 'AIIC_contour_val' in calculated_values:
+                if 'AIIC_contour_val' in calculated_values:
                     print(f"Found AIIC val: {calculated_values['AIIC_contour_val']}")
                     return f"AIIC {calculated_values['AIIC_contour_val']}"
+                elif 'AIIC_contour_result' in calculated_values:
+                    print(f"Found AIIC result: {calculated_values['AIIC_contour_result']}")
+                    return f"AIIC {calculated_values['AIIC_contour_result']}"
             
             elif test_type == TestType.ASTC:
                 # Look for ASTC values
