@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import List, Tuple, Dict, Union
 from enum import Enum
 from pathlib import Path
-import matplotlib.pyplot as plt
+
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -23,6 +23,7 @@ from matplotlib import ticker
 import matplotlib.ticker as ticker
 from typing import List
 import tempfile
+import traceback
 
 @dataclass
 class RoomProperties:
@@ -219,22 +220,78 @@ def calc_NR_new(srs_overalloct, AIIC_rec_overalloct, ASTC_rec_overalloct, bkgrnd
     try:
         # Determine test type and expected length based on input
         if AIIC_rec_overalloct is not None:
-            # AIIC Test (16 values: 100-3150 Hz)
-            expected_length = 16
+            test_type = "AIIC"
+            expected_length = 16  # 100-3150 Hz
+            freq_range = "100-3150 Hz"
             STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]
         else:
-            # ASTC/NIC Test (17 values: 100-4000 Hz)
-            expected_length = 17
+            test_type = "ASTC/NIC"
+            expected_length = 17  # 100-4000 Hz
+            freq_range = "100-4000 Hz"
             STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4]
+
+        print(f"\n=== Processing {test_type} Test Data ===")
+        print(f"Expected: {expected_length} values ({freq_range})")
+        
+        # Debug input data types and shapes
+        print("\nInput Data Analysis:")
+        print(f"Source data type: {type(srs_overalloct)}")
+        print(f"Source length: {len(srs_overalloct) if hasattr(srs_overalloct, '__len__') else 'no length'}")
+        if isinstance(srs_overalloct, pd.Series):
+            print(f"Source index: {srs_overalloct.index.tolist()}")
+        
+        print(f"\nBackground data type: {type(bkgrnd_overalloct)}")
+        print(f"Background length: {len(bkgrnd_overalloct) if hasattr(bkgrnd_overalloct, '__len__') else 'no length'}")
+        if isinstance(bkgrnd_overalloct, pd.Series):
+            print(f"Background index: {bkgrnd_overalloct.index.tolist()}")
+        
+        print(f"\nRT thirty data type: {type(rt_thirty)}")
+        print(f"RT thirty length: {len(rt_thirty) if hasattr(rt_thirty, '__len__') else 'no length'}")
+        if isinstance(rt_thirty, pd.Series):
+            print(f"RT thirty index: {rt_thirty.index.tolist()}")
+        
+        if AIIC_rec_overalloct is not None:
+            print(f"\nAIIC receive data type: {type(AIIC_rec_overalloct)}")
+            print(f"AIIC receive length: {len(AIIC_rec_overalloct) if hasattr(AIIC_rec_overalloct, '__len__') else 'no length'}")
+        
+        if ASTC_rec_overalloct is not None:
+            print(f"\nASTC receive data type: {type(ASTC_rec_overalloct)}")
+            print(f"ASTC receive length: {len(ASTC_rec_overalloct) if hasattr(ASTC_rec_overalloct, '__len__') else 'no length'}")
+
+        # Verify array lengths before processing
+        input_lengths = {
+            'Source': len(srs_overalloct) if hasattr(srs_overalloct, '__len__') else None,
+            'Background': len(bkgrnd_overalloct) if hasattr(bkgrnd_overalloct, '__len__') else None,
+            'RT thirty': len(rt_thirty) if hasattr(rt_thirty, '__len__') else None,
+            'AIIC receive': len(AIIC_rec_overalloct) if AIIC_rec_overalloct is not None and hasattr(AIIC_rec_overalloct, '__len__') else None,
+            'ASTC receive': len(ASTC_rec_overalloct) if ASTC_rec_overalloct is not None and hasattr(ASTC_rec_overalloct, '__len__') else None
+        }
+
+        # Check for length mismatches
+        length_issues = {name: length for name, length in input_lengths.items() 
+                        if length is not None and length != expected_length}
+        
+        if length_issues:
+            error_msg = f"\nLength mismatch detected for {test_type} test:\n"
+            error_msg += f"Expected length: {expected_length}\n"
+            error_msg += "Actual lengths:\n"
+            print(f"srs_overalloct: {srs_overalloct}")
+            print(f"AIIC_rec_overalloct: {AIIC_rec_overalloct}")
+            print(f"ASTC_rec_overalloct: {ASTC_rec_overalloct}")
+            print(f"bkgrnd_overalloct: {bkgrnd_overalloct}")
+            print(f"rt_thirty: {rt_thirty}")
+            for name, length in length_issues.items():
+                error_msg += f"- {name}: {length}\n"
+            raise ValueError(error_msg)
+        
+
+        # If we get here, proceed with the calculation
+        print("\nAll input arrays verified with correct length. Proceeding with calculations...")
 
         # Convert inputs to numpy arrays without additional slicing
         bkgrnd_overalloct = pd.to_numeric(bkgrnd_overalloct).to_numpy() if isinstance(bkgrnd_overalloct, pd.Series) else np.array(bkgrnd_overalloct)
         rt_thirty = rt_thirty.to_numpy() if isinstance(rt_thirty, pd.Series) else np.array(rt_thirty)
         srs_overalloct = pd.to_numeric(srs_overalloct).to_numpy() if isinstance(srs_overalloct, pd.Series) else np.array(srs_overalloct)
-
-        # Verify array lengths
-        if not all(len(arr) == expected_length for arr in [bkgrnd_overalloct, rt_thirty, srs_overalloct]):
-            raise ValueError(f"Input arrays must have length {expected_length}")
 
         # Calculate sabines
         sabines = 0.049 * recieve_roomvol/rt_thirty
@@ -393,96 +450,108 @@ def calculate_nic_curve(NIC_val_list, STCCurve, NIC_start):
 def calc_atl_val(srs_overalloct: pd.Series, rec_overalloct: pd.Series, 
                  bkgrnd_overalloct: pd.Series, rt_thirty: pd.Series, 
                  partition_area: float, receive_roomvol: float) -> pd.Series:
-    ASTC_vollimit = 883
-    if receive_roomvol > ASTC_vollimit:
-        print('Using NIC calc, room volume too large')
-    # constant = np.int32(20.047*np.sqrt(273.15+20))
-    # intermed = 30/rt_thirty ## why did i do this? not right....sabines calc is off
-    # thisval = np.int32(recieve_roomvol*intermed)
-    # sabines =thisval/constant
+    """Calculate ATL values"""
+    try:
+        print("\nATL Calculation Input Validation:")
+        print(f"Source data shape: {srs_overalloct.shape if hasattr(srs_overalloct, 'shape') else len(srs_overalloct)}")
+        print(f"Receive data shape: {rec_overalloct.shape if hasattr(rec_overalloct, 'shape') else len(rec_overalloct)}")
+        print(f"Background data shape: {bkgrnd_overalloct.shape if hasattr(bkgrnd_overalloct, 'shape') else len(bkgrnd_overalloct)}")
+        print(f"RT data shape: {rt_thirty.shape if hasattr(rt_thirty, 'shape') else len(rt_thirty)}")
+        
+        ASTC_vollimit = 883
+        if receive_roomvol > ASTC_vollimit:
+            print('Using NIC calc, room volume too large')
+        # constant = np.int32(20.047*np.sqrt(273.15+20))
+        # intermed = 30/rt_thirty ## why did i do this? not right....sabines calc is off
+        # thisval = np.int32(recieve_roomvol*intermed)
+        # sabines =thisval/constant
 
-    # RT value is right, why is this not working? - RT value MUST NOT BE ROUNDED TO 2 DECIMALS
-    # print('recieve roomvol: ',recieve_roomvol)
-    if isinstance(rt_thirty, pd.DataFrame):
-        rt_thirty = rt_thirty.values
-    print('rt_thirty: ',rt_thirty)
-    print('receive roomvol: ',receive_roomvol)
-    sabines = 0.049*receive_roomvol/rt_thirty  # this produces accurate sabines values
-    ## sabines gets this calc, but is still not accurate to spreadhseet reference, even with the right rt_thirty value
-    if isinstance(bkgrnd_overalloct, pd.DataFrame):
-        bkgrnd_overalloct = bkgrnd_overalloct.values
-    print('bkgrnd_overalloct: ',bkgrnd_overalloct)
-    sabines = np.int32(sabines) 
-    sabines = np.round(sabines)
-    # print('sabines: ',sabines)
-    
-    recieve_corr = list()
-    # print('recieve: ',rec_overalloct)
-    recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
+        # RT value is right, why is this not working? - RT value MUST NOT BE ROUNDED TO 2 DECIMALS
+        # print('recieve roomvol: ',recieve_roomvol)
+        if isinstance(rt_thirty, pd.DataFrame):
+            rt_thirty = rt_thirty.values
+        print('rt_thirty: ',rt_thirty)
+        print('receive roomvol: ',receive_roomvol)
+        sabines = 0.049*receive_roomvol/rt_thirty  # this produces accurate sabines values
+        ## sabines gets this calc, but is still not accurate to spreadhseet reference, even with the right rt_thirty value
+        if isinstance(bkgrnd_overalloct, pd.DataFrame):
+            bkgrnd_overalloct = bkgrnd_overalloct.values
+        print('bkgrnd_overalloct: ',bkgrnd_overalloct)
+        sabines = np.int32(sabines) 
+        sabines = np.round(sabines)
+        # print('sabines: ',sabines)
+        
+        recieve_corr = list()
+        # print('recieve: ',rec_overalloct)
+        recieve_vsBkgrnd = rec_overalloct - bkgrnd_overalloct
 
-    if isinstance(recieve_vsBkgrnd, pd.DataFrame):
-        recieve_vsBkgrnd = recieve_vsBkgrnd.values
+        if isinstance(recieve_vsBkgrnd, pd.DataFrame):
+            recieve_vsBkgrnd = recieve_vsBkgrnd.values
 
-    if isinstance(rec_overalloct, pd.DataFrame):
-        rec_overalloct = rec_overalloct.values
-    print('recieve vs  background: ',recieve_vsBkgrnd)
-    # print('recieve roomvol: ',recieve_roomvol)
-    #### something wrong with this loop #### 
-    for i, val in enumerate(recieve_vsBkgrnd):
-        if val < 5:
-            print('recieve vs background: ',val)
-            recieve_corr.append(rec_overalloct[i]-2)
-            print('less than 5, appending: ',recieve_corr[i])
-        elif val < 10:
-            print('recieve vs background: ',val)
-            recieve_corr.append(10*np.log10((10**(rec_overalloct[i]/10))-(10**(bkgrnd_overalloct[i]/10))))
-            print('less than 10, appending: ',recieve_corr[i])
-        else:
-            print('recieve vs background: ',val)
-            recieve_corr.append(rec_overalloct[i])
-            print('greater than 10, appending: ',recieve_corr[i])
+        if isinstance(rec_overalloct, pd.DataFrame):
+            rec_overalloct = rec_overalloct.values
+        print('recieve vs  background: ',recieve_vsBkgrnd)
+        # print('recieve roomvol: ',recieve_roomvol)
+        #### something wrong with this loop #### 
+        for i, val in enumerate(recieve_vsBkgrnd):
+            if val < 5:
+                print('recieve vs background: ',val)
+                recieve_corr.append(rec_overalloct[i]-2)
+                print('less than 5, appending: ',recieve_corr[i])
+            elif val < 10:
+                print('recieve vs background: ',val)
+                recieve_corr.append(10*np.log10((10**(rec_overalloct[i]/10))-(10**(bkgrnd_overalloct[i]/10))))
+                print('less than 10, appending: ',recieve_corr[i])
+            else:
+                print('recieve vs background: ',val)
+                recieve_corr.append(rec_overalloct[i])
+                print('greater than 10, appending: ',recieve_corr[i])
             
-    
-    # print('recieve correction: ',recieve_corr)
-    if isinstance(srs_overalloct, pd.DataFrame):
-        recieve_corr = recieve_corr.values
-    if isinstance(srs_overalloct, pd.DataFrame):
-        srs_overalloct = srs_overalloct.values
-    if isinstance(sabines, pd.DataFrame):
-        sabines = sabines.values
-    print('srs overalloct: ',srs_overalloct)
-    print('recieve correction: ',recieve_corr)
-    print('sabines: ',sabines)
+        
+        # print('recieve correction: ',recieve_corr)
+        if isinstance(srs_overalloct, pd.DataFrame):
+            recieve_corr = recieve_corr.values
+        if isinstance(srs_overalloct, pd.DataFrame):
+            srs_overalloct = srs_overalloct.values
+        if isinstance(sabines, pd.DataFrame):
+            sabines = sabines.values
+        print('srs overalloct: ',srs_overalloct)
+        print('recieve correction: ',recieve_corr)
+        print('sabines: ',sabines)
 
-    # ATL val initalized to 0
-    # ATL_val = []
-    print('=-=-=-=-=-=-=-ATL val initalized to 0-=-=-=-=-=-=-=-')
-    ATL_val = np.zeros(len(srs_overalloct))
-    # for i, val in enumerate(srs_overalloct):
-    #     ATL_val.append(srs_overalloct[i]-recieve_corr[i]+10*(np.log10(partition_area/sabines.iloc[i])))
+        # ATL val initalized to 0
+        # ATL_val = []
+        print('=-=-=-=-=-=-=-ATL val initalized to 0-=-=-=-=-=-=-=-')
+        ATL_val = np.zeros(len(srs_overalloct))
+        # for i, val in enumerate(srs_overalloct):
+        #     ATL_val.append(srs_overalloct[i]-recieve_corr[i]+10*(np.log10(partition_area/sabines.iloc[i])))
 
-    # Ensure all inputs are numpy arrays
-    srs_overalloct = np.array(srs_overalloct)
-    recieve_corr = np.array(recieve_corr)
-    sabines = np.array(sabines)
-    
+        # Ensure all inputs are numpy arrays
+        srs_overalloct = np.array(srs_overalloct)
+        recieve_corr = np.array(recieve_corr)
+        sabines = np.array(sabines)
+        
 
-    # Ensure all arrays have same length before calculation
-    min_length = min(len(srs_overalloct), len(recieve_corr), len(sabines))
-    srs_overalloct = srs_overalloct[:min_length]
-    recieve_corr = recieve_corr[:min_length] 
-    sabines = sabines[:min_length]
-    
-    # Vectorized calculation
-    # print('=-=-=-=-=-=-=-Vectorized calculation-=-=-=-=-=-=-=-')
-    ATL_val = srs_overalloct - recieve_corr + 10 * np.log10(partition_area / sabines)
-    # Convert ATL_val to numpy array if not already
-    # ATL_val = np.array(ATL_val)
-    # ATL_val = srs_overalloct - recieve_corr+10*(np.log(parition_area/sabines)) 
-    print('-=-=-Rounding ATL val-=-=-=')
-    ATL_val = np.round(ATL_val,1)
-    print('ATL val: ',ATL_val)
-    return ATL_val, sabines
+        # Ensure all arrays have same length before calculation
+        min_length = min(len(srs_overalloct), len(recieve_corr), len(sabines))
+        srs_overalloct = srs_overalloct[:min_length]
+        recieve_corr = recieve_corr[:min_length] 
+        sabines = sabines[:min_length]
+        
+        # Vectorized calculation
+        # print('=-=-=-=-=-=-=-Vectorized calculation-=-=-=-=-=-=-=-')
+        ATL_val = srs_overalloct - recieve_corr + 10 * np.log10(partition_area / sabines)
+        # Convert ATL_val to numpy array if not already
+        # ATL_val = np.array(ATL_val)
+        # ATL_val = srs_overalloct - recieve_corr+10*(np.log(parition_area/sabines)) 
+        print('-=-=-Rounding ATL val-=-=-=')
+        ATL_val = np.round(ATL_val,1)
+        print('ATL val: ',ATL_val)
+        return ATL_val, sabines
+    except Exception as e:
+        print(f"Error in calc_atl_val: {str(e)}")
+        raise
+
 def calc_AIIC_val_claude(Normalized_recieve_IIC, verbose=True):
     pos_diffs = list()
     diff_negative_min = 0
@@ -573,7 +642,7 @@ def calc_astc_val(atl_val: pd.Series) -> float:
     # Since ATL values only go from 125 to 4k, we need to match array lengths
     # ATL_val is length 16, so we need to adjust STCCurve to match  
     print('ATL val: ', atl_val)
-    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4, 4]  # Length 16
+    STCCurve = [-16, -13, -10, -7, -4, -1, 0, 1, 2, 3, 4, 4, 4, 4, 4]  # Length 15
     
     # Convert ATL_val to numpy array if it isn't already
     if isinstance(atl_val, pd.Series):
@@ -581,7 +650,10 @@ def calc_astc_val(atl_val: pd.Series) -> float:
     
     # Ensure we're using the right slice of ATL values
     # we need to truncate the ATL_val to 16 values from 125-4000
-    ATL_val_STC = atl_val[1:17]  # must use values from 125-4000, not 100-4000
+    ATL_val_STC = atl_val[1:16]  # must use values from 125-4000, not 100-4000
+
+    print('ATL val STC: ', ATL_val_STC)
+    print('shape of ATL val STC: ', ATL_val_STC.shape)
     while (diff_negative <= 8 and new_sum <= 32):
         print('ASTC fit test value: ', ASTC_start)
         
@@ -636,8 +708,8 @@ def plot_curves(frequencies: List[float], y_label: str, ref_curve: np.ndarray,
     # Verify input shapes
     print(f"Plot input shapes:")
     print(f"frequencies: {len(frequencies)}")
-    print(f"ref_curve: {len(ref_curve)}")
-    print(f"field_curve: {len(field_curve)}")
+    print(f"ref_curve: {ref_curve}")
+    print(f"field_curve: {field_curve}")
     
     # Create figure
     plt.figure(figsize=(10, 6))
@@ -672,6 +744,169 @@ def sanitize_filepath(filepath: str) -> str:
     filepath = filepath.replace('T:', '//DLA-04/Shared/')
     filepath = filepath.replace('\\', '/')
     return filepath
+
+@dataclass
+class SLMData:
+    """Class to handle Sound Level Meter data with both raw and processed formats"""
+    raw_data: pd.DataFrame
+    measurement_type: str  # '831_Data' or 'RT_Data'
+    
+    def __post_init__(self):
+        """Process raw data after initialization"""
+        if self.measurement_type == 'RT_Data':
+            self._validate_rt_data()
+            self._process_rt_data()
+        else:
+            self._process_oba_data()
+            self._validate_processed_data()
+    
+    def _validate_rt_data(self):
+        """Validate RT data format"""
+        if self.raw_data.empty:
+            raise ValueError("Empty DataFrame provided")
+        if 'Unnamed: 10' not in self.raw_data.columns:
+            raise ValueError("RT data missing required column 'Unnamed: 10'")
+    
+    def _validate_processed_data(self):
+        """Validate processed data has required columns"""
+        expected_cols = ['Frequency (Hz)', 'Overall 1/3 Spectra', 'Max 1/3 Spectra', 'Min 1/3 Spectra']
+        if not all(col in self.processed_data.columns for col in expected_cols):
+            raise ValueError(f"Processing failed to create required columns: {expected_cols}")
+    
+    def _process_rt_data(self):
+        """Process RT data"""
+        self.processed_data = self.raw_data.copy()
+        self.rt_thirty = np.array(self.raw_data['Unnamed: 10'][24:41]/1000, dtype=np.float64).round(3)
+        self.frequency_bands = np.array([100, 125, 160, 200, 250, 315, 400, 500, 630, 
+                                       800, 1000, 1250, 1600, 2000, 2500, 3150, 4000])
+        self.overall_levels = self.rt_thirty
+    
+    def _process_oba_data(self):
+        """Process OBA sheet data into structured format"""
+        try:
+            # First, find the 1/3 Octave section
+            third_oct_idx = None
+            for idx, row in self.raw_data.iterrows():
+                if '1/3 Octave' in str(row.iloc[0]):
+                    third_oct_idx = idx
+                    break
+                
+            if third_oct_idx is None:
+                # If no 1/3 Octave section, try using 1/1 Octave section
+                freq_row = self.raw_data.iloc[0]  # First row contains frequencies
+                data_row = self.raw_data.iloc[1]  # Second row contains Overall spectra
+            else:
+                # Use 1/3 Octave section
+                freq_row = self.raw_data.iloc[third_oct_idx + 1]
+                data_row = self.raw_data.iloc[third_oct_idx + 2]
+
+            # Extract frequencies and values
+            frequencies = []
+            values = []
+            
+            # Iterate through columns to collect data
+            for col in self.raw_data.columns:
+                freq = pd.to_numeric(freq_row[col], errors='coerce')
+                val = pd.to_numeric(data_row[col], errors='coerce')
+                
+                if pd.notna(freq) and pd.notna(val):
+                    frequencies.append(freq)
+                    values.append(val)
+
+            # Create processed DataFrame
+            self.processed_data = pd.DataFrame({
+                'Frequency (Hz)': frequencies,
+                'Overall 1/3 Spectra': values,
+                'Max 1/3 Spectra': values,  # Using same values for now
+                'Min 1/3 Spectra': values   # Using same values for now
+            })
+            
+            # Store frequency bands and levels
+            self.frequency_bands = np.array(frequencies)
+            self.overall_levels = np.array(values)
+            
+            print("\nProcessed OBA Data:")
+            print(f"Found {len(values)} frequency bands")
+            print(f"Frequency range: {min(frequencies)} - {max(frequencies)} Hz")
+            print("Data shape:", self.processed_data.shape)
+            print("\nFirst few rows:")
+            print(self.processed_data.head())
+            
+        except Exception as e:
+            print("\nDebug information:")
+            print("Raw data shape:", self.raw_data.shape)
+            print("First few rows of raw data:")
+            print(self.raw_data.head())
+            print("\nDetailed error:")
+            print(f"Error type: {type(e).__name__}")
+            print(f"Error message: {str(e)}")
+            raise ValueError(f"Error processing OBA sheet: {str(e)}")
+    
+    def get_levels(self, freq_range: tuple = None) -> np.ndarray:
+        """Get overall levels, optionally filtered by frequency range"""
+        if freq_range is None:
+            return self.overall_levels
+            
+        mask = (self.frequency_bands >= freq_range[0]) & (self.frequency_bands <= freq_range[1])
+        return self.overall_levels[mask]
+    
+    def get_rt_thirty(self, freq_range: tuple = None) -> np.ndarray:
+        """Get RT30 values if this is RT data"""
+        if self.measurement_type != 'RT_Data':
+            raise ValueError("RT30 values only available for RT_Data type")
+            
+        if freq_range is None:
+            return self.rt_thirty
+            
+        mask = (self.frequency_bands >= freq_range[0]) & (self.frequency_bands <= freq_range[1])
+        return self.rt_thirty[mask]
+    
+    def plot_data(self) -> None:
+        """Plot the measurement data"""
+        plt.figure(figsize=(10, 6))
+        plt.semilogx(self.frequency_bands, self.overall_levels, 'b-o')
+        plt.grid(True)
+        plt.xlabel('Frequency (Hz)')
+        plt.ylabel('Level (dB)' if self.measurement_type == '831_Data' else 'RT30 (s)')
+        plt.title(f'SLM {self.measurement_type} Measurements')
+
+    def process_rt_data(self, df):
+        """Process RT data and store both RT values and frequencies"""
+        try:
+            # Find header row
+            header_row_idx = None
+            for idx, row in df.iterrows():
+                if 'T30 (ms)' in row.values and 'Frequency (Hz)' in row.values:
+                    header_row_idx = int(idx)
+                    freq_col_idx = int(row.tolist().index('Frequency (Hz)'))
+                    rt_col_idx = int(row.tolist().index('T30 (ms)'))
+                    break
+
+            if header_row_idx is None:
+                raise ValueError("Could not find RT data headers")
+
+            # Extract and clean data
+            data_start_idx = header_row_idx + 1
+            freq_data = df.iloc[data_start_idx:, freq_col_idx]
+            rt_values = df.iloc[data_start_idx:, rt_col_idx]
+
+            # Clean and convert
+            freq_data = freq_data.astype(str).str.replace('Hz', '').str.strip()
+            freq_data = pd.to_numeric(freq_data, errors='coerce')
+            rt_values = pd.to_numeric(rt_values, errors='coerce')
+
+            # Store both values
+            self.frequencies = freq_data.values
+            self.rt_thirty = rt_values.values
+
+            # Store in raw_data as well
+            self.raw_data = pd.DataFrame({
+                'Frequency (Hz)': freq_data,
+                'RT60': rt_values
+            })
+
+        except Exception as e:
+            raise ValueError(f"Error processing RT data: {str(e)}")
 
 
 

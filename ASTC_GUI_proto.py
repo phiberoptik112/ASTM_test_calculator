@@ -1171,6 +1171,19 @@ class ReportDisplayWindow(GridLayout):
         paths_scroll.add_widget(paths_layout)
         self.add_widget(paths_scroll)
 
+def add_config_button(self, layout):
+    config_btn = Button(
+        text='Edit Configuration',
+        size_hint_y=None,
+        height=40
+    )
+    config_btn.bind(on_press=self.open_config_editor)
+    layout.add_widget(config_btn)
+
+def open_config_editor(self, instance):
+    from .launch_config import launch_config_editor
+    launch_config_editor(self.config_manager)
+
 if __name__ == '__main__':
     FileLoaderApp().run()
 
