@@ -217,63 +217,90 @@ class TestPlanManagerWindow(BoxLayout):
         self.edited_rows.add(row_idx)
         self.status_label.text = 'Status: Changes pending save'
         
-    def _on_test_save(self, room_properties: RoomProperties, test_type: TestType):
+    def _on_test_save(self, test_data: dict):
         """Handle saving a new or edited test"""
         try:
-            # Convert RoomProperties to dictionary
-            test_data = vars(room_properties)
-            
-            # Add test type flags
-            test_data.update({
-                'AIIC': 1 if test_type == TestType.AIIC else 0,
-                'ASTC': 1 if test_type == TestType.ASTC else 0,
-                'NIC': 1 if test_type == TestType.NIC else 0,
-                'DTC': 1 if test_type == TestType.DTC else 0
-            })
-            
-            # Create or update DataFrame
+            # Initialize test plan if needed
             if self.current_test_plan is None:
-                self.current_test_plan = pd.DataFrame([test_data])
-            else:
-                # Check if test label exists
-                existing_idx = self.current_test_plan[self.current_test_plan['Test_Label'] == test_data['test_label']].index
+                columns = [
+                    'Test_Label', 'Client_Name', 'Site_Name', 'Source Room',
+                    'Receiving Room', 'Test Date', 'Report Date', 'Project Name',
+                    'source room vol', 'receive room vol', 'partition area',
+                    'partition dim', 'source room finish', 'receive room finish',
+                    'srs floor descrip.', 'srs walls descrip.', 'srs ceiling descrip.',
+                    'rec floor descrip.', 'rec walls descrip.', 'rec ceiling descrip.',
+                    'tested assembly', 'expected performance', 'Test assembly Type',
+                    'Annex 2 used?', 'AIIC', 'ASTC', 'NIC', 'DTC'
+                ]
+                self.current_test_plan = pd.DataFrame(columns=columns)
+            
+            # Convert test data to DataFrame row
+            test_row = pd.DataFrame([test_data])
+            
+            # Check if test label exists
+            if not self.current_test_plan.empty:
+                existing_idx = self.current_test_plan[
+                    self.current_test_plan['Test_Label'] == test_data['Test_Label']
+                ].index
                 if len(existing_idx) > 0:
                     # Update existing row
-                    self.current_test_plan.loc[existing_idx[0]] = test_data
+                    for col in self.current_test_plan.columns:
+                        if col in test_data:
+                            self.current_test_plan.at[existing_idx[0], col] = test_data[col]
                 else:
                     # Add new row
-                    self.current_test_plan = pd.concat([self.current_test_plan, pd.DataFrame([test_data])], ignore_index=True)
+                    self.current_test_plan = pd.concat(
+                        [self.current_test_plan, test_row],
+                        ignore_index=True
+                    )
+            else:
+                # First row in test plan
+                self.current_test_plan = test_row
             
+            # Update test plan display
             self._update_test_plan_display()
+            
+            # Switch to Test Plan tab to show the updated data
+            self.test_plan_tab.state = 'down'
             self.status_label.text = 'Status: Test saved successfully'
+            
+            # Save changes immediately to ensure they're processed
+            self._save_changes(None)
             
         except Exception as e:
             self._show_error(f"Error saving test: {str(e)}")
             
     def _save_changes(self, instance):
-        """Save changes to test plan"""
+        """Save changes to the test plan CSV file"""
         try:
             if self.current_test_plan is None or self.current_test_plan.empty:
                 self._show_error("No test plan data to save")
                 return
-                
-            # Create backups directory if it doesn't exist
-            backup_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'backups')
-            os.makedirs(backup_dir, exist_ok=True)
             
-            # Generate filename with timestamp
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            backup_file = os.path.join(backup_dir, f'test_plan_backup_{timestamp}.csv')
+            # Ensure all required columns are present
+            required_columns = [
+                'Test_Label', 'Client_Name', 'Site_Name', 'Source Room',
+                'Receiving Room', 'Test Date', 'Report Date'
+            ]
+            missing_columns = [col for col in required_columns 
+                             if col not in self.current_test_plan.columns]
+            if missing_columns:
+                self._show_error(f"Missing required columns: {', '.join(missing_columns)}")
+                return
             
             # Save to CSV
-            self.current_test_plan.to_csv(backup_file, index=False)
+            csv_path = self.test_data_manager.test_plan_path
+            if not csv_path:
+                self._show_error("Test plan path not set")
+                return
             
-            # Update test_data_manager if available
-            if self.test_data_manager:
-                self.test_data_manager.test_plan = self.current_test_plan
-                self.test_data_manager.test_plan_path = backup_file
+            self.current_test_plan.to_csv(csv_path, index=False)
             
-            self.edited_rows.clear()
+            # Update test data manager with new data
+            self.test_data_manager.test_plan = self.current_test_plan
+            self.test_data_manager.process_test_data()
+            
+            # Update status
             self.status_label.text = 'Status: Changes saved successfully'
             
         except Exception as e:

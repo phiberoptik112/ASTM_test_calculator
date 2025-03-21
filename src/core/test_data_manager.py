@@ -60,6 +60,11 @@ class TestDataManager:
                 if not os.path.exists(path):
                     raise ValueError(f"Invalid {desc} path: {path}")
             
+            # Verify test plan file format
+            test_plan_ext = os.path.splitext(test_plan_path)[1].lower()
+            if test_plan_ext not in ['.csv', '.xlsx', '.xls']:
+                raise ValueError(f"Unsupported test plan file format: {test_plan_ext}")
+            
             # Set paths
             self.test_plan_path = test_plan_path
             self.slm_data_d_path = meter_d_path
@@ -98,13 +103,87 @@ class TestDataManager:
             raise ValueError(f"Error setting data paths: {str(e)}")
 
     def load_test_plan(self) -> None:
-        """Load test plan from Excel file"""
+        """Load test plan from Excel or CSV file"""
         print(f"Loading test plan from {self.test_plan_path}")
         try:
-            self.test_plan = pd.read_excel(self.test_plan_path)
+            # First, check if the file exists
+            if not os.path.exists(self.test_plan_path):
+                raise FileNotFoundError(f"Test plan file not found: {self.test_plan_path}")
+            
+            # Check file content to determine the actual format regardless of extension
+            is_csv = False
+            try:
+                with open(self.test_plan_path, 'r', encoding='utf-8') as f:
+                    first_line = f.readline().strip()
+                    # If the first line contains many commas, it's likely a CSV
+                    if first_line.count(',') > 3:
+                        is_csv = True
+                        if self.debug_mode:
+                            print(f"File appears to be CSV format based on content (contains {first_line.count(',')} commas)")
+            except UnicodeDecodeError:
+                # If we can't read as text, it's likely a binary Excel file
+                is_csv = False
+                if self.debug_mode:
+                    print("File appears to be binary format (not readable as text)")
+            
+            # Determine file type from extension or content
+            file_ext = os.path.splitext(self.test_plan_path)[1].lower()
+            
+            # Try loading the file based on detected format
+            if is_csv:
+                if self.debug_mode:
+                    print("Loading as CSV file based on content detection")
+                self.test_plan = pd.read_csv(self.test_plan_path)
+            elif file_ext == '.csv':
+                self.test_plan = pd.read_csv(self.test_plan_path)
+            elif file_ext in ['.xlsx', '.xls']:
+                # Try different Excel engines in order
+                engines = ['openpyxl', 'xlrd']
+                last_error = None
+                
+                for engine in engines:
+                    try:
+                        print(f"Attempting to read Excel file with engine: {engine}")
+                        if engine == 'xlrd' and file_ext == '.xlsx':
+                            # xlrd only supports .xls files fully, but can sometimes read .xlsx
+                            print("Warning: Using xlrd with .xlsx file - limited functionality")
+                        
+                        self.test_plan = pd.read_excel(self.test_plan_path, engine=engine)
+                        print(f"Successfully loaded with {engine} engine")
+                        break
+                    except Exception as e:
+                        last_error = e
+                        print(f"Failed with {engine} engine: {str(e)}")
+                        
+                        # If the error suggests the file might be CSV, try that as a fallback
+                        if "File is not a zip file" in str(e) or "Unsupported format" in str(e):
+                            try:
+                                print("Excel engines failed. Trying to load as CSV...")
+                                self.test_plan = pd.read_csv(self.test_plan_path)
+                                print("Successfully loaded as CSV")
+                                break
+                            except Exception as csv_e:
+                                print(f"CSV fallback failed: {str(csv_e)}")
+                                continue
+                
+                if self.test_plan is None:
+                    if "File is not a zip file" in str(last_error):
+                        # Special handling for corrupted Excel files
+                        raise ValueError(
+                            f"The Excel file appears to be corrupted or is actually a CSV file with an .xlsx extension. "
+                            f"Please check if the file can be opened in Excel/LibreOffice and save it with the correct extension. "
+                            f"Try renaming the file to .csv if you believe it's actually a CSV file. "
+                            f"Original error: {str(last_error)}"
+                        )
+                    else:
+                        raise ValueError(f"Failed to read Excel file with all available engines. Last error: {str(last_error)}")
+            else:
+                raise ValueError(f"Unsupported file format: {file_ext}. Please use .xlsx, .xls, or .csv files.")
+            
             if self.debug_mode:
                 print(f"Loaded test plan with {len(self.test_plan)} rows")
                 print("Columns:", self.test_plan.columns.tolist())
+                
         except Exception as e:
             raise ValueError(f"Error loading test plan: {str(e)}")
 
@@ -515,11 +594,11 @@ class TestDataManager:
         try:
             if 'RT_Data' in datatype:
                 print(f"Reading Summary sheet for RT data")
-                df = pd.read_excel(full_path, sheet_name='Summary')
+                df = pd.read_excel(full_path, sheet_name='Summary', engine='openpyxl')
                 measurement_type = 'RT_Data'
             else:
                 print(f"Reading OBA sheet for measurement data")
-                df = pd.read_excel(full_path, sheet_name='OBA')
+                df = pd.read_excel(full_path, sheet_name='OBA', engine='openpyxl')
                 measurement_type = '831_Data'
             
             if self.debug_mode:

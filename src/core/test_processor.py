@@ -152,7 +152,7 @@ class TestProcessor:
     def _load_slm_data(file_id: str, base_path: str, suffix: str) -> pd.DataFrame:
         """Load SLM data from Excel file"""
         file_path = Path(base_path) / f"{file_id}{suffix}xlsx"
-        return pd.read_excel(file_path)
+        return pd.read_excel(file_path, engine='openpyxl')
 
     @staticmethod
     def _verify_dataframes(data_dict: Dict[str, pd.DataFrame]) -> None:

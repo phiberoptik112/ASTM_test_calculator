@@ -1,4 +1,7 @@
 #ASTC GUI proto
+
+#### THIS IS AN OLD FILE- NOT USED IN CURRENT VERSION #### PLEASE IGNORE AND USE ./src/gui/main_window.py INSTEAD ####
+
 import string
 import time
 import pandas as pd
@@ -280,11 +283,11 @@ class FileLoaderApp(App):
             if datatype == '-831_Data.':
                 # Regular measurement data - use OBA sheet
                 print(f"Reading OBA sheet for measurement data")
-                df = pd.read_excel(full_path, sheet_name='OBA')
+                df = pd.read_excel(full_path, sheet_name='OBA', engine='openpyxl')
             elif datatype == '-RT_Data.':
                 # Reverberation time data - use Summary sheet
                 print(f"Reading Summary sheet for RT data")
-                df = pd.read_excel(full_path, sheet_name='Summary')
+                df = pd.read_excel(full_path, sheet_name='Summary', engine='openpyxl')
             else:
                 raise ValueError(f"Unknown datatype: {datatype}")
             
@@ -521,7 +524,7 @@ class FileLoaderApp(App):
             )
             testplan_path = self.test_plan_path
             report_output_folder = self.report_output_folder_path
-            self.test_list = pd.read_excel(testplan_path)
+            self.test_list = pd.read_excel(testplan_path, engine='openpyxl')
             debug = 1 if self.debug_check_box.active else 0
 
 
@@ -744,7 +747,7 @@ class FileLoaderApp(App):
 
             # Load and find test in test plan
             try:
-                test_plan_df = pd.read_excel(self.test_plan_path)
+                test_plan_df = pd.read_excel(self.test_plan_path, engine='openpyxl')
                 mask = test_plan_df.applymap(lambda x: test_label in str(x) if pd.notna(x) else False)
                 test_row_idx = mask.any(axis=1).idxmax()
                 curr_test = test_plan_df.iloc[test_row_idx]

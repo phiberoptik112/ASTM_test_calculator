@@ -35,11 +35,8 @@ class TestPlanInputWindow(BoxLayout):
         # Initialize input fields dictionary
         self.input_fields = {}
         
-        # Create room property fields
-        self._create_room_property_fields()
-        
-        # Create test type checkboxes
-        self._create_test_type_section()
+        # Create all test plan fields
+        self._create_test_plan_fields()
         
         # Add form to scroll view
         scroll.add_widget(self.form)
@@ -48,35 +45,38 @@ class TestPlanInputWindow(BoxLayout):
         # Create buttons
         self._create_buttons()
 
-    def _create_room_property_fields(self):
-        """Create input fields for all RoomProperties"""
-        # Define fields with their display names
+    def _create_test_plan_fields(self):
+        """Create all fields matching test plan structure"""
+        # Define all fields with their display names - exact match to test plan columns
         fields = [
-            ('site_name', 'Site Name'),
-            ('client_name', 'Client Name'),
-            ('source_room', 'Source Room'),
-            ('receive_room', 'Receive Room'),
-            ('test_date', 'Test Date'),
-            ('report_date', 'Report Date'),
-            ('project_name', 'Project Name'),
-            ('test_label', 'Test Label'),
-            ('source_vol', 'Source Room Volume'),
-            ('receive_vol', 'Receive Room Volume'),
-            ('partition_area', 'Partition Area'),
-            ('partition_dim', 'Partition Dimensions'),
-            ('source_room_finish', 'Source Room Finish'),
-            ('source_room_name', 'Source Room Name'),
-            ('receive_room_finish', 'Receive Room Finish'),
-            ('receive_room_name', 'Receive Room Name'),
-            ('srs_floor', 'Source Room Floor'),
-            ('srs_walls', 'Source Room Walls'),
-            ('srs_ceiling', 'Source Room Ceiling'),
-            ('rec_floor', 'Receive Room Floor'),
-            ('rec_walls', 'Receive Room Walls'),
-            ('rec_ceiling', 'Receive Room Ceiling'),
-            ('tested_assembly', 'Tested Assembly'),
-            ('expected_performance', 'Expected Performance'),
-            ('test_assembly_type', 'Test Assembly Type')
+            ('Test_Label', 'Test Label'),
+            ('Client_Name', 'Client Name'),
+            ('Site_Name', 'Site Name'),
+            ('Source Room', 'Source Room'),
+            ('Receiving Room', 'Receiving Room'),
+            ('Test Date', 'Test Date'),
+            ('Report Date', 'Report Date'),
+            ('Project Name', 'Project Name'),
+            ('source room vol', 'Source Room Volume'),
+            ('receive room vol', 'Receive Room Volume'),
+            ('partition area', 'Partition Area'),
+            ('partition dim', 'Partition Dimensions'),
+            ('source room finish', 'Source Room Finish'),
+            ('receive room finish', 'Receive Room Finish'),
+            ('srs floor descrip.', 'Source Room Floor'),
+            ('srs walls descrip.', 'Source Room Walls'),
+            ('srs ceiling descrip.', 'Source Room Ceiling'),
+            ('rec floor descrip.', 'Receive Room Floor'),
+            ('rec walls descrip.', 'Receive Room Walls'),
+            ('rec ceiling descrip.', 'Receive Room Ceiling'),
+            ('tested assembly', 'Tested Assembly'),
+            ('expected performance', 'Expected Performance'),
+            ('Test assembly Type', 'Test Assembly Type'),
+            ('Annex 2 used?', 'Annex 2 Used'),
+            ('AIIC', 'AIIC Test'),
+            ('ASTC', 'ASTC Test'),
+            ('NIC', 'NIC Test'),
+            ('DTC', 'DTC Test')
         ]
         
         # Add fields to form
@@ -88,56 +88,21 @@ class TestPlanInputWindow(BoxLayout):
                 height=40
             ))
             
-            # Add input
-            input_widget = TextInput(
-                multiline=False,
-                size_hint_y=None,
-                height=40
-            )
+            # Add input widget based on field type
+            if field_id in ['Annex 2 used?', 'AIIC', 'ASTC', 'NIC', 'DTC']:
+                input_widget = CheckBox(
+                    size_hint_y=None,
+                    height=40,
+                    active=False
+                )
+            else:
+                input_widget = TextInput(
+                    multiline=False,
+                    size_hint_y=None,
+                    height=40
+                )
             self.input_fields[field_id] = input_widget
             self.form.add_widget(input_widget)
-        
-        # Add Annex 2 checkbox separately
-        self.form.add_widget(Label(
-            text='Annex 2 Used',
-            size_hint_y=None,
-            height=40
-        ))
-        annex_checkbox = CheckBox(size_hint_y=None, height=40)
-        self.input_fields['annex_2_used'] = annex_checkbox
-        self.form.add_widget(annex_checkbox)
-
-    def _create_test_type_section(self):
-        """Create test type checkbox section"""
-        # Add a header for test types
-        self.form.add_widget(Label(
-            text='Test Types',
-            size_hint_y=None,
-            height=40,
-            bold=True
-        ))
-        
-        # Create layout for checkboxes
-        test_type_layout = GridLayout(
-            cols=2,
-            size_hint_y=None,
-            height=len(TestType) * 20
-        )
-        
-        # Add checkbox for each test type
-        self.test_type_checkboxes = {}
-        for test_type in TestType:
-            checkbox = CheckBox(size_hint_y=None, height=20)
-            label = Label(
-                text=test_type.value,
-                size_hint_y=None,
-                height=20
-            )
-            self.test_type_checkboxes[test_type] = checkbox
-            test_type_layout.add_widget(checkbox)
-            test_type_layout.add_widget(label)
-            
-        self.form.add_widget(test_type_layout)
 
     def _create_buttons(self):
         """Create save and cancel buttons"""
@@ -163,71 +128,57 @@ class TestPlanInputWindow(BoxLayout):
     def save_data(self, instance):
         """Collect and save the input data"""
         try:
-            # Collect room properties
-            room_data = {}
+            # Collect all field values
+            test_data = {}
             for field_id, input_widget in self.input_fields.items():
                 if isinstance(input_widget, CheckBox):
-                    room_data[field_id] = input_widget.active
+                    test_data[field_id] = 1 if input_widget.active else 0
                 else:
-                    room_data[field_id] = input_widget.text
+                    test_data[field_id] = input_widget.text.strip()
             
-            # Create RoomProperties instance
-            room_properties = RoomProperties.from_dict(room_data)
+            # Validate required fields
+            required_fields = ['Test_Label', 'Client_Name', 'Site_Name']
+            missing_fields = [f for f in required_fields if not test_data.get(f)]
+            if missing_fields:
+                raise ValueError(f"Required fields missing: {', '.join(missing_fields)}")
             
-            # Get selected test types
-            selected_test_types = [
-                test_type for test_type, checkbox in self.test_type_checkboxes.items()
-                if checkbox.active
-            ]
-            # Save input data to CSV as backup
-
-
-            # Create backups directory if it doesn't exist
+            # Validate at least one test type is selected
+            test_types = ['AIIC', 'ASTC', 'NIC', 'DTC']
+            if not any(test_data.get(tt, 0) == 1 for tt in test_types):
+                raise ValueError("Please select at least one test type")
+            
+            # Save backup
             backup_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'backups')
             os.makedirs(backup_dir, exist_ok=True)
-
-            # Generate filename with timestamp
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            backup_file = os.path.join(backup_dir, f'test_plan_backup_{timestamp}.csv')
-
-            # Prepare data for CSV
-            csv_data = []
+            backup_file = os.path.join(backup_dir, f'test_input_backup_{timestamp}.csv')
             
-            # Add room properties
-            for field_id, value in room_data.items():
-                csv_data.append(['room_property', field_id, str(value)])
-                
-            # Add selected test types
-            for test_type in selected_test_types:
-                csv_data.append(['test_type', test_type.value, 'selected'])
-
-            # Write to CSV file
             try:
                 with open(backup_file, 'w', newline='') as f:
                     writer = csv.writer(f)
-                    writer.writerow(['data_type', 'field', 'value'])  # Header
-                    writer.writerows(csv_data)
-                print(f"Backup saved to {backup_file}")
+                    writer.writerow(['field', 'value'])
+                    for field, value in test_data.items():
+                        writer.writerow([field, value])
             except Exception as e:
                 print(f"Warning: Could not save backup file: {str(e)}")
-            if not selected_test_types:
-                raise ValueError("Please select at least one test type")
             
             # Call callback with the data
             if self.callback_on_save:
-                for test_type in selected_test_types:
-                    self.callback_on_save(room_properties, test_type)
+                self.callback_on_save(test_data)
             
             # Close the window
-            self.parent.parent.dismiss()
+            parent = self.parent
+            while parent is not None:
+                if isinstance(parent, Popup):
+                    parent.dismiss()
+                    break
+                parent = parent.parent
             
         except Exception as e:
-            # Show error popup
             self.show_error(str(e))
 
     def cancel(self, instance):
         """Close the window without saving"""
-        # Find the popup window by traversing up the widget tree
         parent = self.parent
         while parent is not None:
             if isinstance(parent, Popup):
