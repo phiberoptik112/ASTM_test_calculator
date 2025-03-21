@@ -1552,7 +1552,8 @@ class NICTestReport(BaseTestReport):
         main_elements.append(img)
         return main_elements
 
-
+### DTC Report still needs development - needs a calculation method too 
+### currently a placeholder class
 class DTCTestReport(BaseTestReport):
     pass
     # Implement DTC-specific methods
