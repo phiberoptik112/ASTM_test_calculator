@@ -9,6 +9,8 @@ from data_processor import RoomProperties, TestType
 import csv
 import os
 from datetime import datetime
+from kivy.uix.popup import Popup
+
 class TestPlanInputWindow(BoxLayout):
     def __init__(self, callback_on_save=None, **kwargs):
         super().__init__(**kwargs)
@@ -225,11 +227,16 @@ class TestPlanInputWindow(BoxLayout):
 
     def cancel(self, instance):
         """Close the window without saving"""
-        self.parent.parent.dismiss()
+        # Find the popup window by traversing up the widget tree
+        parent = self.parent
+        while parent is not None:
+            if isinstance(parent, Popup):
+                parent.dismiss()
+                break
+            parent = parent.parent
 
     def show_error(self, message):
         """Show error popup"""
-        from kivy.uix.popup import Popup
         popup = Popup(
             title='Error',
             content=Label(text=message),

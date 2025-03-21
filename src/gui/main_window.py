@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 from src.core.test_data_manager import TestDataManager
 from src.gui.test_plan_input import TestPlanInputWindow
 from src.gui.analysis_dashboard import ResultsAnalysisDashboard
+from src.gui.test_plan_manager import TestPlanManagerWindow
 
 import logging
 logging.getLogger('matplotlib.font_manager').disabled = True
@@ -495,9 +496,9 @@ class MainWindow(BoxLayout):
 
     def show_test_plan_input(self, instance):
         """Show test plan input window"""
-        content = TestPlanInputWindow(callback_on_save=self.on_test_plan_save)
+        content = TestPlanManagerWindow(test_data_manager=self.test_data_manager)
         self.test_plan_popup = Popup(
-            title='Add New Test',
+            title='Test Plan Manager',
             content=content,
             size_hint=(0.9, 0.9)
         )
