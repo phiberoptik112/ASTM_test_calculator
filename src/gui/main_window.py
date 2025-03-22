@@ -459,7 +459,7 @@ class MainWindow(BoxLayout):
             self._show_error(error_msg + "\n\nPlease check the debug output for more details.")
             self.status_label.text = f"Status: Error - {error_msg}"
             return False
-
+    # may be a redundant function, but keeping it for now
     def assign_room_properties(self, test_row: pd.Series) -> RoomProperties:
         """Create RoomProperties from test row data"""
         print('test_row:', test_row)
@@ -952,49 +952,118 @@ class MainWindow(BoxLayout):
                         self.freq_data['room_props'] = test_obj.room_properties
                         
                         # Process and store data for calculations while plotting
-                        if hasattr(test_obj, 'srs_data') and hasattr(test_obj.srs_data, 'raw_data'):
-                            print("- Plotting source room data")
-                            df = test_obj.srs_data.raw_data
-                            ax1.plot(
-                                df['Frequency (Hz)'],
-                                df['Overall 1/3 Spectra'],
-                                label=f'{test_type.value} - Source Room'
-                            )
-                            # Store for calculations - using static method call
-                            formatted_df = TestDataManager.format_slm_data(test_obj.srs_data.raw_data)
-                            self.freq_data['source'] = formatted_df['Overall 1/3 Spectra'].values[0:17]
+                        if hasattr(test_obj, 'srs_data'):
+                            print("- Processing source room data")
+                            if hasattr(test_obj.srs_data, 'raw_data'):
+                                # SLMData object with raw_data
+                                df = test_obj.srs_data.raw_data
+                                print("- Plotting source room SLMData.raw_data")
+                            elif isinstance(test_obj.srs_data, pd.DataFrame):
+                                # Direct DataFrame
+                                df = test_obj.srs_data
+                                print("- Plotting source room DataFrame directly")
+                            else:
+                                print(f"- Unsupported source data type: {type(test_obj.srs_data)}")
+                                df = None
+                                
+                            if df is not None:
+                                ax1.plot(
+                                    df['Frequency (Hz)'],
+                                    df['Overall 1/3 Spectra'],
+                                    label=f'{test_type.value} - Source Room'
+                                )
+                                # Store for calculations - using static method call
+                                formatted_df = TestDataManager.format_slm_data(df)
+                                self.freq_data['source'] = formatted_df['Overall 1/3 Spectra'].values[0:17]
                         
-                        if hasattr(test_obj, 'recive_data') and hasattr(test_obj.recive_data, 'raw_data'):
-                            print("- Plotting receive room data")
-                            df = test_obj.recive_data.raw_data
-                            ax1.plot(
-                                df['Frequency (Hz)'],
-                                df['Overall 1/3 Spectra'],
-                                label=f'{test_type.value} - Receive Room'
-                            )
-                            # Store for calculations
-                            formatted_df = TestDataManager.format_slm_data(test_obj.recive_data.raw_data)
-                            self.freq_data['receive'] = formatted_df['Overall 1/3 Spectra'].values[0:17]
+                        # Receive room data
+                        if hasattr(test_obj, 'recive_data'):
+                            print("- Processing receive room data")
+                            if hasattr(test_obj.recive_data, 'raw_data'):
+                                # SLMData object with raw_data
+                                df = test_obj.recive_data.raw_data
+                                print("- Plotting receive room SLMData.raw_data")
+                            elif isinstance(test_obj.recive_data, pd.DataFrame):
+                                # Direct DataFrame
+                                df = test_obj.recive_data
+                                print("- Plotting receive room DataFrame directly")
+                            else:
+                                print(f"- Unsupported receive data type: {type(test_obj.recive_data)}")
+                                df = None
+                                
+                            if df is not None:
+                                ax1.plot(
+                                    df['Frequency (Hz)'],
+                                    df['Overall 1/3 Spectra'],
+                                    label=f'{test_type.value} - Receive Room'
+                                )
+                                # Store for calculations
+                                formatted_df = TestDataManager.format_slm_data(df)
+                                self.freq_data['receive'] = formatted_df['Overall 1/3 Spectra'].values[0:17]
                         
-                        if hasattr(test_obj, 'bkgrnd_data') and hasattr(test_obj.bkgrnd_data, 'raw_data'):
-                            print("- Plotting background data")
-                            df = test_obj.bkgrnd_data.raw_data
-                            ax1.plot(
-                                df['Frequency (Hz)'],
-                                df['Overall 1/3 Spectra'],
-                                label=f'{test_type.value} - Background'
-                            )
-                            # Store for calculations
-                            formatted_df = TestDataManager.format_slm_data(test_obj.bkgrnd_data.raw_data)
-                            self.freq_data['background'] = formatted_df['Overall 1/3 Spectra'].values[0:17]
+                        # Background data
+                        if hasattr(test_obj, 'bkgrnd_data'):
+                            print("- Processing background data")
+                            if hasattr(test_obj.bkgrnd_data, 'raw_data'):
+                                # SLMData object with raw_data
+                                df = test_obj.bkgrnd_data.raw_data
+                                print("- Plotting background SLMData.raw_data")
+                            elif isinstance(test_obj.bkgrnd_data, pd.DataFrame):
+                                # Direct DataFrame
+                                df = test_obj.bkgrnd_data
+                                print("- Plotting background DataFrame directly")
+                            else:
+                                print(f"- Unsupported background data type: {type(test_obj.bkgrnd_data)}")
+                                df = None
+                                
+                            if df is not None:
+                                ax1.plot(
+                                    df['Frequency (Hz)'],
+                                    df['Overall 1/3 Spectra'],
+                                    label=f'{test_type.value} - Background'
+                                )
+                                # Store for calculations
+                                formatted_df = TestDataManager.format_slm_data(df)
+                                self.freq_data['background'] = formatted_df['Overall 1/3 Spectra'].values[0:17]
                         
                         # Store RT data for calculations
                         if hasattr(test_obj, 'rt'):
-                            if hasattr(test_obj.rt, 'rt_thirty'):
-                                rt_data = test_obj.rt.rt_thirty[:17]
-                            else:
-                                rt_data = test_obj.rt['Unnamed: 10'][24:41]/1000
-                            self.freq_data['rt'] = np.array(rt_data, dtype=np.float64).round(3)
+                            try:
+                                # First try accessing rt_thirty if it exists
+                                if hasattr(test_obj.rt, 'rt_thirty'):
+                                    rt_data = test_obj.rt.rt_thirty[:17]
+                                    print("Using rt_thirty property")
+                                # Then try pandas DataFrame access if it's a DataFrame
+                                elif isinstance(test_obj.rt, pd.DataFrame):
+                                    if 'Unnamed: 10' in test_obj.rt.columns:
+                                        rt_data = test_obj.rt['Unnamed: 10'][24:41]/1000
+                                        print("Using DataFrame column access")
+                                    else:
+                                        # Try to find numeric columns in case column name changed
+                                        numeric_cols = test_obj.rt.select_dtypes(include=[np.number]).columns
+                                        if len(numeric_cols) > 0:
+                                            rt_data = test_obj.rt[numeric_cols[0]][24:41]/1000
+                                            print(f"Using alternative column: {numeric_cols[0]}")
+                                        else:
+                                            print("No suitable numeric columns found in RT data")
+                                            rt_data = None
+                                # If it's already a numpy array or list
+                                elif isinstance(test_obj.rt, (np.ndarray, list)):
+                                    rt_data = test_obj.rt[:17] if len(test_obj.rt) >= 17 else test_obj.rt
+                                    print("Using array/list access")
+                                else:
+                                    print(f"Unsupported RT data type: {type(test_obj.rt)}")
+                                    rt_data = None
+                                    
+                                # Store the data if we successfully retrieved it
+                                if rt_data is not None:
+                                    self.freq_data['rt'] = np.array(rt_data, dtype=np.float64).round(3)
+                                    print(f"Stored RT data with shape: {self.freq_data['rt'].shape}")
+                            except Exception as e:
+                                print(f"Error accessing RT data: {str(e)}")
+                                traceback.print_exc()
+                                # Set to None so calculations know to handle missing RT data
+                                self.freq_data['rt'] = None
 
                         # Process test-specific data
                         if test_type == TestType.AIIC:
@@ -1373,59 +1442,118 @@ class MainWindow(BoxLayout):
             print(f"Test Directory: {getattr(test_obj, 'test_dir', 'Unknown')}")
             
             # 1/3 octave bands from 100 to 3150 Hz
-            # still a hardcoded value... is there a better way to do this?
             freq_indices = slice(12, 28)
             
-            # Source room data with detailed file info
-            print("\nSource Room Data:")
-            if hasattr(test_obj.srs_data, 'file_path'):
-                print(f"Source File: {os.path.basename(test_obj.srs_data.file_path)}")
-                print(f"Full Path: {test_obj.srs_data.file_path}")
-            print(f"Data Shape: {test_obj.srs_data.raw_data.shape}")
-            
-            # Background data with detailed file info
-            print("\nBackground Data:")
-            if hasattr(test_obj.bkgrnd_data, 'file_path'):
-                print(f"Background File: {os.path.basename(test_obj.bkgrnd_data.file_path)}")
-                print(f"Full Path: {test_obj.bkgrnd_data.file_path}")
-            print(f"Data Shape: {test_obj.bkgrnd_data.raw_data.shape}")
-            
-            # RT data with detailed file info
-            # still a hardcoded value... is there a better way to do this?
-            print("\nRT Data:")
-            if hasattr(test_obj.rt, 'file_path'):
-                print(f"RT File: {os.path.basename(test_obj.rt.file_path)}")
-                print(f"Full Path: {test_obj.rt.file_path}")
-            print(f"RT30 Values Shape: {test_obj.rt.rt_thirty.shape}")
-            
+            # Initialize raw data structure
             raw_data = {
-                'freq': test_obj.srs_data.raw_data['Frequency (Hz)'].values,
-                'source': test_obj.srs_data.raw_data['Overall 1/3 Spectra'].values[freq_indices],
-                'background': test_obj.bkgrnd_data.raw_data['Overall 1/3 Spectra'].values[freq_indices],
-                'rt': test_obj.rt.rt_thirty[:-1], # this also is still hardcoded 
+                'freq': None,
+                'source': None,
+                'background': None,
+                'rt': None,
                 'room_props': test_obj.room_properties,
                 'positions': []
             }
             
-            # Process tapping positions with detailed file info
+            # Source room data
+            print("\nSource Room Data:")
+            if hasattr(test_obj, 'srs_data'):
+                if hasattr(test_obj.srs_data, 'raw_data'):
+                    # Using SLMData with raw_data
+                    source_df = test_obj.srs_data.raw_data
+                    raw_data['freq'] = source_df['Frequency (Hz)'].values
+                    raw_data['source'] = source_df['Overall 1/3 Spectra'].values[freq_indices]
+                    print("Using source room SLMData.raw_data")
+                    if hasattr(test_obj.srs_data, 'file_path'):
+                        print(f"Source File: {os.path.basename(test_obj.srs_data.file_path)}")
+                elif isinstance(test_obj.srs_data, pd.DataFrame):
+                    # Direct DataFrame
+                    source_df = test_obj.srs_data
+                    raw_data['freq'] = source_df['Frequency (Hz)'].values
+                    raw_data['source'] = source_df['Overall 1/3 Spectra'].values[freq_indices]
+                    print("Using source room DataFrame directly")
+                else:
+                    print(f"Unsupported source data type: {type(test_obj.srs_data)}")
+            
+            # Background data
+            print("\nBackground Data:")
+            if hasattr(test_obj, 'bkgrnd_data'):
+                if hasattr(test_obj.bkgrnd_data, 'raw_data'):
+                    # Using SLMData with raw_data
+                    raw_data['background'] = test_obj.bkgrnd_data.raw_data['Overall 1/3 Spectra'].values[freq_indices]
+                    print("Using background SLMData.raw_data")
+                    if hasattr(test_obj.bkgrnd_data, 'file_path'):
+                        print(f"Background File: {os.path.basename(test_obj.bkgrnd_data.file_path)}")
+                elif isinstance(test_obj.bkgrnd_data, pd.DataFrame):
+                    # Direct DataFrame
+                    raw_data['background'] = test_obj.bkgrnd_data['Overall 1/3 Spectra'].values[freq_indices]
+                    print("Using background DataFrame directly")
+                else:
+                    print(f"Unsupported background data type: {type(test_obj.bkgrnd_data)}")
+            
+            # RT data
+            print("\nRT Data:")
+            if hasattr(test_obj, 'rt'):
+                try:
+                    # First try accessing rt_thirty if it exists
+                    if hasattr(test_obj.rt, 'rt_thirty'):
+                        raw_data['rt'] = test_obj.rt.rt_thirty[:-1]  # Remove last value
+                        print("Using rt_thirty property")
+                        if hasattr(test_obj.rt, 'file_path'):
+                            print(f"RT File: {os.path.basename(test_obj.rt.file_path)}")
+                    # Then try pandas DataFrame access if it's a DataFrame
+                    elif isinstance(test_obj.rt, pd.DataFrame):
+                        if 'Unnamed: 10' in test_obj.rt.columns:
+                            raw_data['rt'] = test_obj.rt['Unnamed: 10'][24:40]/1000  # Slice to match rt_thirty[:-1]
+                            print("Using DataFrame column access for RT")
+                        else:
+                            # Try to find numeric columns in case column name changed
+                            numeric_cols = test_obj.rt.select_dtypes(include=[np.number]).columns
+                            if len(numeric_cols) > 0:
+                                raw_data['rt'] = test_obj.rt[numeric_cols[0]][24:40]/1000
+                                print(f"Using alternative column for RT: {numeric_cols[0]}")
+                            else:
+                                print("No suitable numeric columns found in RT data")
+                    # If it's already a numpy array or list
+                    elif isinstance(test_obj.rt, (np.ndarray, list)):
+                        raw_data['rt'] = test_obj.rt[:-1] if len(test_obj.rt) > 16 else test_obj.rt
+                        print("Using array/list access for RT")
+                    else:
+                        print(f"Unsupported RT data type: {type(test_obj.rt)}")
+                except Exception as e:
+                    print(f"Error accessing RT data: {str(e)}")
+                    traceback.print_exc()
+            
+            # Process tapping positions
+            print("\nTapping Position Files:")
             positions = {
-                1: test_obj.pos1,
-                2: test_obj.pos2,
-                3: test_obj.pos3,
-                4: test_obj.pos4
+                1: 'pos1',
+                2: 'pos2',
+                3: 'pos3',
+                4: 'pos4'
             }
             
-            print("\nTapping Position Files:")
-            for pos_num, pos in positions.items():
-                if pos is not None:
+            for pos_num, pos_attr in positions.items():
+                if hasattr(test_obj, pos_attr):
+                    pos = getattr(test_obj, pos_attr)
                     print(f"\nPosition {pos_num}:")
-                    if hasattr(pos, 'file_path'):
-                        print(f"Position File: {os.path.basename(pos.file_path)}")
-                        print(f"Full Path: {pos.file_path}")
-                    print(f"Data Shape: {pos.raw_data.shape}")
+                    
+                    # Check if it's an SLMData object with raw_data
+                    if hasattr(pos, 'raw_data'):
+                        pos_df = pos.raw_data
+                        if hasattr(pos, 'file_path'):
+                            print(f"Position File: {os.path.basename(pos.file_path)}")
+                        print("Using position SLMData.raw_data")
+                    # Check if it's directly a DataFrame
+                    elif isinstance(pos, pd.DataFrame):
+                        pos_df = pos
+                        print("Using position DataFrame directly")
+                    else:
+                        print(f"Unsupported position data type: {type(pos)}")
+                        continue
+                        
                     try:
                         # Process position data
-                        pos_data = pos.raw_data.loc[pos.raw_data['1/1 Octave'] == 'Overall 1/3 Spectra']
+                        pos_data = pos_df.loc[pos_df['1/1 Octave'] == 'Overall 1/3 Spectra']
                         if not pos_data.empty:
                             pos_values = pos_data.iloc[0, 1:].values[freq_indices]
                             pos_values = np.array(pos_values, dtype=np.float64).round(1)
@@ -1438,22 +1566,28 @@ class MainWindow(BoxLayout):
                         else:
                             print("Warning: No '1/3 Spectra' row found")
                             print("Available rows in file:")
-                            print(pos.raw_data['1/1 Octave'].unique())
+                            print(pos_df['1/1 Octave'].unique())
                     except Exception as e:
                         print(f"Error processing position: {str(e)}")
                 else:
                     print(f"\nPosition {pos_num}: Not provided")
             
-            # Room properties with detailed file info
+            # Room properties
             print("\nRoom Properties:")
             if hasattr(test_obj.room_properties, 'file_path'):
                 print(f"Properties File: {os.path.basename(test_obj.room_properties.file_path)}")
-                print(f"Full Path: {test_obj.room_properties.file_path}")
             print(f"Receive Volume: {test_obj.room_properties.receive_vol}")
             
+            # Verify all required data is present
+            missing = [k for k, v in raw_data.items() if v is None and k != 'positions']
+            if missing:
+                print(f"Missing AIIC data: {missing}")
+                return None
+                
             # Final data validation
             print("\nFinal Data Summary:")
-            print(f"Number of frequencies: {len(raw_data['freq'])}")
+            if raw_data['freq'] is not None:
+                print(f"Number of frequencies: {len(raw_data['freq'])}")
             print(f"Source data points: {len(raw_data['source'])}")
             print(f"Background data points: {len(raw_data['background'])}")
             print(f"RT data points: {len(raw_data['rt'])}")
@@ -1805,16 +1939,98 @@ class MainWindow(BoxLayout):
         try:
             print("Getting ASTC raw data")
             raw_data = {
-                'source': test_obj.srs_data.raw_data if hasattr(test_obj, 'srs_data') else None,
-                'receive': test_obj.recive_data.raw_data if hasattr(test_obj, 'recive_data') else None,
-                'background': test_obj.bkgrnd_data.raw_data if hasattr(test_obj, 'bkgrnd_data') else None,
-                'rt': test_obj.rt.rt_thirty[:17] if hasattr(test_obj.rt, 'rt_thirty') else None,
+                'source': None,
+                'receive': None,
+                'background': None,
+                'rt': None,
                 'room_props': test_obj.room_properties
             }
             
+            # Handle source room data
+            if hasattr(test_obj, 'srs_data'):
+                if hasattr(test_obj.srs_data, 'raw_data'):
+                    # SLMData object with raw_data
+                    raw_data['source'] = test_obj.srs_data.raw_data
+                    print("Using source room SLMData.raw_data")
+                elif isinstance(test_obj.srs_data, pd.DataFrame):
+                    # Direct DataFrame
+                    raw_data['source'] = test_obj.srs_data
+                    print("Using source room DataFrame directly")
+                else:
+                    print(f"Unsupported source data type: {type(test_obj.srs_data)}")
+            
+            # Handle receive room data
+            if hasattr(test_obj, 'recive_data'):
+                if hasattr(test_obj.recive_data, 'raw_data'):
+                    # SLMData object with raw_data
+                    raw_data['receive'] = test_obj.recive_data.raw_data
+                    print("Using receive room SLMData.raw_data")
+                elif isinstance(test_obj.recive_data, pd.DataFrame):
+                    # Direct DataFrame
+                    raw_data['receive'] = test_obj.recive_data
+                    print("Using receive room DataFrame directly")
+                else:
+                    print(f"Unsupported receive data type: {type(test_obj.recive_data)}")
+            
+            # Handle background data
+            if hasattr(test_obj, 'bkgrnd_data'):
+                if hasattr(test_obj.bkgrnd_data, 'raw_data'):
+                    # SLMData object with raw_data
+                    raw_data['background'] = test_obj.bkgrnd_data.raw_data
+                    print("Using background SLMData.raw_data")
+                elif isinstance(test_obj.bkgrnd_data, pd.DataFrame):
+                    # Direct DataFrame
+                    raw_data['background'] = test_obj.bkgrnd_data
+                    print("Using background DataFrame directly")
+                else:
+                    print(f"Unsupported background data type: {type(test_obj.bkgrnd_data)}")
+            
+            # Handle RT data
+            if hasattr(test_obj, 'rt'):
+                try:
+                    # First try accessing rt_thirty if it exists
+                    if hasattr(test_obj.rt, 'rt_thirty'):
+                        raw_data['rt'] = test_obj.rt.rt_thirty[:17]
+                        print("Using rt_thirty property")
+                    # Then try pandas DataFrame access if it's a DataFrame
+                    elif isinstance(test_obj.rt, pd.DataFrame):
+                        if 'Unnamed: 10' in test_obj.rt.columns:
+                            raw_data['rt'] = test_obj.rt['Unnamed: 10'][24:41]/1000
+                            print("Using DataFrame column access for RT")
+                        else:
+                            # Try to find numeric columns in case column name changed
+                            numeric_cols = test_obj.rt.select_dtypes(include=[np.number]).columns
+                            if len(numeric_cols) > 0:
+                                raw_data['rt'] = test_obj.rt[numeric_cols[0]][24:41]/1000
+                                print(f"Using alternative column for RT: {numeric_cols[0]}")
+                            else:
+                                print("No suitable numeric columns found in RT data")
+                    # If it's already a numpy array or list
+                    elif isinstance(test_obj.rt, (np.ndarray, list)):
+                        raw_data['rt'] = test_obj.rt[:17] if len(test_obj.rt) >= 17 else test_obj.rt
+                        print("Using array/list access for RT")
+                    else:
+                        print(f"Unsupported RT data type: {type(test_obj.rt)}")
+                        
+                    # Convert to numpy array if needed
+                    if raw_data['rt'] is not None:
+                        raw_data['rt'] = np.array(raw_data['rt'], dtype=np.float64).round(3)
+                except Exception as e:
+                    print(f"Error accessing RT data: {str(e)}")
+                    traceback.print_exc()
+            
+            # Debug the raw data we collected
+            for key, value in raw_data.items():
+                if key != 'room_props':
+                    if value is not None:
+                        print(f"{key} data type: {type(value)}")
+                        print(f"{key} data shape/length: {value.shape if hasattr(value, 'shape') else len(value) if hasattr(value, '__len__') else 'unknown'}")
+                    else:
+                        print(f"{key} data: None")
+            
             # Verify all required data is present
-            if any(v is None for v in raw_data.values()):
-                missing = [k for k, v in raw_data.items() if v is None]
+            missing = [k for k, v in raw_data.items() if v is None]
+            if missing:
                 print(f"Missing ASTC data: {missing}")
                 return None
             
@@ -1822,6 +2038,7 @@ class MainWindow(BoxLayout):
             
         except Exception as e:
             print(f"Error getting ASTC raw data: {str(e)}")
+            traceback.print_exc()
             return None
 
     def _process_astc_frequencies(self, raw_data):
@@ -1893,16 +2110,98 @@ class MainWindow(BoxLayout):
         try:
             print("Getting NIC raw data")
             raw_data = {
-                'source': test_obj.srs_data.raw_data if hasattr(test_obj, 'srs_data') else None,
-                'receive': test_obj.recive_data.raw_data if hasattr(test_obj, 'recive_data') else None,
-                'background': test_obj.bkgrnd_data.raw_data if hasattr(test_obj, 'bkgrnd_data') else None,
-                'rt': test_obj.rt.rt_thirty[:17] if hasattr(test_obj.rt, 'rt_thirty') else None,
+                'source': None,
+                'receive': None,
+                'background': None,
+                'rt': None,
                 'room_props': test_obj.room_properties
             }
             
+            # Handle source room data
+            if hasattr(test_obj, 'srs_data'):
+                if hasattr(test_obj.srs_data, 'raw_data'):
+                    # SLMData object with raw_data
+                    raw_data['source'] = test_obj.srs_data.raw_data
+                    print("Using source room SLMData.raw_data")
+                elif isinstance(test_obj.srs_data, pd.DataFrame):
+                    # Direct DataFrame
+                    raw_data['source'] = test_obj.srs_data
+                    print("Using source room DataFrame directly")
+                else:
+                    print(f"Unsupported source data type: {type(test_obj.srs_data)}")
+            
+            # Handle receive room data
+            if hasattr(test_obj, 'recive_data'):
+                if hasattr(test_obj.recive_data, 'raw_data'):
+                    # SLMData object with raw_data
+                    raw_data['receive'] = test_obj.recive_data.raw_data
+                    print("Using receive room SLMData.raw_data")
+                elif isinstance(test_obj.recive_data, pd.DataFrame):
+                    # Direct DataFrame
+                    raw_data['receive'] = test_obj.recive_data
+                    print("Using receive room DataFrame directly")
+                else:
+                    print(f"Unsupported receive data type: {type(test_obj.recive_data)}")
+            
+            # Handle background data
+            if hasattr(test_obj, 'bkgrnd_data'):
+                if hasattr(test_obj.bkgrnd_data, 'raw_data'):
+                    # SLMData object with raw_data
+                    raw_data['background'] = test_obj.bkgrnd_data.raw_data
+                    print("Using background SLMData.raw_data")
+                elif isinstance(test_obj.bkgrnd_data, pd.DataFrame):
+                    # Direct DataFrame
+                    raw_data['background'] = test_obj.bkgrnd_data
+                    print("Using background DataFrame directly")
+                else:
+                    print(f"Unsupported background data type: {type(test_obj.bkgrnd_data)}")
+            
+            # Handle RT data
+            if hasattr(test_obj, 'rt'):
+                try:
+                    # First try accessing rt_thirty if it exists
+                    if hasattr(test_obj.rt, 'rt_thirty'):
+                        raw_data['rt'] = test_obj.rt.rt_thirty[:17]
+                        print("Using rt_thirty property")
+                    # Then try pandas DataFrame access if it's a DataFrame
+                    elif isinstance(test_obj.rt, pd.DataFrame):
+                        if 'Unnamed: 10' in test_obj.rt.columns:
+                            raw_data['rt'] = test_obj.rt['Unnamed: 10'][24:41]/1000
+                            print("Using DataFrame column access for RT")
+                        else:
+                            # Try to find numeric columns in case column name changed
+                            numeric_cols = test_obj.rt.select_dtypes(include=[np.number]).columns
+                            if len(numeric_cols) > 0:
+                                raw_data['rt'] = test_obj.rt[numeric_cols[0]][24:41]/1000
+                                print(f"Using alternative column for RT: {numeric_cols[0]}")
+                            else:
+                                print("No suitable numeric columns found in RT data")
+                    # If it's already a numpy array or list
+                    elif isinstance(test_obj.rt, (np.ndarray, list)):
+                        raw_data['rt'] = test_obj.rt[:17] if len(test_obj.rt) >= 17 else test_obj.rt
+                        print("Using array/list access for RT")
+                    else:
+                        print(f"Unsupported RT data type: {type(test_obj.rt)}")
+                        
+                    # Convert to numpy array if needed
+                    if raw_data['rt'] is not None:
+                        raw_data['rt'] = np.array(raw_data['rt'], dtype=np.float64).round(3)
+                except Exception as e:
+                    print(f"Error accessing RT data: {str(e)}")
+                    traceback.print_exc()
+            
+            # Debug the raw data we collected
+            for key, value in raw_data.items():
+                if key != 'room_props':
+                    if value is not None:
+                        print(f"{key} data type: {type(value)}")
+                        print(f"{key} data shape/length: {value.shape if hasattr(value, 'shape') else len(value) if hasattr(value, '__len__') else 'unknown'}")
+                    else:
+                        print(f"{key} data: None")
+            
             # Verify all required data is present
-            if any(v is None for v in raw_data.values()):
-                missing = [k for k, v in raw_data.items() if v is None]
+            missing = [k for k, v in raw_data.items() if v is None]
+            if missing:
                 print(f"Missing NIC data: {missing}")
                 return None
             
@@ -1910,6 +2209,7 @@ class MainWindow(BoxLayout):
             
         except Exception as e:
             print(f"Error getting NIC raw data: {str(e)}")
+            traceback.print_exc()
             return None
 
     def _process_nic_frequencies(self, raw_data):
