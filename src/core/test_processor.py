@@ -3,7 +3,7 @@ import pandas as pd
 from os.path import join
 from pathlib import Path
 
-from data_processor import (
+from src.core.data_processor import (
     TestType,
     RoomProperties,
     AIICTestData,

@@ -31,7 +31,7 @@ from src.gui.test_plan_manager import TestPlanManagerWindow
 import logging
 logging.getLogger('matplotlib.font_manager').disabled = True
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
-from data_processor import (
+from src.core.data_processor import (
     TestType, 
     RoomProperties,
     AIICTestData,
@@ -49,7 +49,7 @@ from data_processor import (
 )
 from src.core.test_processor import TestProcessor
 import numpy as np
-from base_test_reporter import *
+from src.reports.base_test_reporter import *
 
 class MainWindow(BoxLayout):
     def __init__(self, **kwargs):

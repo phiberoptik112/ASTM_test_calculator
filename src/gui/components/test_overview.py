@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 import matplotlib.pyplot as plt
 from typing import Dict, List
-from data_processor import TestType, SLMData
+from src.core.data_processor import TestType, SLMData
 
 class TestOverviewWindow(tk.Toplevel):
     def __init__(self, parent, test_data_manager):

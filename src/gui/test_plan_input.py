@@ -5,7 +5,7 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.checkbox import CheckBox
 from kivy.uix.button import Button
 from kivy.uix.scrollview import ScrollView
-from data_processor import RoomProperties, TestType
+from src.core.data_processor import RoomProperties, TestType
 import csv
 import os
 from datetime import datetime

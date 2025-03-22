@@ -6,8 +6,8 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate
 from reportlab.platypus import Image
 from reportlab.lib.enums import TA_CENTER
-from config import standards_text, test_instrumentation_table, test_procedure_pg, ISR_ony_report, stockNIC_note, stockISR_notes, FREQUENCIES
-from data_processor import *
+from src.config import standards_text, test_instrumentation_table, test_procedure_pg, ISR_ony_report, stockNIC_note, stockISR_notes, FREQUENCIES
+from src.core.data_processor import *
 
 class BaseTestReport:
     def __init__(self, test_data, reportOutputfolder, test_type):

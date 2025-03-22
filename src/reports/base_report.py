@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from src.core.test_data_manager import TestDataManager
-from data_processor import (
+from src.core.data_processor import (
     TestType, 
     RoomProperties,
     TestData,

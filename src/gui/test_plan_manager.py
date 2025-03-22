@@ -7,7 +7,7 @@ from kivy.uix.button import Button
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.popup import Popup
 from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelItem
-from data_processor import RoomProperties, TestType
+from src.core.data_processor import RoomProperties, TestType
 from src.gui.test_plan_input import TestPlanInputWindow
 import pandas as pd
 import os

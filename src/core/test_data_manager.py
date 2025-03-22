@@ -5,7 +5,7 @@ import os
 from os import listdir
 from os.path import isfile, join
 
-from data_processor import (
+from src.core.data_processor import (
     TestType,
     TestData,
     RoomProperties,
