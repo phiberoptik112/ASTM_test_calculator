@@ -127,9 +127,12 @@ class TestPlanManagerWindow(BoxLayout):
             # Create empty DataFrame with required columns
             columns = [
                 'Test_Label', 'Client_Name', 'Site_Name', 'Source Room',
-                'Receiving Room', 'Test Date', 'Report Date', 'Project Name',
-                'source room vol', 'receive room vol', 'partition area',
-                'partition dim', 'source room finish', 'receive room finish',
+                'Receiving Room', 'Test Date', 'Report Date',
+                'Source Room SRS File', 'Receive Room SRS File', 'Background Room SRS File',
+                'RT Room SRS File', 'Position 1 SRS File', 'Position 2 SRS File',
+                'Position 3 SRS File', 'Position 4 SRS File', 'Carpet SRS File',
+                'Tapper SRS File', 'Project Name', 'source room vol', 'receive room vol', 
+                'partition area', 'partition dim', 'source room finish', 'receive room finish',
                 'srs floor descrip.', 'srs walls descrip.', 'srs ceiling descrip.',
                 'rec floor descrip.', 'rec walls descrip.', 'rec ceiling descrip.',
                 'tested assembly', 'expected performance', 'Test assembly Type',
@@ -197,12 +200,31 @@ class TestPlanManagerWindow(BoxLayout):
                     spacing=2
                 )
                 
-                for value in row:
+                # Check if row has issues
+                test_types = ['AIIC', 'ASTC', 'NIC', 'DTC']
+                has_test_label = row.get('Test_Label') and not pd.isna(row.get('Test_Label'))
+                has_test_type = any(row.get(tt) == 1 for tt in test_types if tt in row)
+                row_has_errors = not has_test_label or not has_test_type
+                
+                # Highlight rows with errors
+                background_color = [1, 0.8, 0.8, 1] if row_has_errors else [1, 1, 1, 1]
+                
+                # Add cells
+                for col_idx, (col_name, value) in enumerate(row.items()):
+                    # Special background for test label or test type columns if they have issues
+                    cell_bg_color = background_color
+                    
+                    if col_name == 'Test_Label' and not has_test_label:
+                        cell_bg_color = [1, 0.6, 0.6, 1]  # Stronger red for missing test label
+                    elif col_name in test_types and not has_test_type and all(row.get(tt) != 1 for tt in test_types):
+                        cell_bg_color = [1, 0.9, 0.6, 1]  # Yellow for missing test type selection
+                        
                     cell = TextInput(
                         text=str(value),
                         multiline=False,
                         size_hint_y=None,
-                        height=40
+                        height=40,
+                        background_color=cell_bg_color
                     )
                     cell.bind(text=lambda instance, value, idx=idx: self._on_cell_edit(idx, value))
                     row_layout.add_widget(cell)
@@ -220,13 +242,27 @@ class TestPlanManagerWindow(BoxLayout):
     def _on_test_save(self, test_data: dict):
         """Handle saving a new or edited test"""
         try:
+            # Validate required test_label field
+            if not test_data.get('Test_Label'):
+                self._show_error("Test Label is required and cannot be empty")
+                return
+                
+            # Validate at least one test type is selected
+            test_types = ['AIIC', 'ASTC', 'NIC', 'DTC']
+            if not any(test_data.get(tt, 0) == 1 for tt in test_types):
+                self._show_error("You must select at least one test type (AIIC, ASTC, NIC, or DTC)")
+                return
+            
             # Initialize test plan if needed
             if self.current_test_plan is None:
                 columns = [
                     'Test_Label', 'Client_Name', 'Site_Name', 'Source Room',
-                    'Receiving Room', 'Test Date', 'Report Date', 'Project Name',
-                    'source room vol', 'receive room vol', 'partition area',
-                    'partition dim', 'source room finish', 'receive room finish',
+                    'Receiving Room', 'Test Date', 'Report Date',
+                    'Source Room SRS File', 'Receive Room SRS File', 'Background Room SRS File',
+                    'RT Room SRS File', 'Position 1 SRS File', 'Position 2 SRS File',
+                    'Position 3 SRS File', 'Position 4 SRS File', 'Carpet SRS File',
+                    'Tapper SRS File', 'Project Name', 'source room vol', 'receive room vol', 
+                    'partition area', 'partition dim', 'source room finish', 'receive room finish',
                     'srs floor descrip.', 'srs walls descrip.', 'srs ceiling descrip.',
                     'rec floor descrip.', 'rec walls descrip.', 'rec ceiling descrip.',
                     'tested assembly', 'expected performance', 'Test assembly Type',
@@ -286,6 +322,23 @@ class TestPlanManagerWindow(BoxLayout):
                              if col not in self.current_test_plan.columns]
             if missing_columns:
                 self._show_error(f"Missing required columns: {', '.join(missing_columns)}")
+                return
+            
+            # Validate each row has a test_label and at least one test type
+            invalid_rows = []
+            test_types = ['AIIC', 'ASTC', 'NIC', 'DTC']
+            
+            for idx, row in self.current_test_plan.iterrows():
+                if not row.get('Test_Label') or pd.isna(row.get('Test_Label')):
+                    invalid_rows.append(f"Row {idx+1}: Missing Test Label")
+                elif not any(row.get(tt) == 1 for tt in test_types if tt in row):
+                    invalid_rows.append(f"Row {idx+1} ({row['Test_Label']}): No test type selected")
+            
+            if invalid_rows:
+                self._show_error(
+                    "Cannot save test plan with invalid rows:\n" + 
+                    "\n".join(invalid_rows)
+                )
                 return
             
             # Save to CSV

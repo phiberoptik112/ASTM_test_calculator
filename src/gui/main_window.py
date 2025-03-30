@@ -317,7 +317,7 @@ class MainWindow(BoxLayout):
 
     def populate_test_inputs(self, instance):
         """Populate input fields with example data paths"""
-        self.test_plan_path.text = "./Exampledata/TestPlan_ASTM_testingv2.xlsx"
+        self.test_plan_path.text = "./Exampledata/TestPlan_ASTM_testingv2.csv"
         self.slm_data_1_path.text = "./Exampledata/RawData/A_Meter/"
         self.slm_data_2_path.text = "./Exampledata/RawData/E_Meter/"
         self.output_path.text = "./Exampledata/testeroutputs/"
@@ -387,6 +387,10 @@ class MainWindow(BoxLayout):
                 # Process test data
                 if debug_mode:
                     print("\nProcessing test data...")
+                    print(f"Test plan path: {test_plan_path}")
+                    print(f"SLM data D path: {slm_data_d_path}")
+                    print(f"SLM data E path: {slm_data_e_path}")
+                    print(f"Report output path: {report_output_path}")
                 self.status_label.text = 'Status: Processing test data...'
                 self.test_data_manager.process_test_data()
                 
@@ -395,6 +399,7 @@ class MainWindow(BoxLayout):
                 
                 # Add debug output to verify data was loaded
                 if debug_mode:
+                    print("inside debug mode, going to gather the test collection")
                     test_collection = self.test_data_manager.get_test_collection()
                     print("\nLoaded test collection:")
                     print(f"Number of tests: {len(test_collection)}")

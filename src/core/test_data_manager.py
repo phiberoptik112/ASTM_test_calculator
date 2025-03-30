@@ -49,6 +49,10 @@ class TestDataManager:
                 print(f"Meter D: {meter_d_path}")
                 print(f"Meter E: {meter_e_path}")
                 print(f"Output: {output_path}")
+                print(f"Current working directory: {os.getcwd()}")
+                print(f"Test plan directory: {os.path.dirname(test_plan_path)}")
+                print(f"Meter D directory: {os.path.dirname(meter_d_path)}")
+                print(f"Meter E directory: {os.path.dirname(meter_e_path)}")
             
             # Verify paths exist
             for path, desc in [
@@ -59,6 +63,12 @@ class TestDataManager:
             ]:
                 if not os.path.exists(path):
                     raise ValueError(f"Invalid {desc} path: {path}")
+                if self.debug_mode:
+                    print(f"\nChecking {desc} directory contents:")
+                    try:
+                        print(os.listdir(os.path.dirname(path)))
+                    except Exception as e:
+                        print(f"Error listing directory: {str(e)}")
             
             # Verify test plan file format
             test_plan_ext = os.path.splitext(test_plan_path)[1].lower()
@@ -110,32 +120,36 @@ class TestDataManager:
             if not os.path.exists(self.test_plan_path):
                 raise FileNotFoundError(f"Test plan file not found: {self.test_plan_path}")
             
-            # Check file content to determine the actual format regardless of extension
-            is_csv = False
-            try:
-                with open(self.test_plan_path, 'r', encoding='utf-8') as f:
-                    first_line = f.readline().strip()
-                    # If the first line contains many commas, it's likely a CSV
-                    if first_line.count(',') > 3:
-                        is_csv = True
-                        if self.debug_mode:
-                            print(f"File appears to be CSV format based on content (contains {first_line.count(',')} commas)")
-            except UnicodeDecodeError:
-                # If we can't read as text, it's likely a binary Excel file
-                is_csv = False
-                if self.debug_mode:
-                    print("File appears to be binary format (not readable as text)")
-            
-            # Determine file type from extension or content
+            # Determine file type from extension
             file_ext = os.path.splitext(self.test_plan_path)[1].lower()
             
-            # Try loading the file based on detected format
-            if is_csv:
+            if self.debug_mode:
+                print(f"\nAttempting to load test plan:")
+                print(f"File path: {self.test_plan_path}")
+                print(f"File extension: {file_ext}")
+            
+            # Try loading the file based on extension
+            if file_ext == '.csv':
                 if self.debug_mode:
-                    print("Loading as CSV file based on content detection")
-                self.test_plan = pd.read_csv(self.test_plan_path)
-            elif file_ext == '.csv':
-                self.test_plan = pd.read_csv(self.test_plan_path)
+                    print("Loading as CSV file")
+                # Use pandas to read CSV with proper handling of quoted values
+                self.test_plan = pd.read_csv(
+                    self.test_plan_path,
+                    encoding='utf-8',
+                    quoting=1,  # QUOTE_ALL
+                    skipinitialspace=True,  # Skip leading whitespace
+                    on_bad_lines='warn'  # Warn about problematic lines
+                )
+                
+                # Clean up column names
+                self.test_plan.columns = self.test_plan.columns.str.strip()
+                
+
+                print("CSV load result:")
+                print(f"Shape: {self.test_plan.shape}")
+                print("Columns:", self.test_plan.columns.tolist())
+                print("\nFirst few rows:")
+                print(self.test_plan.head())
             elif file_ext in ['.xlsx', '.xls']:
                 # Try different Excel engines in order
                 engines = ['openpyxl', 'xlrd']
@@ -145,12 +159,41 @@ class TestDataManager:
                     try:
                         print(f"Attempting to read Excel file with engine: {engine}")
                         if engine == 'xlrd' and file_ext == '.xlsx':
-                            # xlrd only supports .xls files fully, but can sometimes read .xlsx
                             print("Warning: Using xlrd with .xlsx file - limited functionality")
                         
-                        self.test_plan = pd.read_excel(self.test_plan_path, engine=engine)
-                        print(f"Successfully loaded with {engine} engine")
-                        break
+                        # First, try to get sheet names
+                        if engine == 'openpyxl':
+                            xl = pd.ExcelFile(self.test_plan_path, engine=engine)
+                            sheet_names = xl.sheet_names
+                            if self.debug_mode:
+                                print(f"Available sheets: {sheet_names}")
+                            
+                            # Try to read first sheet or sheet named 'Test Plan' if it exists
+                            sheet_to_use = 'Test Plan' if 'Test Plan' in sheet_names else sheet_names[0]
+                            print(f"Reading sheet: {sheet_to_use}")
+                            
+                            self.test_plan = pd.read_excel(
+                                self.test_plan_path,
+                                sheet_name=sheet_to_use,
+                                engine=engine
+                            )
+                        else:
+                            self.test_plan = pd.read_excel(self.test_plan_path, engine=engine)
+                        
+                        
+                        print(f"Excel load result with {engine}:")
+                        print(f"Shape: {self.test_plan.shape}")
+                        print("Columns:", self.test_plan.columns.tolist())
+                        if not self.test_plan.empty:
+                            print("\nFirst row:")
+                            print(self.test_plan.iloc[0])
+                        
+                        if not self.test_plan.empty:
+                            print(f"Successfully loaded with {engine} engine")
+                            break
+                        else:
+                            print(f"Warning: {engine} engine loaded empty DataFrame")
+                            
                     except Exception as e:
                         last_error = e
                         print(f"Failed with {engine} engine: {str(e)}")
@@ -159,16 +202,24 @@ class TestDataManager:
                         if "File is not a zip file" in str(e) or "Unsupported format" in str(e):
                             try:
                                 print("Excel engines failed. Trying to load as CSV...")
-                                self.test_plan = pd.read_csv(self.test_plan_path)
-                                print("Successfully loaded as CSV")
-                                break
+                                self.test_plan = pd.read_csv(
+                                    self.test_plan_path,
+                                    encoding='utf-8',
+                                    quoting=1,  # QUOTE_ALL
+                                    skipinitialspace=True,  # Skip leading whitespace
+                                    on_bad_lines='warn'  # Warn about problematic lines
+                                )
+                                if not self.test_plan.empty:
+                                    print("Successfully loaded as CSV")
+                                    break
+                                else:
+                                    print("Warning: CSV fallback loaded empty DataFrame")
                             except Exception as csv_e:
                                 print(f"CSV fallback failed: {str(csv_e)}")
                                 continue
                 
-                if self.test_plan is None:
+                if self.test_plan is None or self.test_plan.empty:
                     if "File is not a zip file" in str(last_error):
-                        # Special handling for corrupted Excel files
                         raise ValueError(
                             f"The Excel file appears to be corrupted or is actually a CSV file with an .xlsx extension. "
                             f"Please check if the file can be opened in Excel/LibreOffice and save it with the correct extension. "
@@ -180,91 +231,214 @@ class TestDataManager:
             else:
                 raise ValueError(f"Unsupported file format: {file_ext}. Please use .xlsx, .xls, or .csv files.")
             
-            if self.debug_mode:
-                print(f"Loaded test plan with {len(self.test_plan)} rows")
-                print("Columns:", self.test_plan.columns.tolist())
+            # Validate loaded data
+            if self.test_plan is None:
+                raise ValueError("Failed to load test plan - data is None")
+            
+            if self.test_plan.empty:
+                raise ValueError("Loaded test plan is empty")
+            
+            # Ensure required columns are present
+            required_columns = [
+                'Test_Label', 'AIIC', 'ASTC', 'NIC', 'DTC'
+            ]
+            missing_columns = [col for col in required_columns if col not in self.test_plan.columns]
+            if missing_columns:
+                print("\nMissing required columns:")
+                print(f"Required: {required_columns}")
+                print(f"Found: {self.test_plan.columns.tolist()}")
+                raise ValueError(f"Test plan missing required columns: {missing_columns}")
+            
+            # Validate test types are properly formatted
+            test_type_columns = ['AIIC', 'ASTC', 'NIC', 'DTC']
+            for col in test_type_columns:
+                if col in self.test_plan.columns:
+                    # Show original values before conversion
+                    print(f"\nValues in {col} before conversion:")
+                    print(self.test_plan[col].value_counts())
+                    
+                    # Convert any non-numeric values to 0
+                    self.test_plan[col] = pd.to_numeric(self.test_plan[col], errors='coerce').fillna(0).astype(int)
+                    
+                    # Ensure values are only 0 or 1
+                    invalid_values = self.test_plan[~self.test_plan[col].isin([0, 1])]
+                    if not invalid_values.empty:
+                        print(f"Warning: Found invalid values in {col} column. Converting to 0.")
+                        self.test_plan.loc[invalid_values.index, col] = 0
+                    
+                    # Show converted values
+                    print(f"Values in {col} after conversion:")
+                    print(self.test_plan[col].value_counts())
+            
+            print(f"\nSuccessfully loaded test plan:")
+            print(f"Number of rows: {len(self.test_plan)}")
+            print(f"Columns: {self.test_plan.columns.tolist()}")
+            print("\nTest types summary:")
+            for col in test_type_columns:
+                    if col in self.test_plan.columns:
+                        num_enabled = (self.test_plan[col] == 1).sum()
+                        print(f"{col}: {num_enabled} tests enabled")
+            print("\nFirst few rows of test plan:")
+            print(self.test_plan.head())
                 
         except Exception as e:
+            print("\nError details:")
+            print(f"Error type: {type(e)}")
+            print(f"Error message: {str(e)}")
+            import traceback
+            traceback.print_exc()
             raise ValueError(f"Error loading test plan: {str(e)}")
 
     def process_test_data(self) -> None:
         """Process all tests in the test plan"""
+        print("now in process_test_data")
+        print(f"test_plan: {self.test_plan}")
         if self.test_plan is None:
             raise ValueError("No test plan loaded")
 
-        if self.debug_mode:
-            print("\n=== Processing Test Data ===")
-            print(f"Number of tests to process: {len(self.test_plan)}")
 
+        print("\n=== Processing Test Data ===")
+        print(f"Number of tests to process: {len(self.test_plan)}")
+        print("Test plan columns:", self.test_plan.columns.tolist())
+        print("\nFirst few rows of test plan:")
+        print(self.test_plan.head())
+        print("resetting test data collection")
+        # Reset test data collection before processing
+        self.test_data_collection = {}
+        print(f"test_data_collection: {self.test_data_collection}")
+        processed_tests = 0
+        failed_tests = []
+        print("now iterating over the test plan")
         for index, curr_test in self.test_plan.iterrows():
             try:
-                test_label = curr_test['Test_Label']
-                if self.debug_mode:
-                    print(f"\nProcessing test {test_label} (row {index})")
-                    print(f"Test types enabled:")
-                    print(f"AIIC: {curr_test.get('AIIC', 0)}")
-                    print(f"ASTC: {curr_test.get('ASTC', 0)}")
-                    print(f"NIC: {curr_test.get('NIC', 0)}")
-                    print(f"DTC: {curr_test.get('DTC', 0)}")
+                # Validate test label
+                test_label = curr_test.get('Test_Label')
+                print(f"curr_test: {curr_test}")
+                print(f"test_label: {test_label}")
+                if pd.isna(test_label) or not test_label:
+                    raise ValueError(f"Row {index + 1}: Missing or invalid Test Label")
+
+                print(f"\nProcessing test {test_label} (row {index + 1})")
+                print("Test types enabled:")
+                for test_type in ['AIIC', 'ASTC', 'NIC', 'DTC']:
+                        value = curr_test.get(test_type, 0)
+                        print(f"{test_type}: {value} ({type(value)})")
 
                 # Create room properties
-                room_props = self._create_room_properties(curr_test)
-                
+                print("creating room properties")
+                try:
+                    room_props = self._create_room_properties(curr_test)
+
+                    print("Successfully created room properties")
+                except Exception as e:
+                    raise ValueError(f"Error creating room properties: {str(e)}")
+
                 # Process each test type
+                print("now processing each test type")
+                print(f"curr_test: {curr_test}")
                 curr_test_data = {}
+                test_types_processed = []
+
                 for test_type, column in {
                     TestType.AIIC: 'AIIC',
                     TestType.ASTC: 'ASTC',
                     TestType.NIC: 'NIC',
                     TestType.DTC: 'DTC'
                 }.items():
-                    if curr_test[column] == 1:
+                    # Ensure the column exists and has a valid value
+                    if column not in curr_test:
+                    
+                        print(f"Warning: {column} column not found in test plan")
+                        continue
+
+                    try:
+                        # Convert to numeric and handle NaN values
+                        value = curr_test[column]
+                        if isinstance(value, (int, float)):
+                            test_enabled = value == 1
+                        else:
+                            test_enabled = pd.to_numeric(value, errors='coerce').fillna(0) == 1
+                        print(f"Test type {test_type.value} enabled: {test_enabled}")
+                    except (ValueError, TypeError) as e:
+                        print(f"Warning: Invalid value in {column} column: {curr_test[column]}")
+                        print(f"Warning: Invalid value in {column} column: {curr_test[column]}")
+                        print(f"Error: {str(e)}")
+                        test_enabled = False
+
+                    if test_enabled:
+                        print(f"test_enabled: {test_enabled}")
                         try:
-                            if self.debug_mode:
-                                print(f"\nProcessing {test_type.value} test")
-                                
+
+                            print(f"\nProcessing {test_type.value} test")
+                            print("Required SRS files:")
+                            for col in ['Source Room SRS File', 'Receive Room SRS File', 
+                                        'Background Room SRS File', 'RT Room SRS File']:
+                                print(f"{col}: {curr_test.get(col)}")
+
                             test_data = self.load_test_data(
                                 curr_test=curr_test,
                                 test_type=test_type,
                                 room_props=room_props
                             )
-                            
+
                             if test_data:
                                 curr_test_data[test_type] = {
                                     'room_properties': room_props,
                                     'test_data': test_data
                                 }
-                                if self.debug_mode:
-                                    print(f"Successfully processed {test_type.value} test")
-                                    print(f"Test data type: {type(test_data)}")
-                                    print(f"Test data attributes: {dir(test_data)}")
+                                test_types_processed.append(test_type.value)
+
+                                print(f"Successfully processed {test_type.value} test")
+                                print(f"Test data type: {type(test_data)}")
                         except Exception as e:
-                            if self.debug_mode:
-                                print(f"Error processing {test_type.value} test: {str(e)}")
-                                import traceback
-                                traceback.print_exc()
+                            print(f"Error processing {test_type.value} test: {str(e)}")
+                            import traceback
+                            traceback.print_exc()
+                            failed_tests.append((test_label, test_type.value, str(e)))
 
                 if curr_test_data:
                     self.test_data_collection[test_label] = curr_test_data
-                    if self.debug_mode:
-                        print(f"\nAdded test data for {test_label}")
-                        print(f"Test types: {list(curr_test_data.keys())}")
-                        print(f"Data structure: {curr_test_data}")
+                    processed_tests += 1
+
+                    print(f"\nSuccessfully added test data for {test_label}")
+                    print(f"Test types processed: {test_types_processed}")
+                else:
+                    print(f"\nWarning: No test data processed for {test_label}")
 
             except Exception as e:
-                if self.debug_mode:
-                    print(f"Error processing test row {index}: {str(e)}")
-                print(f"Test label: {curr_test.get('Test_Label', 'Unknown')}")
+                error_msg = f"Error processing test row {index + 1}"
+                if 'Test_Label' in curr_test:
+                    error_msg += f" ({curr_test['Test_Label']})"
+                error_msg += f": {str(e)}"
+                
+                print(f"\nERROR: {error_msg}")
+                print("Test row data:")
+                print(curr_test)
                 import traceback
                 traceback.print_exc()
+                
+                failed_tests.append((curr_test.get('Test_Label', f'Row {index + 1}'), 'ALL', str(e)))
 
-        if self.debug_mode:
-            print(f"\nProcessed {len(self.test_data_collection)} tests")
+        # Final status report
+
+        print("\n=== Test Processing Summary ===")
+        print(f"Total tests in plan: {len(self.test_plan)}")
+        print(f"Successfully processed: {processed_tests}")
+        print(f"Tests with failures: {len(failed_tests)}")
+            
+        if failed_tests:
+            print("\nFailed tests:")
+            for test_label, test_type, error in failed_tests:
+                print(f"- {test_label} ({test_type}): {error}")
         
-        # Show test overview window
-        if hasattr(self, 'parent_window'):
-            from src.gui.components.test_overview import TestOverviewWindow
-            TestOverviewWindow(self.parent_window, self)
+        print("\nTest data collection:")
+        print(f"Number of tests: {len(self.test_data_collection)}")
+        for test_label, test_data in self.test_data_collection.items():
+            print(f"\n{test_label}:")
+            print(f"Test types: {list(test_data.keys())}")
+
+        if not self.test_data_collection:
+            raise ValueError("No test data was successfully processed")
 
     def get_test_data(self, test_label: str, test_type: TestType) -> Optional[Dict]:
         """Retrieve test data for specific test and type"""
@@ -284,36 +458,139 @@ class TestDataManager:
         except KeyError:
             return []
 
-    def _create_room_properties(self, test_row: pd.Series) -> RoomProperties:
-        """Create RoomProperties instance from test row"""
-        return RoomProperties(
-            site_name=test_row['Site_Name'],
-            client_name=test_row['Client_Name'],
-            source_room_name=test_row['Source Room'],
-            source_room=test_row['Source Room'],
-            receive_room_name=test_row['Receiving Room'],
-            receive_room=test_row['Receiving Room'],
-            test_date=test_row['Test Date'],
-            report_date=test_row['Report Date'],
-            project_name=test_row['Project Name'],
-            test_label=test_row['Test_Label'],
-            source_vol=test_row['source room vol'],
-            receive_vol=test_row['receive room vol'],
-            partition_area=test_row['partition area'],
-            partition_dim=test_row['partition dim'],
-            source_room_finish=test_row['source room finish'],
-            receive_room_finish=test_row['receive room finish'],
-            srs_floor=test_row['srs floor descrip.'],
-            srs_walls=test_row['srs walls descrip.'],
-            srs_ceiling=test_row['srs ceiling descrip.'],
-            rec_floor=test_row['rec floor descrip.'],
-            rec_walls=test_row['rec walls descrip.'],
-            rec_ceiling=test_row['rec ceiling descrip.'],
-            tested_assembly=test_row['tested assembly'],
-            expected_performance=test_row['expected performance'],
-            test_assembly_type=test_row['Test assembly Type'],
-            annex_2_used=bool(test_row['Annex 2 used?'])
-        )
+    def _create_room_properties(self, curr_test: pd.Series) -> RoomProperties:
+        """Create room properties from test data"""
+        print("now in _create_room_properties")
+        try:
+
+            print("\nCreating room properties")
+            print("Available columns:", curr_test.index.tolist())
+            print("Test data:")
+            print(curr_test)
+
+            # Extract room properties with fallback values
+            site_name = curr_test.get('Site_Name', '')
+            client_name = curr_test.get('Client_Name', '')
+            source_room = curr_test.get('Source Room', '')
+            receive_room = curr_test.get('Receiving Room', '')
+            test_date = curr_test.get('Test Date', '')
+            report_date = curr_test.get('Report Date', '')
+            project_name = curr_test.get('Project Name', '')
+            test_label = curr_test.get('Test_Label', '')
+            source_vol = float(curr_test.get('source room vol', 0))
+            receive_vol = float(curr_test.get('receive room vol', 0))
+            partition_area = float(curr_test.get('partition area', 0))
+            partition_dim = curr_test.get('partition dim', '')
+            source_room_finish = curr_test.get('source room finish', '')
+            receive_room_finish = curr_test.get('receive room finish', '')
+            srs_floor = curr_test.get('srs floor descrip.', '')
+            srs_walls = curr_test.get('srs walls descrip.', '')
+            srs_ceiling = curr_test.get('srs ceiling descrip.', '')
+            rec_floor = curr_test.get('rec floor descrip.', '')
+            rec_walls = curr_test.get('rec walls descrip.', '')
+            rec_ceiling = curr_test.get('rec ceiling descrip.', '')
+            tested_assembly = curr_test.get('tested assembly', '')
+            expected_performance = curr_test.get('expected performance', '')
+            annex_2_used = bool(curr_test.get('Annex 2 used?', False))
+            test_assembly_type = curr_test.get('Test assembly Type', '')
+
+            print("\nExtracted room properties:")
+            print(f"Site Name: {site_name}")
+            print(f"Client Name: {client_name}")
+            print(f"Source Room: {source_room}")
+            print(f"Receive Room: {receive_room}")
+            print(f"Test Date: {test_date}")
+            print(f"Report Date: {report_date}")
+            print(f"Project Name: {project_name}")
+            print(f"Test Label: {test_label}")
+            print(f"Source Volume: {source_vol}")
+            print(f"Receive Volume: {receive_vol}")
+            print(f"Partition Area: {partition_area}")
+            print(f"Partition Dim: {partition_dim}")
+            print(f"Source Room Finish: {source_room_finish}")
+            print(f"Receive Room Finish: {receive_room_finish}")
+            print(f"Source Floor: {srs_floor}")
+            print(f"Source Walls: {srs_walls}")
+            print(f"Source Ceiling: {srs_ceiling}")
+            print(f"Receive Floor: {rec_floor}")
+            print(f"Receive Walls: {rec_walls}")
+            print(f"Receive Ceiling: {rec_ceiling}")
+            print(f"Tested Assembly: {tested_assembly}")
+            print(f"Expected Performance: {expected_performance}")
+            print(f"Annex 2 Used: {annex_2_used}")
+            print(f"Test Assembly Type: {test_assembly_type}")
+
+            # Create room properties object with correct parameter names
+            room_props = RoomProperties(
+                site_name=site_name,
+                client_name=client_name,
+                source_room=source_room,
+                receive_room=receive_room,
+                test_date=test_date,
+                report_date=report_date,
+                project_name=project_name,
+                test_label=test_label,
+                source_vol=source_vol,
+                receive_vol=receive_vol,
+                partition_area=partition_area,
+                partition_dim=partition_dim,
+                source_room_finish=source_room_finish,
+                source_room_name=source_room,
+                receive_room_finish=receive_room_finish,
+                receive_room_name=receive_room,
+                srs_floor=srs_floor,
+                srs_walls=srs_walls,
+                srs_ceiling=srs_ceiling,
+                rec_floor=rec_floor,
+                rec_walls=rec_walls,
+                rec_ceiling=rec_ceiling,
+                tested_assembly=tested_assembly,
+                expected_performance=expected_performance,
+                annex_2_used=annex_2_used,
+                test_assembly_type=test_assembly_type
+            )
+
+            print("\nSuccessfully created RoomProperties object")
+            print(f"Site Name: {room_props.site_name}")
+            print(f"Client Name: {room_props.client_name}")
+            print(f"Source Room: {room_props.source_room}")
+            print(f"Receive Room: {room_props.receive_room}")
+            print(f"Test Date: {room_props.test_date}")
+            print(f"Report Date: {room_props.report_date}")
+            print(f"Project Name: {room_props.project_name}")
+            print(f"Test Label: {room_props.test_label}")
+            print(f"Source Volume: {room_props.source_vol}")
+            print(f"Receive Volume: {room_props.receive_vol}")
+            print(f"Partition Area: {room_props.partition_area}")
+            print(f"Partition Dim: {room_props.partition_dim}")
+            print(f"Source Room Finish: {room_props.source_room_finish}")
+            print(f"Source Room Name: {room_props.source_room_name}")
+            print(f"Receive Room Finish: {room_props.receive_room_finish}")
+            print(f"Receive Room Name: {room_props.receive_room_name}")
+            print(f"Source Floor: {room_props.srs_floor}")
+            print(f"Source Walls: {room_props.srs_walls}")
+            print(f"Source Ceiling: {room_props.srs_ceiling}")
+            print(f"Receive Floor: {room_props.rec_floor}")
+            print(f"Receive Walls: {room_props.rec_walls}")
+            print(f"Receive Ceiling: {room_props.rec_ceiling}")
+            print(f"Tested Assembly: {room_props.tested_assembly}")
+            print(f"Expected Performance: {room_props.expected_performance}")
+            print(f"Annex 2 Used: {room_props.annex_2_used}")
+            print(f"Test Assembly Type: {room_props.test_assembly_type}")
+
+            print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
+            print("returning room_props")
+            print(" ....is this the right thing to do here?")
+            return room_props
+
+        except Exception as e:
+        
+            print(f"\nError creating room properties: {str(e)}")
+            print("Test data:")
+            print(curr_test)
+            import traceback
+            traceback.print_exc()
+        raise ValueError(f"Error creating room properties: {str(e)}")
 
     def get_sorted_tests(self) -> List[Dict]:
         """
@@ -360,9 +637,8 @@ class TestDataManager:
                 'results': results
             })
             
-            if self.debug_mode:
-                print(f"Processed test {test_label} with types {test_types}")
-                print(f"Results: {results}")
+            print(f"Processed test {test_label} with types {test_types}")
+            print(f"Results: {results}")
         
         return sorted_tests
 
@@ -377,26 +653,54 @@ class TestDataManager:
         }
         
         test_column = test_type_columns.get(test_type)
-        if test_column not in curr_test or curr_test[test_column] != 1:
-            if self.debug_mode:
-                print(f'Test type {test_type.value} is not enabled for test {curr_test["Test_Label"]}')
+        value = curr_test[test_column]
+        if test_column not in curr_test or (isinstance(value, (int, float)) and value != 1) or (not isinstance(value, (int, float)) and pd.to_numeric(value, errors='coerce').fillna(0) != 1):
+            print(f'Test type {test_type.value} is not enabled for test {curr_test["Test_Label"]}')
             raise ValueError(f"Test type {test_type.value} is not enabled for this test")
 
-        if self.debug_mode:
-            print(f'Loading base data for test: {curr_test["Test_Label"]} ({test_type.value})')
+        print(f'\nLoading base data for test: {curr_test["Test_Label"]} ({test_type.value})')
+        print("Available columns:", curr_test.index.tolist())
 
         try:
             # Clean up column names in curr_test
             curr_test.index = curr_test.index.str.strip()
             
+            # Map new column names to old expected names
+            column_mappings = {
+                'Source': 'Source Room SRS File',
+                'Receive': 'Receive Room SRS File',
+                'BNL': 'Background Room SRS File',
+                'RT': 'RT Room SRS File',
+                'Position1': 'Position 1 SRS File',
+                'Position2': 'Position 2 SRS File',
+                'Position3': 'Position 3 SRS File',
+                'Position4': 'Position 4 SRS File',
+                'SourceTap': 'Tapper SRS File',
+                'Carpet': 'Carpet SRS File'
+            }
+            
+            # Helper function to get value using new or old column name
+            def get_column_value(old_name, new_name):
+                if new_name in curr_test and pd.notna(curr_test[new_name]) and curr_test[new_name]:
+                    print(f"Using new column name: {new_name} = {curr_test[new_name]}")
+                    return curr_test[new_name]
+                elif old_name in curr_test and pd.notna(curr_test[old_name]) and curr_test[old_name]:
+                    print(f"Using old column name: {old_name} = {curr_test[old_name]}")
+                    return curr_test[old_name]
+                print(f"Warning: No value found for {old_name} or {new_name}")
+                return None
+            
             # Load base data
-            if self.debug_mode:
-                print('Loading base data')
+            print('\nLoading base data')
             base_data = {
-                'srs_data': self._raw_slm_datapull(curr_test['Source'], '-831_Data.'),
-                'recive_data': self._raw_slm_datapull(curr_test['Receive'], '-831_Data.'),
-                'bkgrnd_data': self._raw_slm_datapull(curr_test['BNL'], '-831_Data.'),
-                'rt': self._raw_slm_datapull(curr_test['RT'], '-RT_Data.')
+                'srs_data': self._raw_slm_datapull(
+                    get_column_value('Source', 'Source Room SRS File'), '-831_Data.'),
+                'recive_data': self._raw_slm_datapull(
+                    get_column_value('Receive', 'Receive Room SRS File'), '-831_Data.'),
+                'bkgrnd_data': self._raw_slm_datapull(
+                    get_column_value('BNL', 'Background Room SRS File'), '-831_Data.'),
+                'rt': self._raw_slm_datapull(
+                    get_column_value('RT', 'RT Room SRS File'), '-RT_Data.')
             }
 
             # Verify base data
@@ -415,33 +719,49 @@ class TestDataManager:
                 raise ValueError(f"Unsupported test type: {test_type}")
 
         except Exception as e:
-            if self.debug_mode:
-                print(f"Error loading data: {str(e)}")
-                print(f"Current test data: {curr_test}")
+            print(f"Error loading data: {str(e)}")
+            print(f"Current test data: {curr_test}")
+            import traceback
+            traceback.print_exc()
             raise
 
     def _create_aiic_test(self, curr_test: pd.Series, room_props: RoomProperties, base_data: Dict) -> AIICTestData:
         """Create AIIC test data instance with additional validation"""
         try:
-            if self.debug_mode:
-                print("\nCreating AIIC test data")
-                print("Required columns:", ['Position1', 'Position2', 'Position3', 'Position4', 'SourceTap', 'Carpet'])
-                print("Available columns:", curr_test.index.tolist())
+            print("\nCreating AIIC test data")
+            print("Required columns:", ['Position1', 'Position2', 'Position3', 'Position4', 'SourceTap', 'Carpet'])
+            print("Available columns:", curr_test.index.tolist())
             
-            # Verify required columns exist
-            required_cols = ['Position1', 'Position2', 'Position3', 'Position4', 'SourceTap', 'Carpet']
-            missing_cols = [col for col in required_cols if col not in curr_test]
-            if missing_cols:
-                raise ValueError(f"Missing required AIIC columns: {missing_cols}")
+            # Check for both old and new column names
+            # Define helper function if not already defined in this scope
+            def get_column_value(old_name, new_name):
+                if new_name in curr_test and pd.notna(curr_test[new_name]) and curr_test[new_name]:
+                    return curr_test[new_name]
+                elif old_name in curr_test and pd.notna(curr_test[old_name]) and curr_test[old_name]:
+                    return curr_test[old_name]
+                return None
+            
+            # Verify required columns exist, checking both old and new names
+            old_cols = ['Position1', 'Position2', 'Position3', 'Position4', 'SourceTap', 'Carpet']
+            new_cols = ['Position 1 SRS File', 'Position 2 SRS File', 'Position 3 SRS File', 
+                       'Position 4 SRS File', 'Tapper SRS File', 'Carpet SRS File']
+            
+            missing_data = []
+            for i, (old, new) in enumerate(zip(old_cols, new_cols)):
+                if get_column_value(old, new) is None:
+                    missing_data.append(f"{old}/{new}")
+            
+            if missing_data:
+                raise ValueError(f"Missing required AIIC data: {missing_data}")
 
             aiic_data = base_data.copy()
             additional_data = {
-                'AIIC_pos1': self._raw_slm_datapull(curr_test['Position1'], '-831_Data.'),
-                'AIIC_pos2': self._raw_slm_datapull(curr_test['Position2'], '-831_Data.'),
-                'AIIC_pos3': self._raw_slm_datapull(curr_test['Position3'], '-831_Data.'),
-                'AIIC_pos4': self._raw_slm_datapull(curr_test['Position4'], '-831_Data.'),
-                'AIIC_source': self._raw_slm_datapull(curr_test['SourceTap'], '-831_Data.'),
-                'AIIC_carpet': self._raw_slm_datapull(curr_test['Carpet'], '-831_Data.')
+                'AIIC_pos1': self._raw_slm_datapull(get_column_value('Position1', 'Position 1 SRS File'), '-831_Data.'),
+                'AIIC_pos2': self._raw_slm_datapull(get_column_value('Position2', 'Position 2 SRS File'), '-831_Data.'),
+                'AIIC_pos3': self._raw_slm_datapull(get_column_value('Position3', 'Position 3 SRS File'), '-831_Data.'),
+                'AIIC_pos4': self._raw_slm_datapull(get_column_value('Position4', 'Position 4 SRS File'), '-831_Data.'),
+                'AIIC_source': self._raw_slm_datapull(get_column_value('SourceTap', 'Tapper SRS File'), '-831_Data.'),
+                'AIIC_carpet': self._raw_slm_datapull(get_column_value('Carpet', 'Carpet SRS File'), '-831_Data.')
             }
 
             # Verify all data was loaded successfully
@@ -451,27 +771,37 @@ class TestDataManager:
 
             aiic_data.update(additional_data)
             
-            if self.debug_mode:
-                print("AIIC data loaded successfully")
-                print(f"Number of data points: {len(additional_data)}")
+            print("AIIC data loaded successfully")
+            print(f"Number of data points: {len(additional_data)}")
             
             return AIICTestData(room_properties=room_props, test_data=aiic_data)
             
         except Exception as e:
-            if self.debug_mode:
-                print(f"Error creating AIIC test: {str(e)}")
-                import traceback
-                traceback.print_exc()
+            print(f"Error creating AIIC test: {str(e)}")
+            import traceback
+            traceback.print_exc()
             raise
 
     def _create_dtc_test(self, curr_test: pd.Series, room_props: RoomProperties, base_data: Dict) -> DTCtestData:
         """Create DTC test data instance"""
+        # Define helper function if not already defined in this scope
+        def get_column_value(old_name, new_name):
+            if new_name in curr_test and pd.notna(curr_test[new_name]) and curr_test[new_name]:
+                return curr_test[new_name]
+            elif old_name in curr_test and pd.notna(curr_test[old_name]) and curr_test[old_name]:
+                return curr_test[old_name]
+            return None
+            
         dtc_data = base_data.copy()
         additional_data = {
-            'srs_door_open': self._raw_slm_datapull(curr_test['Source_Door_Open'], '-831_Data.'),
-            'srs_door_closed': self._raw_slm_datapull(curr_test['Source_Door_Closed'], '-831_Data.'),
-            'recive_door_open': self._raw_slm_datapull(curr_test['Receive_Door_Open'], '-831_Data.'),
-            'recive_door_closed': self._raw_slm_datapull(curr_test['Receive_Door_Closed'], '-831_Data.')
+            'srs_door_open': self._raw_slm_datapull(
+                get_column_value('Source_Door_Open', 'Source Door Open SRS File'), '-831_Data.'),
+            'srs_door_closed': self._raw_slm_datapull(
+                get_column_value('Source_Door_Closed', 'Source Door Closed SRS File'), '-831_Data.'),
+            'recive_door_open': self._raw_slm_datapull(
+                get_column_value('Receive_Door_Open', 'Receive Door Open SRS File'), '-831_Data.'),
+            'recive_door_closed': self._raw_slm_datapull(
+                get_column_value('Receive_Door_Closed', 'Receive Door Closed SRS File'), '-831_Data.')
         }
         self._verify_dataframes(additional_data)
         dtc_data.update(additional_data)
@@ -522,86 +852,89 @@ class TestDataManager:
             raise ValueError(f"Error formatting SLM data: {str(e)}")
 
     def _raw_slm_datapull(self, find_datafile: str, datatype: str) -> SLMData:
-        """Pull data from SLM files and return as SLMData object"""
-        if self.debug_mode:
-            print("\n=== RAW_SLM_DATAPULL ===")
-            print(f"Looking for file identifier: {find_datafile}")
+        """Pull data from SLM files"""
+        try:
+            # Clean up any spaces in datafile name
+            if isinstance(find_datafile, str):
+                find_datafile = find_datafile.strip()
+            elif find_datafile is None or pd.isna(find_datafile):
+                if self.debug_mode:
+                    print(f"Warning: Missing data file for {datatype}")
+                # Return empty SLMData with placeholder
+                empty_df = pd.DataFrame(columns=['Placeholder'])
+                return SLMData(raw_data=empty_df, measurement_type=datatype.strip('.'))
+            
+            print(f"\nLooking for data file: {find_datafile}")
             print(f"Data type: {datatype}")
+            print(f"SLM data D path: {self.slm_data_d_path}")
+            print(f"SLM data E path: {self.slm_data_e_path}")
+            
+            # Get meter identifier and number
+            if not find_datafile or len(find_datafile) < 2:
+                raise ValueError(f"Invalid file identifier: {find_datafile}")
+            
+            meter_id = find_datafile[0].upper()
+            file_number = find_datafile[1:].zfill(3)  # e.g., '034' or '282'
+            
+            print(f"Meter ID: {meter_id}")
+            print(f"File number: {file_number}")
+            
+            # Define paths for different meter types
+            raw_testpaths = {
+                'A': self.slm_data_d_path,
+                'D': self.slm_data_d_path,
+                'E': self.slm_data_e_path
+            }
 
-        # Clean up input file identifier
-        if isinstance(find_datafile, str):
-            find_datafile = find_datafile.strip()  # Remove any trailing spaces
-        else:
-            raise ValueError(f"Invalid file identifier type: {type(find_datafile)}")
+            if meter_id not in raw_testpaths:
+                raise ValueError(f"Unknown meter identifier: {meter_id}")
 
-        # Get meter identifier and number
-        if not find_datafile or len(find_datafile) < 2:
-            raise ValueError(f"Invalid file identifier: {find_datafile}")
-        
-        meter_id = find_datafile[0].upper()
-        file_number = find_datafile[1:].zfill(3)  # e.g., '034' or '282'
-        
-        # Define paths for different meter types
-        raw_testpaths = {
-            'A': self.slm_data_d_path,
-            'D': self.slm_data_d_path,
-            'E': self.slm_data_e_path
-        }
+            path = raw_testpaths[meter_id]
+            datafiles = self.D_datafiles if meter_id in ['A', 'D'] else self.E_datafiles
 
-        if meter_id not in raw_testpaths:
-            raise ValueError(f"Unknown meter identifier: {meter_id}")
-
-        path = raw_testpaths[meter_id]
-        datafiles = self.D_datafiles if meter_id in ['A', 'D'] else self.E_datafiles
-
-        if self.debug_mode:
             print(f"\nSearching in path: {path}")
             print(f"Number of files: {len(datafiles)}")
             print(f"Looking for file number: {file_number}")
             print(f"Data type: {datatype}")
 
-        # Clean up datatype string for matching
-        datatype_clean = datatype.replace('.', '').replace('-', '')  # Remove dots and hyphens
+            # Clean up datatype string for matching
+            datatype_clean = datatype.replace('.', '').replace('-', '')  # Remove dots and hyphens
 
-        # Look for files that match the actual pattern
-        matching_files = []
-        for filename in datafiles:
-            # Check if both the data type and file number are in the filename
-            if (datatype_clean in filename.replace('-', '') and  # Handle data type
-                f".{file_number}.xlsx" in filename):            # Handle file number
-                matching_files.append(filename)
-                if self.debug_mode:
+            # Look for files that match the actual pattern
+            matching_files = []
+            for filename in datafiles:
+                # Check if both the data type and file number are in the filename
+                if (datatype_clean in filename.replace('-', '') and  # Handle data type
+                    f".{file_number}.xlsx" in filename):            # Handle file number
+                    matching_files.append(filename)
                     print(f"Found matching file: {filename}")
 
-        if not matching_files:
-            if self.debug_mode:
+            if not matching_files:
                 print("\nNo matches found. Available files:")
                 for f in datafiles:
                     print(f"  {f}")
-                print(f"\nWas looking for:")
-                print(f"  - Data type: {datatype_clean}")
-                print(f"  - File number: {file_number}")
-            raise ValueError(f"No matching files found for number {file_number} with type {datatype_clean}")
+                    print(f"\nWas looking for:")
+                    print(f"  - Data type: {datatype_clean}")
+                    print(f"  - File number: {file_number}")
+                raise ValueError(f"No matching files found for number {file_number} with type {datatype_clean}")
 
-        # Use the most recent file if multiple matches exist
-        selected_file = sorted(matching_files)[-1]
-        full_path = os.path.join(path, selected_file)
+            # Use the most recent file if multiple matches exist
+            selected_file = sorted(matching_files)[-1]
+            full_path = os.path.join(path, selected_file)
 
-        if self.debug_mode:
             print(f"\nSelected file: {selected_file}")
             print(f"Full path: {full_path}")
 
-        try:
-            if 'RT_Data' in datatype:
-                print(f"Reading Summary sheet for RT data")
-                df = pd.read_excel(full_path, sheet_name='Summary', engine='openpyxl')
-                measurement_type = 'RT_Data'
-            else:
-                print(f"Reading OBA sheet for measurement data")
-                df = pd.read_excel(full_path, sheet_name='OBA', engine='openpyxl')
-                measurement_type = '831_Data'
-            
-            if self.debug_mode:
+            try:
+                if 'RT_Data' in datatype:
+                    print(f"Reading Summary sheet for RT data")
+                    df = pd.read_excel(full_path, sheet_name='Summary', engine='openpyxl')
+                    measurement_type = 'RT_Data'
+                else:
+                    print(f"Reading OBA sheet for measurement data")
+                    df = pd.read_excel(full_path, sheet_name='OBA', engine='openpyxl')
+                    measurement_type = '831_Data'
+                
                 print("\nRaw DataFrame Structure:")
                 print(f"Shape: {df.shape}")
                 print(f"Columns: {df.columns.tolist()}")
@@ -610,15 +943,14 @@ class TestDataManager:
                 print("\nSearching for 'Frequency (Hz)' in first 10 rows:")
                 for idx, row in df.iloc[:10].iterrows():
                     print(f"Row {idx}:", row.tolist())
-        
-            if df.empty:
-                raise ValueError(f"Empty DataFrame loaded from {full_path}")
             
-            # Create SLMData object with file path
-            slm_data = SLMData(raw_data=df, measurement_type=measurement_type)
-            slm_data.file_path = full_path  # Add this line to store the file path
-            
-            if self.debug_mode:
+                if df.empty:
+                    raise ValueError(f"Empty DataFrame loaded from {full_path}")
+                
+                # Create SLMData object with file path
+                slm_data = SLMData(raw_data=df, measurement_type=measurement_type)
+                slm_data.file_path = full_path  # Add this line to store the file path
+                
                 print("\nSLMData object created:")
                 print(f"Measurement type: {measurement_type}")
                 print(f"Frequency bands: {len(slm_data.frequency_bands)}")
@@ -626,15 +958,19 @@ class TestDataManager:
                 print("First few rows of processed data:")
                 print(slm_data.raw_data.head())
                 print(f"\nFile path stored: {slm_data.file_path}")
+                    
+                return slm_data
                 
-            return slm_data
-            
-        except Exception as e:
-            if self.debug_mode:
+            except Exception as e:
                 print(f"\nError reading file:")
                 print(f"Exception: {str(e)}")
                 print(f"File: {selected_file}")
                 print(f"Path attempted: {full_path}")
+                raise
+
+        except Exception as e:
+            if self.debug_mode:
+                print(f"Error in _raw_slm_datapull: {str(e)}")
             raise
 
     def _verify_dataframes(self, data_dict: Dict[str, Union[pd.DataFrame, SLMData]]) -> None:
