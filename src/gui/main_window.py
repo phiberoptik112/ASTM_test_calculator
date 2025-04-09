@@ -317,11 +317,16 @@ class MainWindow(BoxLayout):
 
     def populate_test_inputs(self, instance):
         """Populate input fields with example data paths"""
-        self.test_plan_path.text = "./Exampledata/TestPlan_ASTM_testingv2.csv"
-        self.slm_data_1_path.text = "./Exampledata/RawData/A_Meter/"
-        self.slm_data_2_path.text = "./Exampledata/RawData/E_Meter/"
-        self.output_path.text = "./Exampledata/testeroutputs/"
-        
+        # self.test_plan_path.text = "./Exampledata/TestPlan_ASTM_testingv2.csv"
+        # self.slm_data_1_path.text = "./Exampledata/RawData/A_Meter/"
+        # self.slm_data_2_path.text = "./Exampledata/RawData/E_Meter/"
+        # self.output_path.text = "./Exampledata/testeroutputs/"
+
+        ## kaanapali shores
+        self.test_plan_path.text = "./example_data_kaanapali/TestPlan_kaanapali_AIIC_testingv2.csv"
+        self.slm_data_1_path.text = "./example_data_kaanapali/rawData/meterD/"
+        self.slm_data_2_path.text = "./example_data_kaanapali/rawData/meterE/"
+        self.output_path.text = "./example_data_kaanapali/reports_outputs/"
         self.status_label.text = "Status: Test inputs populated with example data"
 
     def load_data(self, instance):

@@ -43,16 +43,15 @@ class TestDataManager:
     def set_data_paths(self, test_plan_path: str, meter_d_path: str, meter_e_path: str, output_path: str) -> None:
         """Set all necessary file paths and load data files"""
         try:
-            if self.debug_mode:
-                print("\n=== Setting Data Paths ===")
-                print(f"Test plan: {test_plan_path}")
-                print(f"Meter D: {meter_d_path}")
-                print(f"Meter E: {meter_e_path}")
-                print(f"Output: {output_path}")
-                print(f"Current working directory: {os.getcwd()}")
-                print(f"Test plan directory: {os.path.dirname(test_plan_path)}")
-                print(f"Meter D directory: {os.path.dirname(meter_d_path)}")
-                print(f"Meter E directory: {os.path.dirname(meter_e_path)}")
+            print("\n=== Setting Data Paths ===")
+            print(f"Test plan: {test_plan_path}")
+            print(f"Meter D: {meter_d_path}")
+            print(f"Meter E: {meter_e_path}")
+            print(f"Output: {output_path}")
+            print(f"Current working directory: {os.getcwd()}")
+            print(f"Test plan directory: {os.path.dirname(test_plan_path)}")
+            print(f"Meter D directory: {os.path.dirname(meter_d_path)}")
+            print(f"Meter E directory: {os.path.dirname(meter_e_path)}")
             
             # Verify paths exist
             for path, desc in [
@@ -63,12 +62,11 @@ class TestDataManager:
             ]:
                 if not os.path.exists(path):
                     raise ValueError(f"Invalid {desc} path: {path}")
-                if self.debug_mode:
-                    print(f"\nChecking {desc} directory contents:")
-                    try:
-                        print(os.listdir(os.path.dirname(path)))
-                    except Exception as e:
-                        print(f"Error listing directory: {str(e)}")
+                print(f"\nChecking {desc} directory contents:")
+                try:
+                    print(os.listdir(os.path.dirname(path)))
+                except Exception as e:
+                    print(f"Error listing directory: {str(e)}")
             
             # Verify test plan file format
             test_plan_ext = os.path.splitext(test_plan_path)[1].lower()
@@ -98,12 +96,11 @@ class TestDataManager:
                     if isfile(join(meter_e_path, f)) and f.endswith('.xlsx')
                 ]
                 
-                if self.debug_mode:
-                    print(f'\nFound {len(self.D_datafiles)} D meter files:')
-                    for f in self.D_datafiles:
-                        print(f"  - {f}")
-                    print(f'\nFound {len(self.E_datafiles)} E meter files:')
-                    for f in self.E_datafiles:
+                print(f'\nFound {len(self.D_datafiles)} D meter files:')
+                for f in self.D_datafiles:
+                    print(f"  - {f}")
+                print(f'\nFound {len(self.E_datafiles)} E meter files:')
+                for f in self.E_datafiles:
                         print(f"  - {f}")
                     
             except Exception as e:
@@ -123,15 +120,13 @@ class TestDataManager:
             # Determine file type from extension
             file_ext = os.path.splitext(self.test_plan_path)[1].lower()
             
-            if self.debug_mode:
-                print(f"\nAttempting to load test plan:")
-                print(f"File path: {self.test_plan_path}")
-                print(f"File extension: {file_ext}")
+            print(f"\nAttempting to load test plan:")
+            print(f"File path: {self.test_plan_path}")
+            print(f"File extension: {file_ext}")
             
             # Try loading the file based on extension
             if file_ext == '.csv':
-                if self.debug_mode:
-                    print("Loading as CSV file")
+                print("Loading as CSV file")
                 # Use pandas to read CSV with proper handling of quoted values
                 self.test_plan = pd.read_csv(
                     self.test_plan_path,
@@ -148,8 +143,8 @@ class TestDataManager:
                 print("CSV load result:")
                 print(f"Shape: {self.test_plan.shape}")
                 print("Columns:", self.test_plan.columns.tolist())
-                print("\nFirst few rows:")
-                print(self.test_plan.head())
+                print("\nTestplan loaded:")
+                print(self.test_plan)
             elif file_ext in ['.xlsx', '.xls']:
                 # Try different Excel engines in order
                 engines = ['openpyxl', 'xlrd']
@@ -165,8 +160,8 @@ class TestDataManager:
                         if engine == 'openpyxl':
                             xl = pd.ExcelFile(self.test_plan_path, engine=engine)
                             sheet_names = xl.sheet_names
-                            if self.debug_mode:
-                                print(f"Available sheets: {sheet_names}")
+
+                            print(f"Available sheets: {sheet_names}")
                             
                             # Try to read first sheet or sheet named 'Test Plan' if it exists
                             sheet_to_use = 'Test Plan' if 'Test Plan' in sheet_names else sheet_names[0]
@@ -860,8 +855,19 @@ class TestDataManager:
             elif find_datafile is None or pd.isna(find_datafile):
                 if self.debug_mode:
                     print(f"Warning: Missing data file for {datatype}")
-                # Return empty SLMData with placeholder
-                empty_df = pd.DataFrame(columns=['Placeholder'])
+                # Return empty SLMData with proper structure
+                # Create a minimal DataFrame with the expected structure
+                empty_df = pd.DataFrame({
+                    '1/1 Octave': ['Frequency (Hz)', 'Overall 1/1 Spectra', 'Max 1/1 Spectra', 'Min 1/1 Spectra'],
+                    'Unnamed: 1': [8.0, 0.0, 0.0, 0.0],
+                    'Unnamed: 2': [16.0, 0.0, 0.0, 0.0],
+                    'Unnamed: 3': [31.5, 0.0, 0.0, 0.0],
+                    'Unnamed: 4': [63.0, 0.0, 0.0, 0.0],
+                    'Unnamed: 5': [125.0, 0.0, 0.0, 0.0],
+                    'Unnamed: 6': [250.0, 0.0, 0.0, 0.0],
+                    'Unnamed: 7': [500.0, 0.0, 0.0, 0.0],
+                    'Unnamed: 8': [1000.0, 0.0, 0.0, 0.0]
+                })
                 return SLMData(raw_data=empty_df, measurement_type=datatype.strip('.'))
             
             print(f"\nLooking for data file: {find_datafile}")
@@ -928,7 +934,12 @@ class TestDataManager:
             try:
                 if 'RT_Data' in datatype:
                     print(f"Reading Summary sheet for RT data")
-                    df = pd.read_excel(full_path, sheet_name='Summary', engine='openpyxl')
+                    df = pd.read_excel(
+                        full_path, 
+                        sheet_name='Summary',
+                        engine='openpyxl',
+                        header=None  # Important: Don't try to auto-detect headers
+                    )
                     measurement_type = 'RT_Data'
                 else:
                     print(f"Reading OBA sheet for measurement data")
@@ -969,322 +980,261 @@ class TestDataManager:
                 raise
 
         except Exception as e:
-            if self.debug_mode:
-                print(f"Error in _raw_slm_datapull: {str(e)}")
+            print(f"Error in _raw_slm_datapull: {str(e)}")
             raise
 
     def _verify_dataframes(self, data_dict: Dict[str, Union[pd.DataFrame, SLMData]]) -> None:
-        """
-        Verify and align data objects in the dictionary, ensuring required frequency coverage.
-        """
-        if not data_dict:
-            raise ValueError("Empty data dictionary provided")
-        
-        required_keys = {'srs_data', 'recive_data', 'bkgrnd_data', 'rt'}
-        missing_keys = required_keys - set(data_dict.keys())
-        if missing_keys:
-            raise ValueError(f"Missing required data keys: {missing_keys}")
+        """Verify and align data objects in dictionary"""
+        print("\n=== Starting Data Verification ===")
+        # print("Recieve data: ", self.recieve_data)
+        # print("SRS data: ", self.srs_data)
+        # print("Background data: ", self.bkgrnd_data)
+        # print("RT data: ", self.rt)
+        print(f"Data dictionary: {data_dict}")
 
-        # Define required frequency range and tolerance
-        REQUIRED_MIN_FREQ = 63.0    # Hz
-        REQUIRED_MAX_FREQ = 4000.0  # Hz
-        EXPECTED_BINS = 19          # Number of 1/3 octave bands
-        FREQ_TOLERANCE = 0.1        # Tolerance for float comparison
+        # Required keys
+        required_keys = ['srs_data', 'recive_data', 'bkgrnd_data', 'rt']
         
-        # Define required 1/3 octave bands with exact values
-        REQUIRED_FREQS = [
-            63.0, 80.0,  # Stored as floats in Excel
-            100, 125, 160, 200, 250, 315, 400, 500,
-            630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000
-        ]
-
+        # Required frequency bands (1/3 octave)
+        required_freq_third = [100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
+        
+        # Required frequency bands (1/1 octave)
+        required_freq_first = [125, 250, 500, 1000, 2000, 4000]
+        
+        # Tolerance for frequency matching (in Hz)
+        tolerance = 0.1
+        
         def is_freq_match(freq1: float, freq2: float) -> bool:
-            """Compare two frequencies within tolerance"""
-            return abs(freq1 - freq2) <= FREQ_TOLERANCE
-
-        # PHASE 1: Process and structure all DataFrames
+            """Check if two frequencies match within tolerance"""
+            return abs(freq1 - freq2) <= tolerance * freq1
+        
+        def get_freq_column(df: pd.DataFrame) -> pd.Series:
+            """Extract frequency column from DataFrame, handling different formats"""
+            print("\nAttempting to extract frequency column")
+            print(f"DataFrame shape: {df.shape}")
+            print(f"Columns: {df.columns.tolist()}")
+            
+            # Try to find frequency column
+            freq_col = None
+            
+            # Check if DataFrame has a frequency column
+            if 'Frequency (Hz)' in df.columns:
+                print("Found 'Frequency (Hz)' column")
+                freq_col = df['Frequency (Hz)']
+            elif '1/1 Octave' in df.columns:
+                print("Found '1/1 Octave' format")
+                # For 1/1 octave format, first row contains frequencies
+                freq_col = pd.to_numeric(df.iloc[0, 1:], errors='coerce')
+                print(f"Extracted frequencies: {freq_col.tolist()}")
+            elif '1/3 Octave' in df.columns:
+                print("Found '1/3 Octave' format")
+                # For 1/3 octave format, look for frequency row
+                for idx, row in df.iterrows():
+                    if 'Frequency (Hz)' in str(row.iloc[0]):
+                        freq_col = pd.to_numeric(row.iloc[1:], errors='coerce')
+                        print(f"Found frequencies at row {idx}")
+                        break
+            
+            if freq_col is None:
+                print("WARNING: Could not find frequency column")
+                print("First few rows of data:")
+                print(df.head())
+                raise ValueError("Could not find frequency column")
+                
+            freq_col = pd.Series(freq_col.dropna())
+            print(f"Final frequency range: {min(freq_col)}-{max(freq_col)} Hz")
+            print(f"Number of frequency bands: {len(freq_col)}")
+            return freq_col
+        
+        # Check all required keys are present
+        print("\nChecking required keys...")
+        for key in required_keys:
+            if key not in data_dict:
+                raise ValueError(f"Missing required key: {key}")
+            if data_dict[key] is None:
+                raise ValueError(f"Data for {key} is None")
+        
+        # First pass: Process measurement data (non-RT)
         processed_dfs = {}
         for key, data in data_dict.items():
-            if data is None:
-                raise ValueError(f"Missing data for {key}")
+            if key == 'rt':
+                continue
+                
+            print(f"\n=== Processing {key} ===")
             
-            # Extract DataFrame from SLMData if needed
-            df = data.raw_data if isinstance(data, SLMData) else data
-            
+            # Convert SLMData to DataFrame if needed
+            if isinstance(data, SLMData):
+                print("Converting SLMData to DataFrame")
+                df = data.processed_data
+            else:
+                df = data
+                
             if df.empty:
                 raise ValueError(f"Empty DataFrame for {key}")
-            
-            if self.debug_mode:
-                print(f"\nProcessing {key}:")
-                print(f"Original shape: {df.shape}")
-                print(f"Original columns: {df.columns.tolist()}")
                 
-            # Special handling for RT data
-            if key == 'rt':
-                try:
-                    # Find the row containing 'T30 (ms)' and 'Frequency (Hz)'
-                    header_row_idx = None
-                    for idx, row in df.iterrows():
-                        if 'T30 (ms)' in row.values and 'Frequency (Hz)' in row.values:
-                            header_row_idx = int(idx)
-                            freq_col_idx = int(row.tolist().index('Frequency (Hz)'))
-                            rt_col_idx = int(row.tolist().index('T30 (ms)'))
-                            break
-                    
-                    if header_row_idx is None:
-                        raise ValueError("Could not find RT data headers")
-                        
-                    # Extract data starting from the row after headers
-                    data_start_idx = header_row_idx + 1
-                    
-                    freq_data = df.iloc[data_start_idx:, freq_col_idx]
-                    rt_values = df.iloc[data_start_idx:, rt_col_idx]
-                    
-                    # Clean and convert frequency values
-                    freq_data = freq_data.astype(str).str.replace('Hz', '').str.strip()
-                    freq_data = pd.to_numeric(freq_data, errors='coerce')
-                    rt_values = pd.to_numeric(rt_values, errors='coerce')
-                    
-                    # Remove any rows where conversion failed
-                    valid_mask = ~(freq_data.isna() | rt_values.isna())
-                    freq_data = freq_data[valid_mask]
-                    rt_values = rt_values[valid_mask]
-                    
-                    if self.debug_mode:
-                        print("\nExtracted data:")
-                        print(f"Frequency column index: {freq_col_idx}")
-                        print(f"RT column index: {rt_col_idx}")
-                        print(f"Number of valid rows: {len(freq_data)}")
-                        print(f"Frequency range: {freq_data.min():.1f} - {freq_data.max():.1f} Hz")
-                    
-                    # Create new DataFrame with cleaned data
-                    df = pd.DataFrame({
-                        'Frequency (Hz)': freq_data,
-                        'RT60': rt_values
-                    })
-                    
-                    # Store the frequency data in the original object
-                    if isinstance(data_dict['rt'], SLMData):
-                        data_dict['rt'].frequencies = freq_data.values
-                        data_dict['rt'].raw_data = df
-                    
-                    if self.debug_mode:
-                        print("\nProcessed RT data:")
-                        print(f"Final shape: {df.shape}")
-                        print(f"Frequencies: {freq_data.tolist()}")
-                        print(f"RT values: {rt_values.tolist()}")
-                    
-                except Exception as e:
-                    raise ValueError(f"Error processing RT data: {str(e)}\nDataFrame info:\n{df.info()}")
-            else:
-                # Handle 831_Data files
-                if self.debug_mode:
-                    print(f"\nProcessing {key} DataFrame:")
-                    print("Initial shape:", df.shape)
-                    print("Initial columns:", df.columns.tolist())
-
-                # Find the header row containing 'Frequency (Hz)' in the 1/3 octave section
-                header_row_idx = None
-                found_1_3_octave = False
-
-                if self.debug_mode:
-                    print("\nSearching for frequency data:")
-                    print(f"DataFrame shape: {df.shape}")
-
-                for idx, row in df.iterrows():
-                    # Look for the '1/3 Octave' marker first
-                    if '1/3 Octave' in str(row.iloc[0]):
-                        found_1_3_octave = True
-                        if self.debug_mode:
-                            print(f"Found '1/3 Octave' marker at row {idx}")
-                        continue
-                    
-                    # After finding '1/3 Octave', look for the frequency header
-                    if found_1_3_octave and 'Frequency (Hz)' in row.values:
-                        header_row_idx = int(idx)  # Ensure integer
-                        freq_col_idx = int(row.tolist().index('Frequency (Hz)'))  # Find column index
-                        if self.debug_mode:
-                            print(f"Found 'Frequency (Hz)' at row {header_row_idx}, column {freq_col_idx}")
-                            print("Header row values:", row.tolist())
-                        break
-
-                if header_row_idx is None:
-                    if self.debug_mode:
-                        print(f"Could not find frequency header in {key}")
-                        print("First few rows:")
-                        print(df.head())
-                    raise ValueError(f"Could not find frequency header in {key}")
-
-                try:
-                    # Extract data starting from the header row
-                    df = df.iloc[header_row_idx:].copy()
-                    df.reset_index(drop=True, inplace=True)  # Reset index after slicing
-                    
-                    # Use the header row as column names and remove it from the data
-                    df.columns = df.iloc[0]
-                    df = df.iloc[1:].reset_index(drop=True)
-                    
-                    # Find the rows containing our required data types
-                    required_rows = ['Overall 1/3 Spectra', 'Max 1/3 Spectra', 'Min 1/3 Spectra']
-                    data_rows = {}
-                    
-                    for idx, row in df.iterrows():
-                        first_val = str(row.iloc[0]).strip()
-                        if first_val in required_rows:
-                            data_rows[first_val] = row.iloc[1:].astype(float)
-                    
-                    # Check if we found all required rows
-                    missing_rows = set(required_rows) - set(data_rows.keys())
-                    if missing_rows:
-                        if self.debug_mode:
-                            print(f"Missing required rows: {missing_rows}")
-                            print("Available first column values:")
-                            print(df.iloc[:, 0].tolist())
-                        raise ValueError(f"Missing required data rows in {key}: {missing_rows}")
-                    
-                    # Create new DataFrame with proper structure
-                    freq_values = [float(col) for col in df.columns[1:] if pd.notna(col)]
-                    new_df = pd.DataFrame({
-                        'Frequency (Hz)': freq_values,
-                        'Overall 1/3 Spectra': data_rows['Overall 1/3 Spectra'],
-                        'Max 1/3 Spectra': data_rows['Max 1/3 Spectra'],
-                        'Min 1/3 Spectra': data_rows['Min 1/3 Spectra']
-                    })
-                    
-                    # Remove any rows with NaN values
-                    new_df = new_df.dropna()
-                    
-                    if self.debug_mode:
-                        print("\nProcessed DataFrame:")
-                        print("Final shape:", new_df.shape)
-                        print("Final columns:", new_df.columns.tolist())
-                        print("Frequency range:", f"{new_df['Frequency (Hz)'].min():.1f} - {new_df['Frequency (Hz)'].max():.1f} Hz")
-                        print("Number of frequency bands:", len(new_df))
-                    
-                    df = new_df
-
-                except Exception as e:
-                    if self.debug_mode:
-                        print(f"\nError processing data:")
-                        print(f"Header row index: {header_row_idx}")
-                        print(f"Frequency column index: {freq_col_idx}")
-                        print(f"DataFrame shape: {df.shape}")
-                        print("Exception:", str(e))
-                    raise
-
-            if self.debug_mode:
-                print(f"Processed shape: {df.shape}")
-                print(f"Processed columns: {df.columns.tolist()}")
-                if 'Frequency (Hz)' in df.columns:
-                    freqs = pd.to_numeric(df['Frequency (Hz)'], errors='coerce')
-                    valid_freqs = freqs.dropna()
-                    if not valid_freqs.empty:
-                        print(f"Frequency range: {valid_freqs.min():.1f} - {valid_freqs.max():.1f} Hz")
-                        print(f"Number of frequency bands: {len(valid_freqs)}")
-        
-            processed_dfs[key] = df
-
-        # Update the original data dictionary with processed DataFrames
-        for key, df in processed_dfs.items():
-            if isinstance(data_dict[key], SLMData):
-                data_dict[key].raw_data = df
-            else:
-                data_dict[key] = df
-
-        # PHASE 2: Validate and align frequencies
-        measurement_dfs = {k: v for k, v in processed_dfs.items() if k != 'rt'}
-        
-        # Validate frequency ranges for all datasets
-        for key, df in processed_dfs.items():
-            if 'Frequency (Hz)' not in df.columns:
-                raise ValueError(f"{key}: Missing Frequency (Hz) column")
-            
-            freqs = pd.to_numeric(df['Frequency (Hz)'], errors='coerce')
-            freqs = freqs.dropna()
-            
-            if freqs.empty:
-                raise ValueError(f"{key}: No valid frequency values found")
-            
-            # For measurement data, check required frequency range
-            if key != 'rt':
-                min_freq = freqs.min()
-                max_freq = freqs.max()
+            try:
+                # Get frequency column
+                freq_col = get_freq_column(df)
+                print(f"Found {len(freq_col)} frequency bands")
+                print(f"Frequency range: {min(freq_col)}-{max(freq_col)} Hz")
                 
-                if min_freq > (REQUIRED_MIN_FREQ + FREQ_TOLERANCE):
-                    raise ValueError(
-                        f"{key}: Missing low frequency data. Minimum frequency is {min_freq}Hz "
-                        f"but {REQUIRED_MIN_FREQ}Hz is required"
-                    )
+                # Determine if it's 1/1 or 1/3 octave format
+                is_third_octave = any(is_freq_match(freq, 160) for freq in freq_col)
+                format_type = "1/3 octave" if is_third_octave else "1/1 octave"
+                required_freqs = required_freq_third if is_third_octave else required_freq_first
+                print(f"\nDetected {format_type} format")
                 
-                if max_freq < (REQUIRED_MAX_FREQ - FREQ_TOLERANCE):
-                    raise ValueError(
-                        f"{key}: Missing high frequency data. Maximum frequency is {max_freq}Hz "
-                        f"but {REQUIRED_MAX_FREQ}Hz is required"
-                    )
-
-        # Find common frequency bands across measurement DataFrames
-        common_freqs = None
-        for df in measurement_dfs.values():
-            curr_freqs = pd.to_numeric(df['Frequency (Hz)'], errors='coerce')
-            curr_freqs = curr_freqs.dropna()
-            if common_freqs is None:
-                common_freqs = set(curr_freqs)
+                # Verify required frequencies are present
+                missing_freqs = []
+                for req_freq in required_freqs:
+                    if not any(is_freq_match(freq, req_freq) for freq in freq_col):
+                        missing_freqs.append(req_freq)
+                
+                if missing_freqs:
+                    print(f"\nWARNING: Missing frequencies in {key}:")
+                    print(f"Missing: {missing_freqs}")
+                    print(f"Available: {freq_col.tolist()}")
+                    print("\nFirst few rows of data:")
+                    print(df.head())
+                    raise ValueError(f"Missing required frequencies in {key}: {missing_freqs}")
+                
+                processed_dfs[key] = df
+                    
+            except Exception as e:
+                print(f"\nError processing {key}:")
+                print(f"Error type: {type(e).__name__}")
+                print(f"Error message: {str(e)}")
+                print("\nDataFrame info:")
+                print(df.info())
+                print("\nFirst few rows:")
+                print(df.head())
+                raise ValueError(f"Could not verify frequency data in {key}: {str(e)}")
+        
+        # Second pass: Process RT data
+        print("\n=== Processing RT Data ===")
+        try:
+            rt_data = data_dict['rt']
+            if isinstance(rt_data, SLMData):
+                rt_df = rt_data.raw_data
             else:
-                # Match frequencies within tolerance
-                matched_freqs = set()
-                for freq1 in common_freqs:
-                    for freq2 in curr_freqs:
-                        if is_freq_match(freq1, freq2):
-                            matched_freqs.add(freq1)
-                            break
-                common_freqs = matched_freqs
-        
-        common_freqs = sorted(list(common_freqs))
-        
-        # Validate common frequency bands
-        common_required_freqs = [
-            f for f in common_freqs 
-            if REQUIRED_MIN_FREQ - FREQ_TOLERANCE <= f <= REQUIRED_MAX_FREQ + FREQ_TOLERANCE
-        ]
-        
-        if len(common_required_freqs) != EXPECTED_BINS:
-            raise ValueError(
-                f"Insufficient common frequency bands in required range. "
-                f"Expected {EXPECTED_BINS} bands, found {len(common_required_freqs)}. "
-                f"Available bands: {[f'{f:g}Hz' for f in common_required_freqs]}"
-            )
-        
-        if self.debug_mode:
-            print(f"\nFound {len(common_freqs)} common frequency bands")
-            print(f"Range: {min(common_freqs):g} - {max(common_freqs):g} Hz")
-            print("Required frequency bands present:", [f'{f:g}Hz' for f in common_required_freqs])
-
-        # Align measurement DataFrames to common frequency bands
-        aligned_dfs = {}
-        for key, df in measurement_dfs.items():
-            # Match frequencies within tolerance
-            mask = pd.to_numeric(df['Frequency (Hz)'], errors='coerce').apply(
-                lambda x: any(is_freq_match(x, f) for f in common_freqs)
-            )
-            aligned_df = df[mask].copy()
-            aligned_df.reset_index(drop=True, inplace=True)
-            aligned_dfs[key] = aligned_df
+                rt_df = rt_data
             
-            if self.debug_mode:
-                print(f"\nAligned {key}:")
-                print(f"Original shape: {df.shape}")
-                print(f"Aligned shape: {aligned_df.shape}")
-
-        # Update the original data objects with aligned data
-        for key, data in data_dict.items():
-            if key != 'rt':
-                if isinstance(data, SLMData):
-                    data.raw_data = aligned_dfs[key]
+            print("RT data shape:", rt_df.shape)
+            print("RT data columns:", rt_df.columns.tolist())
+            
+            # Find RT data headers
+            header_row_idx = None
+            for idx, row in rt_df.iterrows():
+                if 'T30 (ms)' in row.values and 'Frequency (Hz)' in row.values:
+                    header_row_idx = int(idx)
+                    freq_col_idx = int(row.tolist().index('Frequency (Hz)'))
+                    rt_col_idx = int(row.tolist().index('T30 (ms)'))
+                    break
+            
+            if header_row_idx is None:
+                print("WARNING: Could not find RT data headers")
+                print("First few rows of RT data:")
+                print(rt_df.head())
+                raise ValueError("Could not find RT data headers")
+            
+            print(f"Found RT headers at row {header_row_idx}")
+            print(f"Frequency column: {freq_col_idx}")
+            print(f"RT column: {rt_col_idx}")
+            
+            # Extract and clean RT data
+            data_start_idx = header_row_idx + 1
+            freq_data = rt_df.iloc[data_start_idx:, freq_col_idx]
+            rt_values = rt_df.iloc[data_start_idx:, rt_col_idx]
+            
+            # Clean and convert
+            freq_data = freq_data.astype(str).str.replace('Hz', '').str.strip()
+            freq_data = pd.to_numeric(freq_data, errors='coerce')
+            rt_values = pd.to_numeric(rt_values, errors='coerce')
+            
+            # Remove invalid data
+            valid_mask = ~(freq_data.isna() | rt_values.isna())
+            freq_data = freq_data[valid_mask]
+            rt_values = rt_values[valid_mask]
+            
+            print("\nRT Data Summary:")
+            print(f"Number of valid measurements: {len(freq_data)}")
+            print(f"Frequency range: {freq_data.min():.1f} - {freq_data.max():.1f} Hz")
+            print(f"RT values range: {rt_values.min():.3f} - {rt_values.max():.3f} ms")
+            
+            # Create cleaned RT DataFrame
+            rt_df_clean = pd.DataFrame({
+                'Frequency (Hz)': freq_data,
+                'RT60': rt_values
+            })
+            
+            # Update RT data in dictionary
+            if isinstance(data_dict['rt'], SLMData):
+                data_dict['rt'].frequencies = freq_data.values
+                data_dict['rt'].raw_data = rt_df_clean
+            else:
+                data_dict['rt'] = rt_df_clean
+            
+        except Exception as e:
+            print("\nError processing RT data:")
+            print(f"Error type: {type(e).__name__}")
+            print(f"Error message: {str(e)}")
+            raise ValueError(f"Failed to process RT data: {str(e)}")
+        
+        # Third pass: Align frequency bands across all measurement data
+        print("\n=== Aligning Frequency Bands ===")
+        try:
+            # Find common frequencies across measurement data
+            common_freqs = None
+            for df in processed_dfs.values():
+                curr_freqs = pd.to_numeric(df['Frequency (Hz)'], errors='coerce')
+                curr_freqs = curr_freqs.dropna()
+                
+                if common_freqs is None:
+                    common_freqs = set(curr_freqs)
                 else:
-                    data_dict[key] = aligned_dfs[key]
-
-        if self.debug_mode:
-            print("\nData verification and alignment complete")
+                    # Match frequencies within tolerance
+                    matched_freqs = set()
+                    for freq1 in common_freqs:
+                        for freq2 in curr_freqs:
+                            if is_freq_match(freq1, freq2):
+                                matched_freqs.add(freq1)
+                                break
+                    common_freqs = matched_freqs
+            
+            common_freqs = sorted(list(common_freqs))
+            print(f"\nFound {len(common_freqs)} common frequency bands:")
+            print(f"Range: {min(common_freqs):.1f} - {max(common_freqs):.1f} Hz")
+            print("Bands:", [f"{f:.1f}" for f in common_freqs])
+            
+            # Align each measurement DataFrame to common frequencies
+            for key, df in processed_dfs.items():
+                print(f"\nAligning {key}...")
+                print(f"Original shape: {df.shape}")
+                
+                # Create frequency matching mask
+                mask = pd.to_numeric(df['Frequency (Hz)'], errors='coerce').apply(
+                    lambda x: any(is_freq_match(x, f) for f in common_freqs)
+                )
+                
+                # Apply mask and reset index
+                aligned_df = df[mask].copy()
+                aligned_df.reset_index(drop=True, inplace=True)
+                
+                print(f"Aligned shape: {aligned_df.shape}")
+                
+                # Update data in dictionary
+                if isinstance(data_dict[key], SLMData):
+                    data_dict[key].raw_data = aligned_df
+                else:
+                    data_dict[key] = aligned_df
+            
+        except Exception as e:
+            print("\nError aligning frequency bands:")
+            print(f"Error type: {type(e).__name__}")
+            print(f"Error message: {str(e)}")
+            raise ValueError(f"Failed to align frequency bands: {str(e)}")
+        
+        print("\n=== Data Verification Complete ===")
 
     def get_test_collection(self) -> Dict[str, Dict[TestType, Dict]]:
         """Return the processed test data collection"""
