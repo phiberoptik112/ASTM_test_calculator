@@ -1434,6 +1434,7 @@ class NICTestReport(BaseTestReport):
                     'L1,\nAverage\nSource\nRoom\nLevel\n(dB)',
                     'L2,\nAverage\nCorrected\nReceiver\nRoom\nLevel\n(dB)',
                     'Average\nReceiver\nBackground\nLevel\n(dB)',
+                    'Average\nRT60\n(seconds)',
                     'Noise\nReduction,\nNR\n(dB)'
                     ]
                 
