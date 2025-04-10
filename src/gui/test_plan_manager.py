@@ -150,8 +150,16 @@ class TestPlanManagerWindow(BoxLayout):
         """Load and display current test plan"""
         try:
             if self.test_data_manager and self.test_data_manager.test_plan is not None:
-                self.current_test_plan = self.test_data_manager.test_plan.copy()
+                # Create a deep copy of the test plan to avoid modifying the original
+                self.current_test_plan = self.test_data_manager.test_plan.copy(deep=True)
+                
+                # Update the display with the loaded test plan
                 self._update_test_plan_display()
+                
+                # Clear any previously edited rows
+                self.edited_rows.clear()
+                
+                # Update status
                 self.status_label.text = 'Status: Current test plan loaded'
             else:
                 self._show_error("No current test plan available")
@@ -218,15 +226,26 @@ class TestPlanManagerWindow(BoxLayout):
                         cell_bg_color = [1, 0.6, 0.6, 1]  # Stronger red for missing test label
                     elif col_name in test_types and not has_test_type and all(row.get(tt) != 1 for tt in test_types):
                         cell_bg_color = [1, 0.9, 0.6, 1]  # Yellow for missing test type selection
+                    
+                    # Convert value to string, handling NaN values
+                    if pd.isna(value):
+                        display_value = ""
+                    else:
+                        display_value = str(value)
                         
                     cell = TextInput(
-                        text=str(value),
+                        text=display_value,
                         multiline=False,
                         size_hint_y=None,
                         height=40,
                         background_color=cell_bg_color
                     )
-                    cell.bind(text=lambda instance, value, idx=idx: self._on_cell_edit(idx, value))
+                    
+                    # Bind the text input to the cell edit handler
+                    # Use a lambda to capture the current row index and column name
+                    cell.bind(text=lambda instance, value, row_idx=idx, col_name=col_name: 
+                             self._on_cell_edit(row_idx, type('CellEdit', (), {'obj': instance, 'text': value})))
+                    
                     row_layout.add_widget(cell)
                 
                 self.test_plan_grid.add_widget(row_layout)
@@ -234,8 +253,19 @@ class TestPlanManagerWindow(BoxLayout):
         except Exception as e:
             self._show_error(f"Error updating test plan display: {str(e)}")
             
-    def _on_cell_edit(self, row_idx, value):
+    def _on_cell_edit(self, row_idx, cell_edit):
         """Handle cell edit events"""
+        # Get the cell that was edited
+        cell = cell_edit.obj
+        # Get the column name from the cell's parent (row) and the cell's index
+        row_widget = cell.parent
+        col_idx = row_widget.children.index(cell)
+        col_name = self.current_test_plan.columns[-(col_idx + 1)]  # Reverse index because Kivy children are in reverse order
+        
+        # Update the DataFrame with the new value
+        self.current_test_plan.at[row_idx, col_name] = cell_edit.text
+        
+        # Mark the row as edited
         self.edited_rows.add(row_idx)
         self.status_label.text = 'Status: Changes pending save'
         
@@ -314,15 +344,22 @@ class TestPlanManagerWindow(BoxLayout):
                 return
             
             # Ensure all required columns are present
-            required_columns = [
-                'Test_Label', 'Client_Name', 'Site_Name', 'Source Room',
-                'Receiving Room', 'Test Date', 'Report Date'
-            ]
-            missing_columns = [col for col in required_columns 
-                             if col not in self.current_test_plan.columns]
-            if missing_columns:
-                self._show_error(f"Missing required columns: {', '.join(missing_columns)}")
-                return
+            # required_columns = [
+            #     'Test_Label', 'Client_Name', 'Site_Name', 'Source Room',
+            #     'Receiving Room', 'Test Date', 'Report Date','Source Room SRS File', 'Receive Room SRS File', 'Background Room SRS File','RT Room SRS File', 'Position 1 SRS File', 'Position 2 SRS File',
+            #         'Position 3 SRS File', 'Position 4 SRS File', 'Carpet SRS File',
+            #         'Tapper SRS File', 'Project Name', 'source room vol', 'receive room vol', 
+            #         'partition area', 'partition dim', 'source room finish', 'receive room finish',
+            #         'srs floor descrip.', 'srs walls descrip.', 'srs ceiling descrip.',
+            #         'rec floor descrip.', 'rec walls descrip.', 'rec ceiling descrip.',
+            #         'tested assembly', 'expected performance', 'Test assembly Type',
+            #         'Annex 2 used?', 'AIIC', 'ASTC', 'NIC', 'DTC'
+            # ]
+            # missing_columns = [col for col in required_columns 
+            #                  if col not in self.current_test_plan.columns]
+            # if missing_columns:
+            #     self._show_error(f"Missing required columns: {', '.join(missing_columns)}")
+            #     return
             
             # Validate each row has a test_label and at least one test type
             invalid_rows = []
@@ -341,20 +378,41 @@ class TestPlanManagerWindow(BoxLayout):
                 )
                 return
             
-            # Save to CSV
-            csv_path = self.test_data_manager.test_plan_path
-            if not csv_path:
+            # Save to CSV with versioning
+            print("Saving test plan to CSV")
+            
+            # Get the original CSV path
+            original_csv_path = self.test_data_manager.test_plan_path
+            if not original_csv_path:
                 self._show_error("Test plan path not set")
                 return
             
-            self.current_test_plan.to_csv(csv_path, index=False)
+            # Create a versioned filename
+            base_path, ext = os.path.splitext(original_csv_path)
             
-            # Update test data manager with new data
-            self.test_data_manager.test_plan = self.current_test_plan
+            # Find the next version number
+            version = 1
+            while os.path.exists(f"{base_path}_v{version}{ext}"):
+                version += 1
+            
+            # Create the new versioned path
+            versioned_csv_path = f"{base_path}_v{version}{ext}"
+            
+            # Save to the versioned CSV file
+            self.current_test_plan.to_csv(versioned_csv_path, index=False)
+            
+            # Update the test data manager with the new path and data
+            self.test_data_manager.test_plan_path = versioned_csv_path
+            self.test_data_manager.test_plan = self.current_test_plan.copy(deep=True)
+            
+            # Process the test data
             self.test_data_manager.process_test_data()
             
+            # Clear edited rows
+            self.edited_rows.clear()
+            
             # Update status
-            self.status_label.text = 'Status: Changes saved successfully'
+            self.status_label.text = f'Status: Changes saved successfully to {os.path.basename(versioned_csv_path)}'
             
         except Exception as e:
             self._show_error(f"Error saving changes: {str(e)}")
