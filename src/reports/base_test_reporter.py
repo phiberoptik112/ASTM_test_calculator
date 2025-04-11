@@ -592,30 +592,32 @@ class BaseTestReport:
             
             instrumentation = self.get_test_instrumentation()
 
+            # Create header row with rotated text
             header_row = ["Equipment Type","Manufacturer","Model Number","Serial Number","Last NIST Traceable Calibration","Last Local Calibration"]
             rotated_style = ParagraphStyle(
                 'RotatedHeader',
                 fontName='Helvetica-Bold',
-                fontSize=8,  # Slightly smaller font for headers
+                fontSize=8,
                 alignment=TA_CENTER,
                 textColor=colors.black,
-                leading=10  # Controls line spacing for multi-line text
+                leading=10
             )
             rotated_headers = [
-                            Paragraph(f'<rotate>{text}</rotate>', rotated_style)
-                            for text in header_row
-                        ]
-            instrumentation[0] = rotated_headers
+                Paragraph(f'<rotate>{text}</rotate>', rotated_style)
+                for text in header_row
+            ]
+            
+            # Combine headers with data
+            table_data = [rotated_headers] + instrumentation
 
-            if not instrumentation:
+            if not table_data:
                 raise ValueError("Test instrumentation data is missing")
                 
             test_instrumentation_table = Table(
-                instrumentation, 
-                rowHeights=[65] + [20]*(len(instrumentation)-1), 
+                table_data, 
+                rowHeights=[65] + [20]*(len(instrumentation)), 
                 hAlign='LEFT'
             )
-
 
             test_instrumentation_table.setStyle(TableStyle([
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -810,7 +812,7 @@ class AIICTestReport(BaseTestReport):
 
     def get_test_instrumentation(self):
         equipment = super().get_test_instrumentation()
-        # Add AIIC-specific equipment
+        # Add AIIC-specific equipment - only adding tapping machine since other equipment is in base list
         aiic_equipment = [
             ["Tapping Machine", "Norsonics", "CAL200", "2775671", "9/19/2022", "N/A"],
         ]
@@ -1091,11 +1093,8 @@ class ASTCTestReport(BaseTestReport):
 
     def get_test_instrumentation(self):
         equipment = super().get_test_instrumentation()
-        # Add ASTC-specific equipment
-        astc_equipment = [
-            ["Amplified Loudspeaker", "QSC", "K10", "GAA530909", "N/A", "N/A"],
-            ["Noise Generator", "NTi Audio", "MR-PRO", "0162", "N/A", "N/A"],
-        ]
+        # Add ASTC-specific equipment - removing duplicates that are already in base list
+        astc_equipment = []  # Empty since all equipment is already in base list
         return equipment + astc_equipment
 
     def get_statement_of_conformance(self):
@@ -1373,7 +1372,11 @@ class NICTestReport(BaseTestReport):
 
             # Set single number result
             self.test_data.single_number_result = self.NIC_final_val
-
+                        # Calculate background check exceptions
+            self.NIC_exceptions_backcheck = []
+            for i in range(len(onethird_rec)):
+                background_diff = onethird_rec[i,1] - onethird_bkgrd[i,1]
+                self.NIC_exceptions_backcheck.append('0' if background_diff > 5 else '1')
             # Define frequencies including 4kHz
             frequencies = [100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
 
@@ -1386,7 +1389,7 @@ class NICTestReport(BaseTestReport):
                 print(f"Source room level: {len(onethird_srs)}")
                 print(f"RT30: {len(rt_thirty)}")
                 print(f"Average corrected receiver room level: {self.NIC_recieve_corr}")
-                
+                print(f"NIC exceptions backcheck: {len(self.NIC_exceptions_backcheck)}")
                 # Create table data
                 table_data = [
                     ['Frequency (Hz)',
@@ -1394,7 +1397,8 @@ class NICTestReport(BaseTestReport):
                         'L2, Average Corrected Receiver Room Level (dB)',
                         'Average Receiver Background Level (dB)',
                         'Average RT60 (seconds)',
-                        'Noise Reduction, NR (dB)'
+                        'Noise Reduction, NR (dB)',
+                        'Backgrnd check\nExceptions'
                     ]
                 ]
 
@@ -1413,7 +1417,8 @@ class NICTestReport(BaseTestReport):
                             f"{corr_rec_val:.1f}",
                             f"{bkg_val:.1f}",
                             f"{rt_val:.3f}",
-                            f"{NR_table_val:.1f}"
+                            f"{NR_table_val:.1f}",
+                            f"{self.NIC_exceptions_backcheck[i]}"
                         ]
                         print(f"Created row {i}: {row}")  # Debug output
                         table_data.append(row)
@@ -1435,7 +1440,8 @@ class NICTestReport(BaseTestReport):
                     'L2,\nAverage\nCorrected\nReceiver\nRoom\nLevel\n(dB)',
                     'Average\nReceiver\nBackground\nLevel\n(dB)',
                     'Average\nRT60\n(seconds)',
-                    'Noise\nReduction,\nNR\n(dB)'
+                    'Noise\nReduction,\nNR\n(dB)',
+                    'Backgrnd check\nExceptions'
                     ]
                 
                 # Create paragraph style for rotated headers
@@ -1458,7 +1464,7 @@ class NICTestReport(BaseTestReport):
                 # Create and style the table with adjusted dimensions
                     Test_result_table = Table(
                     table_data, 
-                    colWidths=[65, 85, 65, 45, 45],  # Narrower columns
+                    colWidths=[65, 85, 65, 45, 65, 65, 65],  # Narrower columns
                     rowHeights=[60] + [10]*(len(table_data)-1),  # Shorter rows overall
                     hAlign='LEFT'
                     )
