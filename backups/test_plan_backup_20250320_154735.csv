@@ -1,0 +1,29 @@
+data_type,field,value
+room_property,Test_Label,1.5.1
+room_property,Client_Name,mr test
+room_property,Site_Name,testville
+room_property,Source Room,
+room_property,Receiving Room,
+room_property,Test Date,
+room_property,Report Date,
+room_property,Project Name,
+room_property,source room vol,
+room_property,receive room vol,
+room_property,partition area,
+room_property,partition dim,
+room_property,source room finish,
+room_property,receive room finish,
+room_property,srs floor descrip.,
+room_property,srs walls descrip.,
+room_property,srs ceiling descrip.,
+room_property,rec floor descrip.,
+room_property,rec walls descrip.,
+room_property,rec ceiling descrip.,
+room_property,tested assembly,
+room_property,expected performance,
+room_property,Test assembly Type,
+room_property,Annex 2 used?,0
+room_property,AIIC,1
+room_property,ASTC,1
+room_property,NIC,0
+room_property,DTC,0

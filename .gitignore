@@ -7,3 +7,5 @@
 *.pyz
 .env/
 .tmp.*
+./example_data_kaanapali/
+./example_data_kaanapali/**/*

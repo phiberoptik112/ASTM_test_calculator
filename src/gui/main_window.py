@@ -26,11 +26,12 @@ import matplotlib.pyplot as plt
 from src.core.test_data_manager import TestDataManager
 from src.gui.test_plan_input import TestPlanInputWindow
 from src.gui.analysis_dashboard import ResultsAnalysisDashboard
+from src.gui.test_plan_manager import TestPlanManagerWindow
 
 import logging
 logging.getLogger('matplotlib.font_manager').disabled = True
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
-from data_processor import (
+from src.core.data_processor import (
     TestType, 
     RoomProperties,
     AIICTestData,
@@ -48,7 +49,7 @@ from data_processor import (
 )
 from src.core.test_processor import TestProcessor
 import numpy as np
-from base_test_reporter import *
+from src.reports.base_test_reporter import *
 
 class MainWindow(BoxLayout):
     def __init__(self, **kwargs):
@@ -286,90 +287,124 @@ class MainWindow(BoxLayout):
         self.add_widget(status_layout)
 
     def _show_error(self, message: str):
-        """Display error message in popup"""
+        """Display error message in popup with more detailed formatting"""
+        content_layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
+        
+        # Add scrollable text for long error messages
+        scroll_view = ScrollView(size_hint=(1, 0.8))
+        error_label = Label(
+            text=message, 
+            size_hint_y=None,
+            text_size=(380, None)
+        )
+        error_label.bind(texture_size=error_label.setter('size'))
+        scroll_view.add_widget(error_label)
+        content_layout.add_widget(scroll_view)
+        
+        # Add close button
+        close_button = Button(text="Close", size_hint=(1, 0.2))
+        content_layout.add_widget(close_button)
+        
         popup = Popup(
             title='Error',
-            content=Label(text=message),
+            content=content_layout,
             size_hint=(None, None),
-            size=(400, 200)
+            size=(400, 300)
         )
+        
+        close_button.bind(on_press=popup.dismiss)
         popup.open()
 
     def populate_test_inputs(self, instance):
         """Populate input fields with example data paths"""
-        self.test_plan_path.text = "./Exampledata/TestPlan_ASTM_testingv2.xlsx"
-        self.slm_data_1_path.text = "./Exampledata/RawData/A_Meter/"
-        self.slm_data_2_path.text = "./Exampledata/RawData/E_Meter/"
-        self.output_path.text = "./Exampledata/testeroutputs/"
-        
+        # self.test_plan_path.text = "./Exampledata/TestPlan_ASTM_testingv2.csv"
+        # self.slm_data_1_path.text = "./Exampledata/RawData/A_Meter/"
+        # self.slm_data_2_path.text = "./Exampledata/RawData/E_Meter/"
+        # self.output_path.text = "./Exampledata/testeroutputs/"
+
+        ## kaanapali shores
+        self.test_plan_path.text = "./example_data_kaanapali/TestPlan_kaanapali_AIIC_testingv2.csv"
+        self.slm_data_1_path.text = "./example_data_kaanapali/rawData/meterD/"
+        self.slm_data_2_path.text = "./example_data_kaanapali/rawData/meterE/"
+        self.output_path.text = "./example_data_kaanapali/reports_outputs/"
         self.status_label.text = "Status: Test inputs populated with example data"
 
     def load_data(self, instance):
-        """Load and process test data files"""
+        """Load and process all test data with improved error handling"""
         try:
-            # Update status
-            self.status_label.text = 'Status: Loading Data...'
-            
-            # Get debug mode from checkbox
             debug_mode = self.debug_checkbox.active
             
-            # Initialize TestDataManager with debug mode
-            print(f"Debug mode: {debug_mode}")
-            print(f"TestDataManager: {self.test_data_manager}")
-            self.test_data_manager = TestDataManager(debug_mode=debug_mode)
+            # Get paths from input fields
+            test_plan_path = self.test_plan_path.text
+            slm_data_d_path = self.slm_data_1_path.text
+            slm_data_e_path = self.slm_data_2_path.text
+            report_output_path = self.output_path.text
             
-            # Print debug info before path processing
-            if debug_mode:
-                print("\n=== Loading Data ===")
-                print(f"Raw Test Plan Path: {self.test_plan_path.text}")
-                print(f"Raw Meter 1 Path: {self.slm_data_1_path.text}")
-                print(f"Raw Meter 2 Path: {self.slm_data_2_path.text}")
-                print(f"Raw Output Path: {self.output_path.text}")
-            
-            # Convert relative paths to absolute and normalize them
-            try:
-                base_dir = os.path.dirname(os.path.abspath(__file__))  # Get the directory of main_window.py
-                paths = {
-                    'test_plan': os.path.abspath(os.path.join(base_dir, '..', '..', self.test_plan_path.text)),
-                    'meter_1': os.path.abspath(os.path.join(base_dir, '..', '..', self.slm_data_1_path.text)),
-                    'meter_2': os.path.abspath(os.path.join(base_dir, '..', '..', self.slm_data_2_path.text)),
-                    'output': os.path.abspath(os.path.join(base_dir, '..', '..', self.output_path.text))
-                }
+            # Validate paths
+            if not all([test_plan_path, slm_data_d_path, slm_data_e_path, report_output_path]):
+                raise ValueError("All paths must be provided")
                 
-                if debug_mode:
-                    print("\n=== Resolved Paths ===")
-                    for key, path in paths.items():
-                        print(f"{key}: {path}")
-                        print(f"Exists: {os.path.exists(path)}")
+            # Check if the test plan file exists
+            if not os.path.exists(test_plan_path):
+                raise FileNotFoundError(f"Test plan file not found: {test_plan_path}")
             
-            except Exception as e:
-                raise ValueError(f"Error resolving paths: {str(e)}")
+            # Check if the data directories exist
+            for path, name in [
+                (slm_data_d_path, "SLM Data Meter 1"),
+                (slm_data_e_path, "SLM Data Meter 2")
+            ]:
+                if not os.path.exists(path):
+                    raise FileNotFoundError(f"{name} directory not found: {path}")
+                if not os.path.isdir(path):
+                    raise ValueError(f"{name} path must be a directory: {path}")
             
-            # Set paths in TestDataManager
-            try:
-                self.test_data_manager.set_data_paths(
-                    test_plan_path=paths['test_plan'],
-                    meter_d_path=paths['meter_1'],
-                    meter_e_path=paths['meter_2'],
-                    output_path=paths['output']
-                )
-            except Exception as e:
-                raise ValueError(f"Error setting paths in TestDataManager: {str(e)}")
+            # Create output directory if it doesn't exist
+            if not os.path.exists(report_output_path):
+                try:
+                    os.makedirs(report_output_path, exist_ok=True)
+                    if debug_mode:
+                        print(f"Created output directory: {report_output_path}")
+                except PermissionError:
+                    raise PermissionError(f"Cannot create output directory: {report_output_path}. Please check permissions.")
+            
+            if debug_mode:
+                print("\nLoading data with paths:")
+                print(f"Test plan: {test_plan_path}")
+                print(f"SLM Data D: {slm_data_d_path}")
+                print(f"SLM Data E: {slm_data_e_path}")
+                print(f"Output: {report_output_path}")
+            
+            # Set paths in test data manager
+            self.test_data_manager.set_data_paths(
+                test_plan_path=test_plan_path,
+                meter_d_path=slm_data_d_path,
+                meter_e_path=slm_data_e_path,
+                output_path=report_output_path
+            )
             
             # Load test plan
             try:
                 if debug_mode:
                     print("\nLoading test plan...")
+                self.status_label.text = 'Status: Loading test plan...'
                 self.test_data_manager.load_test_plan()
-                self.update_displays()  # Add this line to update all displays
                 
                 # Process test data
                 if debug_mode:
                     print("\nProcessing test data...")
+                    print(f"Test plan path: {test_plan_path}")
+                    print(f"SLM data D path: {slm_data_d_path}")
+                    print(f"SLM data E path: {slm_data_e_path}")
+                    print(f"Report output path: {report_output_path}")
+                self.status_label.text = 'Status: Processing test data...'
                 self.test_data_manager.process_test_data()
+                
+                # Update all displays
+                self.update_displays()
                 
                 # Add debug output to verify data was loaded
                 if debug_mode:
+                    print("inside debug mode, going to gather the test collection")
                     test_collection = self.test_data_manager.get_test_collection()
                     print("\nLoaded test collection:")
                     print(f"Number of tests: {len(test_collection)}")
@@ -384,10 +419,37 @@ class MainWindow(BoxLayout):
                 
                 return True
                 
-            except Exception as e:
-                raise ValueError(f"Error loading test plan: {str(e)}")
+            except ValueError as e:
+                error_msg = str(e)
                 
-        except Exception as e:
+                # Check for specific Excel extension issue
+                if "File is not a zip file" in error_msg or "appears to be corrupted" in error_msg:
+                    self._show_excel_extension_error(error_msg)
+                    return False
+                
+                # Provide specific suggestions based on error types
+                if "corrupted" in error_msg and "Excel file" in error_msg:
+                    error_msg += "\n\nSuggestions:\n- Open the file in Excel/LibreOffice and save it in a new format (CSV or XLSX)\n- Check if the file is password protected\n- Try using a different Excel file"
+                elif "No matching files found" in error_msg:
+                    error_msg += "\n\nSuggestions:\n- Verify SLM data file naming format\n- Check paths to SLM data directories\n- Ensure data files are in the expected format (.xlsx)"
+                
+                raise ValueError(error_msg)
+                
+        except FileNotFoundError as e:
+            error_msg = f"File not found: {str(e)}"
+            if debug_mode:
+                print(f"\nERROR: {error_msg}")
+            self._show_error(error_msg + "\n\nPlease check that all paths are correct and files/directories exist.")
+            self.status_label.text = f"Status: Error - {error_msg}"
+            return False
+        except PermissionError as e:
+            error_msg = f"Permission error: {str(e)}"
+            if debug_mode:
+                print(f"\nERROR: {error_msg}")
+            self._show_error(error_msg + "\n\nPlease check file/directory permissions.")
+            self.status_label.text = f"Status: Error - {error_msg}"
+            return False
+        except ValueError as e:
             error_msg = f"Error loading data: {str(e)}"
             if debug_mode:
                 print(f"\nERROR: {error_msg}")
@@ -397,7 +459,17 @@ class MainWindow(BoxLayout):
             self._show_error(error_msg)
             self.status_label.text = f"Status: {error_msg}"
             return False
-
+        except Exception as e:
+            error_msg = f"Unexpected error: {str(e)}"
+            if debug_mode:
+                print(f"\nERROR: {error_msg}")
+                print("Stack trace:")
+                import traceback
+                traceback.print_exc()
+            self._show_error(error_msg + "\n\nPlease check the debug output for more details.")
+            self.status_label.text = f"Status: Error - {error_msg}"
+            return False
+    # may be a redundant function, but keeping it for now
     def assign_room_properties(self, test_row: pd.Series) -> RoomProperties:
         """Create RoomProperties from test row data"""
         print('test_row:', test_row)
@@ -495,9 +567,9 @@ class MainWindow(BoxLayout):
 
     def show_test_plan_input(self, instance):
         """Show test plan input window"""
-        content = TestPlanInputWindow(callback_on_save=self.on_test_plan_save)
+        content = TestPlanManagerWindow(test_data_manager=self.test_data_manager)
         self.test_plan_popup = Popup(
-            title='Add New Test',
+            title='Test Plan Manager',
             content=content,
             size_hint=(0.9, 0.9)
         )
@@ -890,49 +962,118 @@ class MainWindow(BoxLayout):
                         self.freq_data['room_props'] = test_obj.room_properties
                         
                         # Process and store data for calculations while plotting
-                        if hasattr(test_obj, 'srs_data') and hasattr(test_obj.srs_data, 'raw_data'):
-                            print("- Plotting source room data")
-                            df = test_obj.srs_data.raw_data
-                            ax1.plot(
-                                df['Frequency (Hz)'],
-                                df['Overall 1/3 Spectra'],
-                                label=f'{test_type.value} - Source Room'
-                            )
-                            # Store for calculations - using static method call
-                            formatted_df = TestDataManager.format_slm_data(test_obj.srs_data.raw_data)
-                            self.freq_data['source'] = formatted_df['Overall 1/3 Spectra'].values[0:17]
+                        if hasattr(test_obj, 'srs_data'):
+                            print("- Processing source room data")
+                            if hasattr(test_obj.srs_data, 'raw_data'):
+                                # SLMData object with raw_data
+                                df = test_obj.srs_data.raw_data
+                                print("- Plotting source room SLMData.raw_data")
+                            elif isinstance(test_obj.srs_data, pd.DataFrame):
+                                # Direct DataFrame
+                                df = test_obj.srs_data
+                                print("- Plotting source room DataFrame directly")
+                            else:
+                                print(f"- Unsupported source data type: {type(test_obj.srs_data)}")
+                                df = None
+                                
+                            if df is not None:
+                                ax1.plot(
+                                    df['Frequency (Hz)'],
+                                    df['Overall 1/3 Spectra'],
+                                    label=f'{test_type.value} - Source Room'
+                                )
+                                # Store for calculations - using static method call
+                                formatted_df = TestDataManager.format_slm_data(df)
+                                self.freq_data['source'] = formatted_df['Overall 1/3 Spectra'].values[0:17]
                         
-                        if hasattr(test_obj, 'recive_data') and hasattr(test_obj.recive_data, 'raw_data'):
-                            print("- Plotting receive room data")
-                            df = test_obj.recive_data.raw_data
-                            ax1.plot(
-                                df['Frequency (Hz)'],
-                                df['Overall 1/3 Spectra'],
-                                label=f'{test_type.value} - Receive Room'
-                            )
-                            # Store for calculations
-                            formatted_df = TestDataManager.format_slm_data(test_obj.recive_data.raw_data)
-                            self.freq_data['receive'] = formatted_df['Overall 1/3 Spectra'].values[0:17]
+                        # Receive room data
+                        if hasattr(test_obj, 'recive_data'):
+                            print("- Processing receive room data")
+                            if hasattr(test_obj.recive_data, 'raw_data'):
+                                # SLMData object with raw_data
+                                df = test_obj.recive_data.raw_data
+                                print("- Plotting receive room SLMData.raw_data")
+                            elif isinstance(test_obj.recive_data, pd.DataFrame):
+                                # Direct DataFrame
+                                df = test_obj.recive_data
+                                print("- Plotting receive room DataFrame directly")
+                            else:
+                                print(f"- Unsupported receive data type: {type(test_obj.recive_data)}")
+                                df = None
+                                
+                            if df is not None:
+                                ax1.plot(
+                                    df['Frequency (Hz)'],
+                                    df['Overall 1/3 Spectra'],
+                                    label=f'{test_type.value} - Receive Room'
+                                )
+                                # Store for calculations
+                                formatted_df = TestDataManager.format_slm_data(df)
+                                self.freq_data['receive'] = formatted_df['Overall 1/3 Spectra'].values[0:17]
                         
-                        if hasattr(test_obj, 'bkgrnd_data') and hasattr(test_obj.bkgrnd_data, 'raw_data'):
-                            print("- Plotting background data")
-                            df = test_obj.bkgrnd_data.raw_data
-                            ax1.plot(
-                                df['Frequency (Hz)'],
-                                df['Overall 1/3 Spectra'],
-                                label=f'{test_type.value} - Background'
-                            )
-                            # Store for calculations
-                            formatted_df = TestDataManager.format_slm_data(test_obj.bkgrnd_data.raw_data)
-                            self.freq_data['background'] = formatted_df['Overall 1/3 Spectra'].values[0:17]
+                        # Background data
+                        if hasattr(test_obj, 'bkgrnd_data'):
+                            print("- Processing background data")
+                            if hasattr(test_obj.bkgrnd_data, 'raw_data'):
+                                # SLMData object with raw_data
+                                df = test_obj.bkgrnd_data.raw_data
+                                print("- Plotting background SLMData.raw_data")
+                            elif isinstance(test_obj.bkgrnd_data, pd.DataFrame):
+                                # Direct DataFrame
+                                df = test_obj.bkgrnd_data
+                                print("- Plotting background DataFrame directly")
+                            else:
+                                print(f"- Unsupported background data type: {type(test_obj.bkgrnd_data)}")
+                                df = None
+                                
+                            if df is not None:
+                                ax1.plot(
+                                    df['Frequency (Hz)'],
+                                    df['Overall 1/3 Spectra'],
+                                    label=f'{test_type.value} - Background'
+                                )
+                                # Store for calculations
+                                formatted_df = TestDataManager.format_slm_data(df)
+                                self.freq_data['background'] = formatted_df['Overall 1/3 Spectra'].values[0:17]
                         
                         # Store RT data for calculations
                         if hasattr(test_obj, 'rt'):
-                            if hasattr(test_obj.rt, 'rt_thirty'):
-                                rt_data = test_obj.rt.rt_thirty[:17]
-                            else:
-                                rt_data = test_obj.rt['Unnamed: 10'][24:41]/1000
-                            self.freq_data['rt'] = np.array(rt_data, dtype=np.float64).round(3)
+                            try:
+                                # First try accessing rt_thirty if it exists
+                                if hasattr(test_obj.rt, 'rt_thirty'):
+                                    rt_data = test_obj.rt.rt_thirty[:17]
+                                    print("Using rt_thirty property")
+                                # Then try pandas DataFrame access if it's a DataFrame
+                                elif isinstance(test_obj.rt, pd.DataFrame):
+                                    if 'Unnamed: 10' in test_obj.rt.columns:
+                                        rt_data = test_obj.rt['Unnamed: 10'][24:41]/1000
+                                        print("Using DataFrame column access")
+                                    else:
+                                        # Try to find numeric columns in case column name changed
+                                        numeric_cols = test_obj.rt.select_dtypes(include=[np.number]).columns
+                                        if len(numeric_cols) > 0:
+                                            rt_data = test_obj.rt[numeric_cols[0]][24:41]/1000
+                                            print(f"Using alternative column: {numeric_cols[0]}")
+                                        else:
+                                            print("No suitable numeric columns found in RT data")
+                                            rt_data = None
+                                # If it's already a numpy array or list
+                                elif isinstance(test_obj.rt, (np.ndarray, list)):
+                                    rt_data = test_obj.rt[:17] if len(test_obj.rt) >= 17 else test_obj.rt
+                                    print("Using array/list access")
+                                else:
+                                    print(f"Unsupported RT data type: {type(test_obj.rt)}")
+                                    rt_data = None
+                                    
+                                # Store the data if we successfully retrieved it
+                                if rt_data is not None:
+                                    self.freq_data['rt'] = np.array(rt_data, dtype=np.float64).round(3)
+                                    print(f"Stored RT data with shape: {self.freq_data['rt'].shape}")
+                            except Exception as e:
+                                print(f"Error accessing RT data: {str(e)}")
+                                traceback.print_exc()
+                                # Set to None so calculations know to handle missing RT data
+                                self.freq_data['rt'] = None
 
                         # Process test-specific data
                         if test_type == TestType.AIIC:
@@ -1311,59 +1452,118 @@ class MainWindow(BoxLayout):
             print(f"Test Directory: {getattr(test_obj, 'test_dir', 'Unknown')}")
             
             # 1/3 octave bands from 100 to 3150 Hz
-            # still a hardcoded value... is there a better way to do this?
             freq_indices = slice(12, 28)
             
-            # Source room data with detailed file info
-            print("\nSource Room Data:")
-            if hasattr(test_obj.srs_data, 'file_path'):
-                print(f"Source File: {os.path.basename(test_obj.srs_data.file_path)}")
-                print(f"Full Path: {test_obj.srs_data.file_path}")
-            print(f"Data Shape: {test_obj.srs_data.raw_data.shape}")
-            
-            # Background data with detailed file info
-            print("\nBackground Data:")
-            if hasattr(test_obj.bkgrnd_data, 'file_path'):
-                print(f"Background File: {os.path.basename(test_obj.bkgrnd_data.file_path)}")
-                print(f"Full Path: {test_obj.bkgrnd_data.file_path}")
-            print(f"Data Shape: {test_obj.bkgrnd_data.raw_data.shape}")
-            
-            # RT data with detailed file info
-            # still a hardcoded value... is there a better way to do this?
-            print("\nRT Data:")
-            if hasattr(test_obj.rt, 'file_path'):
-                print(f"RT File: {os.path.basename(test_obj.rt.file_path)}")
-                print(f"Full Path: {test_obj.rt.file_path}")
-            print(f"RT30 Values Shape: {test_obj.rt.rt_thirty.shape}")
-            
+            # Initialize raw data structure
             raw_data = {
-                'freq': test_obj.srs_data.raw_data['Frequency (Hz)'].values,
-                'source': test_obj.srs_data.raw_data['Overall 1/3 Spectra'].values[freq_indices],
-                'background': test_obj.bkgrnd_data.raw_data['Overall 1/3 Spectra'].values[freq_indices],
-                'rt': test_obj.rt.rt_thirty[:-1], # this also is still hardcoded 
+                'freq': None,
+                'source': None,
+                'background': None,
+                'rt': None,
                 'room_props': test_obj.room_properties,
                 'positions': []
             }
             
-            # Process tapping positions with detailed file info
+            # Source room data
+            print("\nSource Room Data:")
+            if hasattr(test_obj, 'srs_data'):
+                if hasattr(test_obj.srs_data, 'raw_data'):
+                    # Using SLMData with raw_data
+                    source_df = test_obj.srs_data.raw_data
+                    raw_data['freq'] = source_df['Frequency (Hz)'].values
+                    raw_data['source'] = source_df['Overall 1/3 Spectra'].values[freq_indices]
+                    print("Using source room SLMData.raw_data")
+                    if hasattr(test_obj.srs_data, 'file_path'):
+                        print(f"Source File: {os.path.basename(test_obj.srs_data.file_path)}")
+                elif isinstance(test_obj.srs_data, pd.DataFrame):
+                    # Direct DataFrame
+                    source_df = test_obj.srs_data
+                    raw_data['freq'] = source_df['Frequency (Hz)'].values
+                    raw_data['source'] = source_df['Overall 1/3 Spectra'].values[freq_indices]
+                    print("Using source room DataFrame directly")
+                else:
+                    print(f"Unsupported source data type: {type(test_obj.srs_data)}")
+            
+            # Background data
+            print("\nBackground Data:")
+            if hasattr(test_obj, 'bkgrnd_data'):
+                if hasattr(test_obj.bkgrnd_data, 'raw_data'):
+                    # Using SLMData with raw_data
+                    raw_data['background'] = test_obj.bkgrnd_data.raw_data['Overall 1/3 Spectra'].values[freq_indices]
+                    print("Using background SLMData.raw_data")
+                    if hasattr(test_obj.bkgrnd_data, 'file_path'):
+                        print(f"Background File: {os.path.basename(test_obj.bkgrnd_data.file_path)}")
+                elif isinstance(test_obj.bkgrnd_data, pd.DataFrame):
+                    # Direct DataFrame
+                    raw_data['background'] = test_obj.bkgrnd_data['Overall 1/3 Spectra'].values[freq_indices]
+                    print("Using background DataFrame directly")
+                else:
+                    print(f"Unsupported background data type: {type(test_obj.bkgrnd_data)}")
+            
+            # RT data
+            print("\nRT Data:")
+            if hasattr(test_obj, 'rt'):
+                try:
+                    # First try accessing rt_thirty if it exists
+                    if hasattr(test_obj.rt, 'rt_thirty'):
+                        raw_data['rt'] = test_obj.rt.rt_thirty[:-1]  # Remove last value
+                        print("Using rt_thirty property")
+                        if hasattr(test_obj.rt, 'file_path'):
+                            print(f"RT File: {os.path.basename(test_obj.rt.file_path)}")
+                    # Then try pandas DataFrame access if it's a DataFrame
+                    elif isinstance(test_obj.rt, pd.DataFrame):
+                        if 'Unnamed: 10' in test_obj.rt.columns:
+                            raw_data['rt'] = test_obj.rt['Unnamed: 10'][24:40]/1000  # Slice to match rt_thirty[:-1]
+                            print("Using DataFrame column access for RT")
+                        else:
+                            # Try to find numeric columns in case column name changed
+                            numeric_cols = test_obj.rt.select_dtypes(include=[np.number]).columns
+                            if len(numeric_cols) > 0:
+                                raw_data['rt'] = test_obj.rt[numeric_cols[0]][24:40]/1000
+                                print(f"Using alternative column for RT: {numeric_cols[0]}")
+                            else:
+                                print("No suitable numeric columns found in RT data")
+                    # If it's already a numpy array or list
+                    elif isinstance(test_obj.rt, (np.ndarray, list)):
+                        raw_data['rt'] = test_obj.rt[:-1] if len(test_obj.rt) > 16 else test_obj.rt
+                        print("Using array/list access for RT")
+                    else:
+                        print(f"Unsupported RT data type: {type(test_obj.rt)}")
+                except Exception as e:
+                    print(f"Error accessing RT data: {str(e)}")
+                    traceback.print_exc()
+            
+            # Process tapping positions
+            print("\nTapping Position Files:")
             positions = {
-                1: test_obj.pos1,
-                2: test_obj.pos2,
-                3: test_obj.pos3,
-                4: test_obj.pos4
+                1: 'pos1',
+                2: 'pos2',
+                3: 'pos3',
+                4: 'pos4'
             }
             
-            print("\nTapping Position Files:")
-            for pos_num, pos in positions.items():
-                if pos is not None:
+            for pos_num, pos_attr in positions.items():
+                if hasattr(test_obj, pos_attr):
+                    pos = getattr(test_obj, pos_attr)
                     print(f"\nPosition {pos_num}:")
-                    if hasattr(pos, 'file_path'):
-                        print(f"Position File: {os.path.basename(pos.file_path)}")
-                        print(f"Full Path: {pos.file_path}")
-                    print(f"Data Shape: {pos.raw_data.shape}")
+                    
+                    # Check if it's an SLMData object with raw_data
+                    if hasattr(pos, 'raw_data'):
+                        pos_df = pos.raw_data
+                        if hasattr(pos, 'file_path'):
+                            print(f"Position File: {os.path.basename(pos.file_path)}")
+                        print("Using position SLMData.raw_data")
+                    # Check if it's directly a DataFrame
+                    elif isinstance(pos, pd.DataFrame):
+                        pos_df = pos
+                        print("Using position DataFrame directly")
+                    else:
+                        print(f"Unsupported position data type: {type(pos)}")
+                        continue
+                        
                     try:
                         # Process position data
-                        pos_data = pos.raw_data.loc[pos.raw_data['1/1 Octave'] == 'Overall 1/3 Spectra']
+                        pos_data = pos_df.loc[pos_df['1/1 Octave'] == 'Overall 1/3 Spectra']
                         if not pos_data.empty:
                             pos_values = pos_data.iloc[0, 1:].values[freq_indices]
                             pos_values = np.array(pos_values, dtype=np.float64).round(1)
@@ -1376,22 +1576,28 @@ class MainWindow(BoxLayout):
                         else:
                             print("Warning: No '1/3 Spectra' row found")
                             print("Available rows in file:")
-                            print(pos.raw_data['1/1 Octave'].unique())
+                            print(pos_df['1/1 Octave'].unique())
                     except Exception as e:
                         print(f"Error processing position: {str(e)}")
                 else:
                     print(f"\nPosition {pos_num}: Not provided")
             
-            # Room properties with detailed file info
+            # Room properties
             print("\nRoom Properties:")
             if hasattr(test_obj.room_properties, 'file_path'):
                 print(f"Properties File: {os.path.basename(test_obj.room_properties.file_path)}")
-                print(f"Full Path: {test_obj.room_properties.file_path}")
             print(f"Receive Volume: {test_obj.room_properties.receive_vol}")
             
+            # Verify all required data is present
+            missing = [k for k, v in raw_data.items() if v is None and k != 'positions']
+            if missing:
+                print(f"Missing AIIC data: {missing}")
+                return None
+                
             # Final data validation
             print("\nFinal Data Summary:")
-            print(f"Number of frequencies: {len(raw_data['freq'])}")
+            if raw_data['freq'] is not None:
+                print(f"Number of frequencies: {len(raw_data['freq'])}")
             print(f"Source data points: {len(raw_data['source'])}")
             print(f"Background data points: {len(raw_data['background'])}")
             print(f"RT data points: {len(raw_data['rt'])}")
@@ -1743,16 +1949,98 @@ class MainWindow(BoxLayout):
         try:
             print("Getting ASTC raw data")
             raw_data = {
-                'source': test_obj.srs_data.raw_data if hasattr(test_obj, 'srs_data') else None,
-                'receive': test_obj.recive_data.raw_data if hasattr(test_obj, 'recive_data') else None,
-                'background': test_obj.bkgrnd_data.raw_data if hasattr(test_obj, 'bkgrnd_data') else None,
-                'rt': test_obj.rt.rt_thirty[:17] if hasattr(test_obj.rt, 'rt_thirty') else None,
+                'source': None,
+                'receive': None,
+                'background': None,
+                'rt': None,
                 'room_props': test_obj.room_properties
             }
             
+            # Handle source room data
+            if hasattr(test_obj, 'srs_data'):
+                if hasattr(test_obj.srs_data, 'raw_data'):
+                    # SLMData object with raw_data
+                    raw_data['source'] = test_obj.srs_data.raw_data
+                    print("Using source room SLMData.raw_data")
+                elif isinstance(test_obj.srs_data, pd.DataFrame):
+                    # Direct DataFrame
+                    raw_data['source'] = test_obj.srs_data
+                    print("Using source room DataFrame directly")
+                else:
+                    print(f"Unsupported source data type: {type(test_obj.srs_data)}")
+            
+            # Handle receive room data
+            if hasattr(test_obj, 'recive_data'):
+                if hasattr(test_obj.recive_data, 'raw_data'):
+                    # SLMData object with raw_data
+                    raw_data['receive'] = test_obj.recive_data.raw_data
+                    print("Using receive room SLMData.raw_data")
+                elif isinstance(test_obj.recive_data, pd.DataFrame):
+                    # Direct DataFrame
+                    raw_data['receive'] = test_obj.recive_data
+                    print("Using receive room DataFrame directly")
+                else:
+                    print(f"Unsupported receive data type: {type(test_obj.recive_data)}")
+            
+            # Handle background data
+            if hasattr(test_obj, 'bkgrnd_data'):
+                if hasattr(test_obj.bkgrnd_data, 'raw_data'):
+                    # SLMData object with raw_data
+                    raw_data['background'] = test_obj.bkgrnd_data.raw_data
+                    print("Using background SLMData.raw_data")
+                elif isinstance(test_obj.bkgrnd_data, pd.DataFrame):
+                    # Direct DataFrame
+                    raw_data['background'] = test_obj.bkgrnd_data
+                    print("Using background DataFrame directly")
+                else:
+                    print(f"Unsupported background data type: {type(test_obj.bkgrnd_data)}")
+            
+            # Handle RT data
+            if hasattr(test_obj, 'rt'):
+                try:
+                    # First try accessing rt_thirty if it exists
+                    if hasattr(test_obj.rt, 'rt_thirty'):
+                        raw_data['rt'] = test_obj.rt.rt_thirty[:17]
+                        print("Using rt_thirty property")
+                    # Then try pandas DataFrame access if it's a DataFrame
+                    elif isinstance(test_obj.rt, pd.DataFrame):
+                        if 'Unnamed: 10' in test_obj.rt.columns:
+                            raw_data['rt'] = test_obj.rt['Unnamed: 10'][24:41]/1000
+                            print("Using DataFrame column access for RT")
+                        else:
+                            # Try to find numeric columns in case column name changed
+                            numeric_cols = test_obj.rt.select_dtypes(include=[np.number]).columns
+                            if len(numeric_cols) > 0:
+                                raw_data['rt'] = test_obj.rt[numeric_cols[0]][24:41]/1000
+                                print(f"Using alternative column for RT: {numeric_cols[0]}")
+                            else:
+                                print("No suitable numeric columns found in RT data")
+                    # If it's already a numpy array or list
+                    elif isinstance(test_obj.rt, (np.ndarray, list)):
+                        raw_data['rt'] = test_obj.rt[:17] if len(test_obj.rt) >= 17 else test_obj.rt
+                        print("Using array/list access for RT")
+                    else:
+                        print(f"Unsupported RT data type: {type(test_obj.rt)}")
+                        
+                    # Convert to numpy array if needed
+                    if raw_data['rt'] is not None:
+                        raw_data['rt'] = np.array(raw_data['rt'], dtype=np.float64).round(3)
+                except Exception as e:
+                    print(f"Error accessing RT data: {str(e)}")
+                    traceback.print_exc()
+            
+            # Debug the raw data we collected
+            for key, value in raw_data.items():
+                if key != 'room_props':
+                    if value is not None:
+                        print(f"{key} data type: {type(value)}")
+                        print(f"{key} data shape/length: {value.shape if hasattr(value, 'shape') else len(value) if hasattr(value, '__len__') else 'unknown'}")
+                    else:
+                        print(f"{key} data: None")
+            
             # Verify all required data is present
-            if any(v is None for v in raw_data.values()):
-                missing = [k for k, v in raw_data.items() if v is None]
+            missing = [k for k, v in raw_data.items() if v is None]
+            if missing:
                 print(f"Missing ASTC data: {missing}")
                 return None
             
@@ -1760,6 +2048,7 @@ class MainWindow(BoxLayout):
             
         except Exception as e:
             print(f"Error getting ASTC raw data: {str(e)}")
+            traceback.print_exc()
             return None
 
     def _process_astc_frequencies(self, raw_data):
@@ -1831,16 +2120,98 @@ class MainWindow(BoxLayout):
         try:
             print("Getting NIC raw data")
             raw_data = {
-                'source': test_obj.srs_data.raw_data if hasattr(test_obj, 'srs_data') else None,
-                'receive': test_obj.recive_data.raw_data if hasattr(test_obj, 'recive_data') else None,
-                'background': test_obj.bkgrnd_data.raw_data if hasattr(test_obj, 'bkgrnd_data') else None,
-                'rt': test_obj.rt.rt_thirty[:17] if hasattr(test_obj.rt, 'rt_thirty') else None,
+                'source': None,
+                'receive': None,
+                'background': None,
+                'rt': None,
                 'room_props': test_obj.room_properties
             }
             
+            # Handle source room data
+            if hasattr(test_obj, 'srs_data'):
+                if hasattr(test_obj.srs_data, 'raw_data'):
+                    # SLMData object with raw_data
+                    raw_data['source'] = test_obj.srs_data.raw_data
+                    print("Using source room SLMData.raw_data")
+                elif isinstance(test_obj.srs_data, pd.DataFrame):
+                    # Direct DataFrame
+                    raw_data['source'] = test_obj.srs_data
+                    print("Using source room DataFrame directly")
+                else:
+                    print(f"Unsupported source data type: {type(test_obj.srs_data)}")
+            
+            # Handle receive room data
+            if hasattr(test_obj, 'recive_data'):
+                if hasattr(test_obj.recive_data, 'raw_data'):
+                    # SLMData object with raw_data
+                    raw_data['receive'] = test_obj.recive_data.raw_data
+                    print("Using receive room SLMData.raw_data")
+                elif isinstance(test_obj.recive_data, pd.DataFrame):
+                    # Direct DataFrame
+                    raw_data['receive'] = test_obj.recive_data
+                    print("Using receive room DataFrame directly")
+                else:
+                    print(f"Unsupported receive data type: {type(test_obj.recive_data)}")
+            
+            # Handle background data
+            if hasattr(test_obj, 'bkgrnd_data'):
+                if hasattr(test_obj.bkgrnd_data, 'raw_data'):
+                    # SLMData object with raw_data
+                    raw_data['background'] = test_obj.bkgrnd_data.raw_data
+                    print("Using background SLMData.raw_data")
+                elif isinstance(test_obj.bkgrnd_data, pd.DataFrame):
+                    # Direct DataFrame
+                    raw_data['background'] = test_obj.bkgrnd_data
+                    print("Using background DataFrame directly")
+                else:
+                    print(f"Unsupported background data type: {type(test_obj.bkgrnd_data)}")
+            
+            # Handle RT data
+            if hasattr(test_obj, 'rt'):
+                try:
+                    # First try accessing rt_thirty if it exists
+                    if hasattr(test_obj.rt, 'rt_thirty'):
+                        raw_data['rt'] = test_obj.rt.rt_thirty[:17]
+                        print("Using rt_thirty property")
+                    # Then try pandas DataFrame access if it's a DataFrame
+                    elif isinstance(test_obj.rt, pd.DataFrame):
+                        if 'Unnamed: 10' in test_obj.rt.columns:
+                            raw_data['rt'] = test_obj.rt['Unnamed: 10'][24:41]/1000
+                            print("Using DataFrame column access for RT")
+                        else:
+                            # Try to find numeric columns in case column name changed
+                            numeric_cols = test_obj.rt.select_dtypes(include=[np.number]).columns
+                            if len(numeric_cols) > 0:
+                                raw_data['rt'] = test_obj.rt[numeric_cols[0]][24:41]/1000
+                                print(f"Using alternative column for RT: {numeric_cols[0]}")
+                            else:
+                                print("No suitable numeric columns found in RT data")
+                    # If it's already a numpy array or list
+                    elif isinstance(test_obj.rt, (np.ndarray, list)):
+                        raw_data['rt'] = test_obj.rt[:17] if len(test_obj.rt) >= 17 else test_obj.rt
+                        print("Using array/list access for RT")
+                    else:
+                        print(f"Unsupported RT data type: {type(test_obj.rt)}")
+                        
+                    # Convert to numpy array if needed
+                    if raw_data['rt'] is not None:
+                        raw_data['rt'] = np.array(raw_data['rt'], dtype=np.float64).round(3)
+                except Exception as e:
+                    print(f"Error accessing RT data: {str(e)}")
+                    traceback.print_exc()
+            
+            # Debug the raw data we collected
+            for key, value in raw_data.items():
+                if key != 'room_props':
+                    if value is not None:
+                        print(f"{key} data type: {type(value)}")
+                        print(f"{key} data shape/length: {value.shape if hasattr(value, 'shape') else len(value) if hasattr(value, '__len__') else 'unknown'}")
+                    else:
+                        print(f"{key} data: None")
+            
             # Verify all required data is present
-            if any(v is None for v in raw_data.values()):
-                missing = [k for k, v in raw_data.items() if v is None]
+            missing = [k for k, v in raw_data.items() if v is None]
+            if missing:
                 print(f"Missing NIC data: {missing}")
                 return None
             
@@ -1848,6 +2219,7 @@ class MainWindow(BoxLayout):
             
         except Exception as e:
             print(f"Error getting NIC raw data: {str(e)}")
+            traceback.print_exc()
             return None
 
     def _process_nic_frequencies(self, raw_data):
@@ -2256,6 +2628,84 @@ class MainWindow(BoxLayout):
             print(f"Error refreshing results dashboard: {str(e)}")
             traceback.print_exc()
             
+    def _fix_excel_extension_issue(self, file_path):
+        """Attempt to fix the Excel file extension issue by creating a CSV copy"""
+        try:
+            # Get current file name and path components
+            file_dir = os.path.dirname(file_path)
+            file_name = os.path.basename(file_path)
+            file_base, file_ext = os.path.splitext(file_name)
+            
+            # Create new file path with CSV extension
+            new_file_path = os.path.join(file_dir, f"{file_base}.csv")
+            
+            # Copy the file to the new path
+            import shutil
+            shutil.copy2(file_path, new_file_path)
+            
+            # Update the file path in the UI
+            self.test_plan_path.text = new_file_path
+            
+            # Show success message
+            self.status_label.text = f"Status: Created CSV copy at {new_file_path}"
+            
+            return new_file_path
+        except Exception as e:
+            self._show_error(f"Failed to fix file extension: {str(e)}")
+            return None
+
+    def _show_excel_extension_error(self, message):
+        """Show error popup with option to fix Excel extension issue"""
+        content_layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
+        
+        # Add scrollable text for error message
+        scroll_view = ScrollView(size_hint=(1, 0.7))
+        error_label = Label(
+            text=message + "\n\nThis file appears to be a CSV file with an incorrect .xlsx extension.",
+            size_hint_y=None,
+            text_size=(380, None)
+        )
+        error_label.bind(texture_size=error_label.setter('size'))
+        scroll_view.add_widget(error_label)
+        content_layout.add_widget(scroll_view)
+        
+        # Add buttons layout
+        button_layout = BoxLayout(orientation='horizontal', size_hint=(1, 0.3), spacing=10)
+        
+        # Add fix button
+        fix_button = Button(text="Create CSV Copy", size_hint=(0.5, 1))
+        
+        # Add close button
+        close_button = Button(text="Close", size_hint=(0.5, 1))
+        
+        button_layout.add_widget(fix_button)
+        button_layout.add_widget(close_button)
+        content_layout.add_widget(button_layout)
+        
+        popup = Popup(
+            title='Excel File Extension Error',
+            content=content_layout,
+            size_hint=(None, None),
+            size=(500, 350)
+        )
+        
+        # Handle button clicks
+        fix_button.bind(on_press=lambda x: self._handle_fix_extension(popup))
+        close_button.bind(on_press=popup.dismiss)
+        
+        popup.open()
+
+    def _handle_fix_extension(self, popup):
+        """Handle the fix extension button click"""
+        popup.dismiss()
+        
+        # Fix the extension issue
+        new_file_path = self._fix_excel_extension_issue(self.test_plan_path.text)
+        
+        if new_file_path:
+            # Try loading the data again
+            self.load_data(None)
+
 class MainApp(App):
     def build(self):
         return MainWindow()

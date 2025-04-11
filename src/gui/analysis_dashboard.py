@@ -8,7 +8,7 @@ from kivy.uix.widget import Widget
 import traceback
 import numpy as np
 
-from data_processor import (
+from src.core.data_processor import (
     TestType,
     TestData
 )

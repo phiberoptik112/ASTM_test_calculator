@@ -3,7 +3,7 @@ import pandas as pd
 from os.path import join
 from pathlib import Path
 
-from data_processor import (
+from src.core.data_processor import (
     TestType,
     RoomProperties,
     AIICTestData,
@@ -152,7 +152,7 @@ class TestProcessor:
     def _load_slm_data(file_id: str, base_path: str, suffix: str) -> pd.DataFrame:
         """Load SLM data from Excel file"""
         file_path = Path(base_path) / f"{file_id}{suffix}xlsx"
-        return pd.read_excel(file_path)
+        return pd.read_excel(file_path, engine='openpyxl')
 
     @staticmethod
     def _verify_dataframes(data_dict: Dict[str, pd.DataFrame]) -> None:
