@@ -115,26 +115,62 @@ class MainWindow(BoxLayout):
         
         # SLM Data Inputs
         input_grid.add_widget(Label(text='SLM Data Meter 1:'))
+        slm1_layout = BoxLayout(orientation='horizontal', spacing=5)
+        
         self.slm_data_1_path = TextInput(
             multiline=False,
-            hint_text='Path to first SLM data file'
+            hint_text='Path to first SLM data file',
+            size_hint_x=0.85
         )
-        input_grid.add_widget(self.slm_data_1_path)
+        slm1_layout.add_widget(self.slm_data_1_path)
+        
+        # Add file picker button
+        file_picker_btn = Button(
+            text='...',
+            size_hint_x=0.15
+        )
+        file_picker_btn.bind(on_press=lambda x: self.show_file_picker(self.slm_data_1_path, [('All Files', '*.*')]))
+        slm1_layout.add_widget(file_picker_btn)
+        input_grid.add_widget(slm1_layout)
         
         input_grid.add_widget(Label(text='SLM Data Meter 2:'))
+        slm2_layout = BoxLayout(orientation='horizontal', spacing=5)
+        
         self.slm_data_2_path = TextInput(
             multiline=False,
-            hint_text='Path to second SLM data file'
+            hint_text='Path to second SLM data file',
+            size_hint_x=0.85
         )
-        input_grid.add_widget(self.slm_data_2_path)
+        slm2_layout.add_widget(self.slm_data_2_path)
+        
+        # Add file picker button
+        file_picker_btn = Button(
+            text='...',
+            size_hint_x=0.15
+        )
+        file_picker_btn.bind(on_press=lambda x: self.show_file_picker(self.slm_data_2_path, [('All Files', '*.*')]))
+        slm2_layout.add_widget(file_picker_btn)
+        input_grid.add_widget(slm2_layout)
         
         # Output Folder
         input_grid.add_widget(Label(text='Output Folder:'))
+        output_layout = BoxLayout(orientation='horizontal', spacing=5)
+        
         self.output_path = TextInput(
             multiline=False,
-            hint_text='Path for output reports'
+            hint_text='Path for output reports',
+            size_hint_x=0.85
         )
-        input_grid.add_widget(self.output_path)
+        output_layout.add_widget(self.output_path)
+        
+        # Add file picker button
+        file_picker_btn = Button(
+            text='...',
+            size_hint_x=0.15
+        )
+        file_picker_btn.bind(on_press=lambda x: self.show_file_picker(self.output_path, [('All Files', '*.*')]))
+        output_layout.add_widget(file_picker_btn)
+        input_grid.add_widget(output_layout)
         
         self.add_widget(input_grid)
         
