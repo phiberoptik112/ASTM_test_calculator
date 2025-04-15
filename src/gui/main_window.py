@@ -27,6 +27,7 @@ from src.core.test_data_manager import TestDataManager
 from src.gui.test_plan_input import TestPlanInputWindow
 from src.gui.analysis_dashboard import ResultsAnalysisDashboard
 from src.gui.test_plan_manager import TestPlanManagerWindow
+from kivy.uix.filechooser import FileChooserListView
 
 import logging
 logging.getLogger('matplotlib.font_manager').disabled = True
@@ -82,12 +83,25 @@ class MainWindow(BoxLayout):
         input_grid.add_widget(Label(text='Test Plan:'))
         test_plan_layout = BoxLayout(orientation='horizontal', spacing=5)
         
+        # Create text input and file picker button layout
+        path_picker_layout = BoxLayout(orientation='horizontal', size_hint_x=0.7)
+        
         self.test_plan_path = TextInput(
             multiline=False,
             hint_text='Path to test plan Excel file',
-            size_hint_x=0.7
+            size_hint_x=0.85
         )
-        test_plan_layout.add_widget(self.test_plan_path)
+        path_picker_layout.add_widget(self.test_plan_path)
+        
+        # Add file picker button
+        file_picker_btn = Button(
+            text='...',
+            size_hint_x=0.15
+        )
+        file_picker_btn.bind(on_press=lambda x: self.show_file_picker(self.test_plan_path, [('Excel Files', '*.xlsx'), ('All Files', '*.*'), ('CSV Files', '*.csv')]))
+        path_picker_layout.add_widget(file_picker_btn)
+        
+        test_plan_layout.add_widget(path_picker_layout)
         
         # Add Test Plan GUI Button
         self.test_plan_gui_button = Button(
@@ -2705,6 +2719,86 @@ class MainWindow(BoxLayout):
         if new_file_path:
             # Try loading the data again
             self.load_data(None)
+
+    def show_file_picker(self, target_input, filters):
+        """Show a file picker dialog and update the target input with selected path
+        
+        Args:
+            target_input: TextInput widget to update with selected path
+            filters: List of tuples with file filters, e.g. [('Excel Files', '*.xlsx')]
+        """
+        content = BoxLayout(orientation='vertical')
+        
+        # Get the workspace directory path
+        import os
+        workspace_dir = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        
+        # Create file chooser with proper filters
+        def custom_filter(folder, filename):
+            if os.path.isdir(os.path.join(folder, filename)):
+                return True
+            return any(filename.endswith(ext[1:]) for _, ext in filters)
+            
+        file_chooser = FileChooserListView(
+            path=workspace_dir,  # Start in workspace directory
+            filters=[custom_filter],
+            size_hint=(1, 0.9)
+        )
+        
+        # Create buttons
+        button_layout = BoxLayout(
+            size_hint_y=None,
+            height='40dp',
+            spacing='5dp',
+            padding='5dp'
+        )
+        
+        # Create select and cancel buttons
+        select_button = Button(
+            text='Select',
+            size_hint_x=0.5
+        )
+        cancel_button = Button(
+            text='Cancel',
+            size_hint_x=0.5
+        )
+        
+        # Add buttons to layout
+        button_layout.add_widget(select_button)
+        button_layout.add_widget(cancel_button)
+        
+        # Add widgets to content
+        content.add_widget(file_chooser)
+        content.add_widget(button_layout)
+        
+        # Create popup
+        popup = Popup(
+            title='Choose File',
+            content=content,
+            size_hint=(0.9, 0.9)
+        )
+        
+        # Bind button actions
+        def on_select(instance):
+            if file_chooser.selection:
+                # Convert to relative path if within workspace
+                selected_path = file_chooser.selection[0]
+                try:
+                    relative_path = os.path.relpath(selected_path, workspace_dir)
+                    target_input.text = relative_path
+                except ValueError:
+                    # If not within workspace, use absolute path
+                    target_input.text = selected_path
+                popup.dismiss()
+                
+        def on_cancel(instance):
+            popup.dismiss()
+            
+        select_button.bind(on_press=on_select)
+        cancel_button.bind(on_press=on_cancel)
+        
+        # Show popup
+        popup.open()
 
 class MainApp(App):
     def build(self):
