@@ -653,35 +653,58 @@ class MainWindow(BoxLayout):
     def preview_pdf(self, pdf_path):
         """Preview generated PDF report"""
         try:
+            print(f"\nAttempting to preview PDF at: {pdf_path}")
+            if not pdf_path:
+                raise ValueError("PDF path is empty or None")
+                
             if os.path.exists(pdf_path):
-                # Create temporary image of first page
-                doc = fitz.open(pdf_path)
-                page = doc[0]
-                pix = page.get_pixmap()
-                img_path = tempfile.mktemp(suffix='.png')
-                pix.save(img_path)
-                
-                # Create scrollable image preview
-                scroll = ScrollView(size_hint=(1, 1))
-                image = KivyImage(source=img_path, size_hint_y=None)
-                image.height = image.texture_size[1]
-                scroll.add_widget(image)
-                
-                # Create popup with preview
-                content = BoxLayout(orientation='vertical')
-                content.add_widget(scroll)
-                
-                preview_popup = Popup(
-                    title='PDF Preview',
-                    content=content,
-                    size_hint=(0.9, 0.9)
-                )
-                preview_popup.open()
+                print(f"PDF file found at: {pdf_path}")
+                try:
+                    # Create temporary image of first page
+                    doc = fitz.open(pdf_path)
+                    page = doc[0]
+                    pix = page.get_pixmap()
+                    img_path = tempfile.mktemp(suffix='.png')
+                    pix.save(img_path)
+                    print(f"Created preview image at: {img_path}")
+                    
+                    # Create scrollable image preview
+                    scroll = ScrollView(size_hint=(1, 1))
+                    image = KivyImage(source=img_path, size_hint_y=None)
+                    image.height = image.texture_size[1]
+                    scroll.add_widget(image)
+                    
+                    # Create popup with preview
+                    content = BoxLayout(orientation='vertical')
+                    content.add_widget(scroll)
+                    
+                    preview_popup = Popup(
+                        title='PDF Preview',
+                        content=content,
+                        size_hint=(0.9, 0.9)
+                    )
+                    preview_popup.open()
+                    
+                except Exception as e:
+                    error_msg = f"Error creating PDF preview: {str(e)}"
+                    print(error_msg)
+                    if self.debug_checkbox.active:
+                        traceback.print_exc()
+                    self._show_error(error_msg)
             else:
-                self._show_error('PDF file not found')
+                error_msg = f'PDF file not found at path: {pdf_path}'
+                print(error_msg)
+                if self.debug_checkbox.active:
+                    print(f"Current working directory: {os.getcwd()}")
+                    print(f"Directory contents: {os.listdir(os.path.dirname(pdf_path))}")
+                self._show_error(error_msg)
                 
         except Exception as e:
-            self._show_error(f'Error previewing PDF: {str(e)}')
+            error_msg = f'Error previewing PDF: {str(e)}'
+            print(error_msg)
+            if self.debug_checkbox.active:
+                traceback.print_exc()
+            self._show_error(error_msg)
 
     def show_results(self, test_data: TestData):
         """Display test results in a popup"""
@@ -750,6 +773,13 @@ class MainWindow(BoxLayout):
                         }.get(test_type)
                         
                         if report_class:
+                            # Create a temporary report instance to get the filename
+                            temp_report = report_class(
+                                test_data=converted_test_data,
+                                reportOutputfolder=self.output_path.text,
+                                test_type=test_type
+                            )
+                            
                             # Generate report using the converted test data
                             report = report_class.create_report(
                                 test_data=converted_test_data,
@@ -757,14 +787,12 @@ class MainWindow(BoxLayout):
                                 test_type=test_type
                             )
                             
-                            # Get PDF path
-                            pdf_path = os.path.join(
-                                self.output_path.text,
-                                f"{test_label}_{test_type.value}_Report.pdf"
-                            )
+                            # Get PDF path using the same method as the report generator
+                            pdf_path = os.path.join(self.output_path.text, temp_report.get_doc_name())
                             
                             if self.debug_checkbox.active:
                                 print(f'Generated {test_type.value} report for test {test_label}')
+                                print(f'Looking for PDF at: {pdf_path}')
                             
                             # Show preview
                             self.preview_pdf(pdf_path)

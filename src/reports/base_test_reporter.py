@@ -884,6 +884,7 @@ class AIICTestReport(BaseTestReport):
             
             # Create exceptions list based on difference
             self.AIIC_exceptions_backcheck = ['0' if diff > 5 else '1' for diff in background_diff]
+            
             #########################################################
             
             self.test_data.single_number_result = self.AIIC_contour_val
