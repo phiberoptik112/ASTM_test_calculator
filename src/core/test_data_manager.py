@@ -852,23 +852,6 @@ class TestDataManager:
             # Clean up any spaces in datafile name
             if isinstance(find_datafile, str):
                 find_datafile = find_datafile.strip()
-            elif find_datafile is None or pd.isna(find_datafile):
-                if self.debug_mode:
-                    print(f"Warning: Missing data file for {datatype}")
-                # Return empty SLMData with proper structure
-                # Create a minimal DataFrame with the expected structure
-                empty_df = pd.DataFrame({
-                    '1/1 Octave': ['Frequency (Hz)', 'Overall 1/1 Spectra', 'Max 1/1 Spectra', 'Min 1/1 Spectra'],
-                    'Unnamed: 1': [8.0, 0.0, 0.0, 0.0],
-                    'Unnamed: 2': [16.0, 0.0, 0.0, 0.0],
-                    'Unnamed: 3': [31.5, 0.0, 0.0, 0.0],
-                    'Unnamed: 4': [63.0, 0.0, 0.0, 0.0],
-                    'Unnamed: 5': [125.0, 0.0, 0.0, 0.0],
-                    'Unnamed: 6': [250.0, 0.0, 0.0, 0.0],
-                    'Unnamed: 7': [500.0, 0.0, 0.0, 0.0],
-                    'Unnamed: 8': [1000.0, 0.0, 0.0, 0.0]
-                })
-                return SLMData(raw_data=empty_df, measurement_type=datatype.strip('.'))
             
             print(f"\nLooking for data file: {find_datafile}")
             print(f"Data type: {datatype}")
