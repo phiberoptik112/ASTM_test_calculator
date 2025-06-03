@@ -207,29 +207,9 @@ class MainWindow(BoxLayout):
             size_hint_y=0.3
         )
         
-        # Single Test Input
-        test_input_layout = BoxLayout(size_hint_y=0.5)
-        test_input_layout.add_widget(Label(
-            text='Test Number:',
-            size_hint_x=0.3
-        ))
-        self.test_number_input = TextInput(
-            multiline=False,
-            hint_text='Enter test number and test type'
-        )
-        test_input_layout.add_widget(self.test_number_input)
-        test_controls.add_widget(test_input_layout)
-        
         # Test Control Buttons
         button_layout = BoxLayout(spacing=5, size_hint_y=0.5)
         
-        self.calc_button = Button(text='Calculate Test')
-        self.calc_button.bind(on_press=self.calculate_single_test)
-        button_layout.add_widget(self.calc_button)
-        
-        self.view_button = Button(text='View Data')
-        self.view_button.bind(on_press=self.view_test_data)
-        button_layout.add_widget(self.view_button)
         
         self.report_button = Button(text='Generate Reports')
         self.report_button.bind(on_press=self.generate_reports)
@@ -274,27 +254,6 @@ class MainWindow(BoxLayout):
         self.raw_data_tab = TabbedPanelItem(text='Raw Data')
         self.raw_data_layout = BoxLayout(orientation='vertical')
         
-        # Add test selection controls
-        test_controls = BoxLayout(
-            orientation='horizontal',
-            size_hint_y=None,
-            height=40
-        )
-        self.raw_data_test_input = TextInput(
-            multiline=False,
-            hint_text='Enter test number and test type',
-            size_hint_x=0.7
-        )
-        view_button = Button(
-            text='View Data',
-            size_hint_x=0.3
-        )
-        view_button.bind(on_press=self.view_test_data)
-        
-        test_controls.add_widget(self.raw_data_test_input)
-        test_controls.add_widget(view_button)
-        
-        self.raw_data_layout.add_widget(test_controls)
         
         # Scrollable data view
         self.raw_data_view = ScrollView()
@@ -551,69 +510,6 @@ class MainWindow(BoxLayout):
             test_assembly_type=test_row['Test assembly Type'],
             expected_performance=test_row['expected performance']
         )
-
-    def calculate_single_test(self, instance):
-        """Calculate results for a single test"""
-        try:
-            test_number = self.test_number_input.text
-            if not test_number:
-                raise ValueError("Please enter a test number")
-                
-            # Implementation similar to ASTC_GUI_proto's calculate_single_test
-            # but integrated with TestDataManager
-            
-            self.status_label.text = 'Status: Test calculated successfully'
-            
-        except Exception as e:
-            self.status_label.text = f'Status: Error calculating test - {str(e)}'
-            if self.debug_checkbox.active:
-                print(f"Error calculating test: {str(e)}")
-
-    def view_test_data(self, instance):
-        """View raw data for current test - integrated with Raw Data tab"""
-        try:
-            input_text = self.raw_data_test_input.text or self.test_number_input.text
-            test_number, test_type = input_text.split(',') if ',' in input_text else (input_text, None)
-            test_number = test_number.strip()
-            if test_type:
-                test_type = test_type.strip()
-            if not test_number:
-                raise ValueError("Please enter a test number and test type")
-        
-            # Clear existing data
-            self.raw_data_grid.clear_widgets()
-            
-            # Get test data
-            test_data = self.test_data_manager.get_test_data(test_number, test_type)
-            if test_data:
-                # Display test information
-                self._add_data_section("Test Information", {
-                    "Test Number": test_number,
-                    "Test Type": test_type,
-                    "Date": test_data.get('test_date', 'Unknown')
-                })
-                
-                # Display raw measurements
-                if 'measurements' in test_data:
-                    self._add_data_section("Raw Measurements", test_data['measurements'])
-                
-                # Display calculated values
-                if 'calculated_values' in test_data:
-                    self._add_data_section("Calculated Values", test_data['calculated_values'])
-                
-                # Switch to raw data tab
-                self.raw_data_tab.state = 'down'
-            else:
-                self.raw_data_grid.add_widget(Label(
-                    text=f'No data found for test {test_number}',
-                    size_hint_y=None,
-                    height=40
-                ))
-                
-        except Exception as e:
-            self.status_label.text = f'Status: Error viewing test data - {str(e)}'
-            if self.debug_checkbox.active:
-                print(f"Error viewing test data: {str(e)}")
 
     def show_test_plan_input(self, instance):
         """Show test plan input window"""
