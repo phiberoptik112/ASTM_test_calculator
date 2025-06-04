@@ -622,22 +622,28 @@ class MainWindow(BoxLayout):
         )
         popup.open()
 
+    def _show_success(self, message: str):
+        """Show a success message to the user"""
+        self.status_label.text = f'Status: {message}'
+        # You could also add a popup or other visual feedback here if desired
+
     def generate_reports(self, test_data: TestData):
         """Generate CSV exports and plots for test results"""
         try:
-            # Create output directory
-            output_dir = Path('test_results')
-            output_dir.mkdir(exist_ok=True)
+            # Use the output path from the UI, or default to 'test_results'
+            output_dir = Path(self.output_path.text) if self.output_path.text else Path('test_results')
+            print(f"Exporting results to: {output_dir.absolute()}")
             
             # Export results to CSV and generate plots
             from src.reports.test_data_exporter import export_test_results
             export_test_results(self.test_data_collection, output_dir)
             
-            # Show success message
-            self.show_success(f"Results exported to {output_dir}")
+            # Show success message with absolute path
+            self._show_success(f"Results exported to {output_dir.absolute()}")
             
         except Exception as e:
-            self.show_error(f"Error exporting results: {str(e)}")
+            print(f"Error exporting results: {str(e)}")
+            self._show_error(f"Error exporting results: {str(e)}")
 
     def show_plot_selection(self, instance):
         """Show popup with buttons to plot data for each test, with test type selection"""
