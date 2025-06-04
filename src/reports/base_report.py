@@ -221,11 +221,11 @@ class BaseReport:
         """Draw company information in footer"""
         canvas.setFont('Helvetica', 8)
         address_lines = [
-            "970 N. Kalaheo Ave",
-            "Suite A311",
-            "Kailua, HI 96734",
-            "www.dlaa.com",
-            "808-254-3318x222"
+            "The Company",
+            "PO BOX 1234",
+            "Anywhere, USA, XXXXX",
+            "www.thecompany.com",
+            "XXX-XXX-XXXX"
         ]
         
         line_height = 12

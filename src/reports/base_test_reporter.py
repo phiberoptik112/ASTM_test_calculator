@@ -124,7 +124,7 @@ class BaseTestReport:
         leftside_data = [
             ["Report Date:", Paragraph(str(props['report_date']), self.styles['Normal'])],
             ['Test Date:', Paragraph(str(props['test_date']), self.styles['Normal'])],
-            ['DLAA Test No', Paragraph(str(props['test_label']), self.styles['Normal'])],
+            ['Test No:', Paragraph(str(props['test_label']), self.styles['Normal'])],
             ['Test Site', Paragraph(str(props['site_name']), self.styles['Normal'])],
             ['Client', Paragraph(str(props['client_name']), self.styles['Normal'])]
         ]
@@ -194,11 +194,11 @@ class BaseTestReport:
         # Draw address block in footer on right side
         canvas.setFont('Helvetica', 8)  # Smaller font for address
         address_lines = [
-            "970 N. Kalaheo Ave",
-            "Suite A311",
-            "Kailua, HI 96734",
-            "www.dlaa.com",
-            "808-254-3318x222"
+            "The Company",
+            "PO BOX 1234",
+            "Anywhere, USA, XXXXX",
+            "www.thecompany.com",
+            "XXX-XXX-XXXX"
         ]
         # Calculate position for right-aligned text block
         line_height = 12  # Adjust spacing between lines
@@ -261,12 +261,12 @@ class BaseTestReport:
         
     def get_test_instrumentation(self):
         common_equipment = [
-            ['Sound Level Meter','Larson Davis','831','4328','10/24/2022','4/4/2024'],
-            ['Microphone Pre-Amp','Larson Davis','PRM831','046469','10/24/2022','4/4/2024'],
-            ['Microphone','Larson Davis','377B20','168830','10/20/2022','4/4/2024'],
-            ['Calibrator','Larson Davis','CAL200','5955','10/26/2022','N/A'],
-            ['Amplified Loudspeaker','QSC','K10','GAA530909','N/A','N/A'],
-            ['Noise Generator','NTi Audio','MR-PRO','0162','N/A','N/A']
+            ['Sound Level Meter','Larson Davis','831','4328','10/24/2000','10/24/2000'],
+            ['Microphone Pre-Amp','Larson Davis','PRM831','046469','10/24/2000','10/24/2000'],
+            ['Microphone','Larson Davis','377B20','168830','10/20/2000','10/20/2000'],
+            ['Calibrator','Larson Davis','CAL200','5955','10/26/2000','10/26/2000'],
+            ['Amplified Loudspeaker','ANC','K10','GAA530909','10/24/2000','10/24/2000'],
+            ['Noise Generator','ANC','THE-PRO','0000','10/26/2000','10/26/2000']
         ]
         return common_equipment
 
@@ -409,19 +409,19 @@ class BaseTestReport:
         print('Getting signatures')
         main_elements = []
         main_elements.append(Paragraph('Test Conducted By:', self.styles['Normal']))
-        jp_sig_image = Image('./images/JPsignature.png')
+        jp_sig_image = Image('./images/signatureOne.png')
         jp_sig_image.drawHeight = 50
         jp_sig_image.drawWidth = 100
         jp_sig_image.hAlign = 'LEFT'
         main_elements.append(jp_sig_image)
-        main_elements.append(Paragraph('Jake Pfitsch, Project Consultant', self.styles['Normal']))
+        main_elements.append(Paragraph('One Consultant, Project Consultant', self.styles['Normal']))
 
-        zw_sig_image = Image('./images/ZWsignature.png')
+        zw_sig_image = Image('./images/signatureTwo.png')
         zw_sig_image.drawHeight = 40
-        zw_sig_image.drawWidth = 130
+        zw_sig_image.drawWidth = 130    
         zw_sig_image.hAlign = 'LEFT'
         main_elements.append(zw_sig_image)
-        main_elements.append(Paragraph('Zane Wright, Project Consultant', self.styles['Normal']))
+        main_elements.append(Paragraph('Two Consultant, Project Consultant', self.styles['Normal']))
         return main_elements
     
     @classmethod
