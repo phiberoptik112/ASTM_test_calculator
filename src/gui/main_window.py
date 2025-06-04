@@ -50,7 +50,8 @@ from src.core.data_processor import (
 )
 from src.core.test_processor import TestProcessor
 import numpy as np
-from src.reports.base_test_reporter import *
+from pathlib import Path
+from src.reports.test_data_exporter import export_test_results
 
 class MainWindow(BoxLayout):
     def __init__(self, **kwargs):
@@ -622,88 +623,21 @@ class MainWindow(BoxLayout):
         popup.open()
 
     def generate_reports(self, test_data: TestData):
-        """Generate PDF report for test data"""
+        """Generate CSV exports and plots for test results"""
         try:
-            if not test_data:
-                raise ValueError("No test data provided")
+            # Create output directory
+            output_dir = Path('test_results')
+            output_dir.mkdir(exist_ok=True)
             
-            test_collection = self.test_data_manager.get_test_collection()
+            # Export results to CSV and generate plots
+            from src.reports.test_data_exporter import export_test_results
+            export_test_results(self.test_data_collection, output_dir)
             
-            for test_label, test_types in test_collection.items():
-                print(f"\nGenerating reports for test: {test_label}")
-                
-                for test_type, data in test_types.items():
-                    try:
-                        self.status_label.text = f'Status: Generating {test_type.value} report for {test_label}...'
-                        
-                        # Debug: Print data before conversion
-                        print("\nData before conversion:")
-                        if hasattr(data['test_data'], 'calculated_values'):
-                            print("Calculated values keys:", data['test_data'].calculated_values.keys())
-                        else:
-                            print("No calculated_values attribute found")
-                        
-                        # Convert the data to the expected format
-                        converted_test_data = self.convert_to_test_data(data)
-                        
-                        # Debug: Print data after conversion
-                        print("\nData after conversion:")
-                        if hasattr(converted_test_data, 'calculated_values'):
-                            print("Calculated values keys:", converted_test_data.calculated_values.keys())
-                        else:
-                            print("No calculated_values attribute found after conversion")
-                        
-                        # Get appropriate report class
-                        report_class = {
-                            TestType.ASTC: ASTCTestReport,
-                            TestType.AIIC: AIICTestReport,
-                            TestType.NIC: NICTestReport,
-                            TestType.DTC: DTCTestReport
-                        }.get(test_type)
-                        
-                        if report_class:
-                            # Create a temporary report instance to get the filename
-                            temp_report = report_class(
-                                test_data=converted_test_data,
-                                reportOutputfolder=self.output_path.text,
-                                test_type=test_type
-                            )
-                            
-                            # Generate report using the converted test data
-                            report = report_class.create_report(
-                                test_data=converted_test_data,
-                                output_folder=self.output_path.text,
-                                test_type=test_type
-                            )
-                            
-                            # Get PDF path using the same method as the report generator
-                            pdf_path = os.path.join(self.output_path.text, temp_report.get_doc_name())
-                            
-                            if self.debug_checkbox.active:
-                                print(f'Generated {test_type.value} report for test {test_label}')
-                                print(f'Looking for PDF at: {pdf_path}')
-                            
-                            # Show preview
-                            self.preview_pdf(pdf_path)
-                            
-                    except Exception as e:
-                        error_msg = f"Error generating {test_type.value} report for {test_label}: {str(e)}"
-                        print(error_msg)
-                        if self.debug_checkbox.active:
-                            traceback.print_exc()
-                        continue
-            
-            self.status_label.text = 'Status: All reports generated successfully'
-            return True
+            # Show success message
+            self.show_success(f"Results exported to {output_dir}")
             
         except Exception as e:
-            error_msg = f"Error generating reports: {str(e)}"
-            if self.debug_checkbox.active:
-                print(f"\nERROR: {error_msg}")
-                traceback.print_exc()
-            self._show_error(error_msg)
-            self.status_label.text = f"Status: {error_msg}"
-            return False
+            self.show_error(f"Error exporting results: {str(e)}")
 
     def show_plot_selection(self, instance):
         """Show popup with buttons to plot data for each test, with test type selection"""
