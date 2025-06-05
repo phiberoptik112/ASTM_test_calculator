@@ -634,12 +634,19 @@ class MainWindow(BoxLayout):
             output_dir = Path(self.output_path.text) if self.output_path.text else Path('test_results')
             print(f"Exporting results to: {output_dir.absolute()}")
             
-            # Export results to CSV and generate plots
-            from src.reports.test_data_exporter import export_test_results
-            export_test_results(self.test_data_collection, output_dir)
-            
-            # Show success message with absolute path
-            self._show_success(f"Results exported to {output_dir.absolute()}")
+            # Get test data from test_data_manager instead of self.test_data_collection
+            if hasattr(self, 'test_data_manager') and hasattr(self.test_data_manager, 'test_data_collection'):
+                test_data_collection = self.test_data_manager.test_data_collection
+                print(f"Found test data collection with {len(test_data_collection)} tests")
+                
+                # Export results to CSV and generate plots
+                from src.reports.test_data_exporter import export_test_results
+                export_test_results(test_data_collection, output_dir)
+                
+                # Show success message with absolute path
+                self._show_success(f"Results exported to {output_dir.absolute()}")
+            else:
+                raise ValueError("No test data manager or test data collection found")
             
         except Exception as e:
             print(f"Error exporting results: {str(e)}")
