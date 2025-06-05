@@ -29,7 +29,7 @@ test_instrumentation_table = [["Equipment Type","Manufacturer","Model Number","S
 
 test_procedure_pg = 'Determination of space-average sound pressure levels was performed via the manually scanned microphones techique, described in ' + standards_text[0][0] + ', Paragraph 11.4.3.3.'+ 'The source room was selected in accordance with ASTM E336-11 Paragraph 9.2.5, which states that "If a corridor must be used as one of the spaces for measurement of ATL or FTL, it shall be used as the source space."'
 # code:
-# =CONCATENATE("The test was performaned in general accordance with ",AIIC or ASTC or NIC,". Determination of Space-Average Levels performed via the manually scanned microphones techique, described in ",'SLM Data'!C59,", Paragraph 11.4.2.2.")
+
 # The test was performaned in general accordance with ASTM E1007-14. Determination of Space-Average Levels performed via the manually scanned microphones techique, described in ASTM E1007-14, Paragraph 11.4.2.2.								
 
 flanking_text = "Flanking transmission was not evaluated."
@@ -190,19 +190,6 @@ main_content_height = letter[1] - top_margin - bottom_margin - header_height - f
 # # after results
 # results_blurb = 'The results stated in this report represent only the specific construction and acoustical conditions present at the time of the test. Measurements performed in accordance with this test method on nominally identical constructions and acoustical conditions may produce different results.'
 
-# #test instrumentation
-# table with SLM serial, micpreamp, mic, calibrator, speaker, noise gen.
-# LOGIC NEEDED: 
-#  import very simply spreadsheet with this information preloaded, and pull from the spreadsheet
-#  or select from a menu of all the SLMs, calibrators, tapping machine, speaker.
-#  
-# Example text Entry Box for the fifth path - must be inside a kivy app and build application:
-# class FileLoaderApp(App):
-#     def build(self):
-
-        # self.fifth_text_input = TextInput(multiline=False, hint_text='File Path 5')
-        # self.fifth_text_input.bind(on_text_validate=self.on_text_validate)
-        # layout.add_widget(self.fifth_text_input)
 
 
 # ## STATEMENT OF TEST RESULTS 
