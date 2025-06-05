@@ -24,9 +24,9 @@ Once the data is loaded, a 'Plot Test Data' menu will show the tests available t
 Checking the box by the appropriate test number and type and pressing 'Plot selected' will open the plot of the raw data and the test result calculations:
 ![](test_data_plot.png)
 
-Once finished reviewing the dataplots, select 'Store Calculated Data' to store the results for input to the final PDF reports. This will also make the raw calculation results available in the Results Dasboard of the main menu. 
+Once finished reviewing the dataplots, select 'Store Calculated Data' to store the results for input to the final CSV datafiles. This will also make the raw calculation results available in the Results Dasboard of the main menu. 
 
-Use the 'Generate Reports' Button to generate the reports from the stored data.
+Use the 'Generate Reports' Button to generate the CSV reports from the stored data.
 
 Use the 'Raw Loaded Data Plot' Button to return to the available loaded tests to select and store more data from the testplan.
 
