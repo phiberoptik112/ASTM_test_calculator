@@ -9,3 +9,4 @@
 .tmp.*
 ./example_data_kaanapali/
 ./example_data_kaanapali/**/*
+.DS_Store
