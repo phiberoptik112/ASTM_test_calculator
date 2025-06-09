@@ -1206,7 +1206,7 @@ class MainWindow(BoxLayout):
             # Show success message
             success_popup = Popup(
                 title='Success',
-                content=Label(text='Calculated values stored successfully'),
+                content=Label(text='Calculated values stored successfully, press Escape twice to return to main menu'),
                 size_hint=(None, None),
                 size=(300, 150)
             )
