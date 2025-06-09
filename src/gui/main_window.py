@@ -665,14 +665,25 @@ class MainWindow(BoxLayout):
                     print(f"  Room properties: {test_data['room_properties']}")
                     print(f"  Test data type: {type(test_data['test_data'])}")
 
-        # Create content layout
+        # Create content layout with a light background
         content = BoxLayout(orientation='vertical', spacing=10, padding=10)
+        with content.canvas.before:
+            Color(0.95, 0.95, 0.95, 1)  # Light gray background
+            self.rect = Rectangle(pos=content.pos, size=content.size)
+        
+        def update_rect(instance, value):
+            self.rect.pos = instance.pos
+            self.rect.size = instance.size
+        
+        content.bind(pos=update_rect, size=update_rect)
         
         # Add title label
         content.add_widget(Label(
             text='Select tests and types to plot:',
             size_hint_y=None,
-            height=40
+            height=40,
+            bold=True,
+            color=(0.2, 0.2, 0.2, 1)  # Dark gray text
         ))
         
         # Create scrollable list
@@ -694,20 +705,30 @@ class MainWindow(BoxLayout):
             test_data = self.test_data_manager.test_data_collection[test_label]
             print(f"Test data keys: {test_data.keys()}")
             
-            # Create container for this test
+            # Create container for this test with a white background
             test_container = BoxLayout(
                 orientation='vertical',
                 size_hint_y=None,
                 height=120,
                 padding=[10, 5]
             )
+            with test_container.canvas.before:
+                Color(1, 1, 1, 1)  # White background
+                self.test_rect = Rectangle(pos=test_container.pos, size=test_container.size)
+            
+            def update_test_rect(instance, value):
+                instance.canvas.before.children[-1].pos = instance.pos
+                instance.canvas.before.children[-1].size = instance.size
+            
+            test_container.bind(pos=update_test_rect, size=update_test_rect)
             
             # Add test label
             test_container.add_widget(Label(
                 text=f'Test {test_label}',
                 size_hint_y=None,
                 height=30,
-                bold=True
+                bold=True,
+                color=(0.2, 0.2, 0.2, 1)  # Dark gray text
             ))
             
             # Create horizontal layout for checkboxes
@@ -737,19 +758,30 @@ class MainWindow(BoxLayout):
             print(f"Available test types for {test_label}: {[t[0] for t in available_types]}")
             
             for type_name, test_type in available_types:
-                # Create checkbox container
+                # Create checkbox container with light blue background
                 type_container = BoxLayout(
                     orientation='horizontal',
                     size_hint_y=None,
                     height=30,
-                    spacing=5
+                    spacing=5,
+                    padding=[5, 2]
                 )
+                with type_container.canvas.before:
+                    Color(0.9, 0.95, 1, 1)  # Light blue background
+                    self.type_rect = Rectangle(pos=type_container.pos, size=type_container.size)
                 
-                # Create checkbox
+                def update_type_rect(instance, value):
+                    instance.canvas.before.children[-1].pos = instance.pos
+                    instance.canvas.before.children[-1].size = instance.size
+                
+                type_container.bind(pos=update_type_rect, size=update_type_rect)
+                
+                # Create checkbox with custom colors
                 checkbox = CheckBox(
                     size_hint_x=None,
                     width=30,
-                    active=False
+                    active=False,
+                    color=(0.2, 0.6, 0.8, 1)  # Blue color for checkbox
                 )
                 self.test_type_checkboxes[test_label][test_type] = checkbox
                 
@@ -758,7 +790,8 @@ class MainWindow(BoxLayout):
                     text=type_name,
                     size_hint_x=None,
                     width=70,
-                    halign='left'
+                    halign='left',
+                    color=(0.2, 0.2, 0.2, 1)  # Dark gray text
                 )
                 
                 # Add widgets to container
@@ -770,11 +803,13 @@ class MainWindow(BoxLayout):
             
             test_container.add_widget(checkbox_layout)
             
-            # Add plot button
+            # Add plot button with custom styling
             plot_btn = Button(
                 text='Plot Selected',
                 size_hint_y=None,
-                height=30
+                height=30,
+                background_color=(0.2, 0.6, 0.8, 1),  # Blue background
+                color=(1, 1, 1, 1)  # White text
             )
             plot_btn.bind(
                 on_press=lambda x, label=test_label: self.plot_selected_test_data(label)
@@ -787,7 +822,7 @@ class MainWindow(BoxLayout):
                 height=2
             )
             with separator.canvas:
-                Color(0.5, 0.5, 0.5, 1)
+                Color(0.7, 0.7, 0.7, 1)  # Lighter gray for separator
                 Rectangle(pos=separator.pos, size=separator.size)
             
             def update_rect(instance, value):
@@ -802,18 +837,21 @@ class MainWindow(BoxLayout):
         scroll.add_widget(main_layout)
         content.add_widget(scroll)
         
-        # Create close button
+        # Create close button with custom styling
         close_btn = Button(
             text='Close',
             size_hint_y=None,
-            height=40
+            height=40,
+            background_color=(0.8, 0.2, 0.2, 1),  # Red background
+            color=(1, 1, 1, 1)  # White text
         )
         
         # Create popup
         plot_popup = Popup(
             title='Plot Test Data',
             content=content,
-            size_hint=(0.8, 0.8)
+            size_hint=(0.8, 0.8),
+            background='white'  # White background for popup
         )
         
         # Bind close button
