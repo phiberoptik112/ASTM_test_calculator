@@ -115,12 +115,12 @@ class MainWindow(BoxLayout):
         input_grid.add_widget(test_plan_layout)
         
         # SLM Data Inputs
-        input_grid.add_widget(Label(text='SLM Data Meter 1:'))
+        input_grid.add_widget(Label(text='SLM Raw Data Folder 1:'))
         slm1_layout = BoxLayout(orientation='horizontal', spacing=5)
         
         self.slm_data_1_path = TextInput(
             multiline=False,
-            hint_text='Path to first SLM data file',
+            hint_text='Path to first SLM data folder',
             size_hint_x=0.85
         )
         slm1_layout.add_widget(self.slm_data_1_path)
@@ -134,12 +134,12 @@ class MainWindow(BoxLayout):
         slm1_layout.add_widget(file_picker_btn)
         input_grid.add_widget(slm1_layout)
         
-        input_grid.add_widget(Label(text='SLM Data Meter 2:'))
+        input_grid.add_widget(Label(text='SLM Raw Data Folder 2:'))
         slm2_layout = BoxLayout(orientation='horizontal', spacing=5)
         
         self.slm_data_2_path = TextInput(
             multiline=False,
-            hint_text='Path to second SLM data file',
+            hint_text='Path to second SLM data folder',
             size_hint_x=0.85
         )
         slm2_layout.add_widget(self.slm_data_2_path)
@@ -540,61 +540,6 @@ class MainWindow(BoxLayout):
         except Exception as e:
             self._show_error(f"Error saving test plan: {str(e)}")
 
-    def preview_pdf(self, pdf_path):
-        """Preview generated PDF report"""
-        try:
-            print(f"\nAttempting to preview PDF at: {pdf_path}")
-            if not pdf_path:
-                raise ValueError("PDF path is empty or None")
-                
-            if os.path.exists(pdf_path):
-                print(f"PDF file found at: {pdf_path}")
-                try:
-                    # Create temporary image of first page
-                    doc = fitz.open(pdf_path)
-                    page = doc[0]
-                    pix = page.get_pixmap()
-                    img_path = tempfile.mktemp(suffix='.png')
-                    pix.save(img_path)
-                    print(f"Created preview image at: {img_path}")
-                    
-                    # Create scrollable image preview
-                    scroll = ScrollView(size_hint=(1, 1))
-                    image = KivyImage(source=img_path, size_hint_y=None)
-                    image.height = image.texture_size[1]
-                    scroll.add_widget(image)
-                    
-                    # Create popup with preview
-                    content = BoxLayout(orientation='vertical')
-                    content.add_widget(scroll)
-                    
-                    preview_popup = Popup(
-                        title='PDF Preview',
-                        content=content,
-                        size_hint=(0.9, 0.9)
-                    )
-                    preview_popup.open()
-                    
-                except Exception as e:
-                    error_msg = f"Error creating PDF preview: {str(e)}"
-                    print(error_msg)
-                    if self.debug_checkbox.active:
-                        traceback.print_exc()
-                    self._show_error(error_msg)
-            else:
-                error_msg = f'PDF file not found at path: {pdf_path}'
-                print(error_msg)
-                if self.debug_checkbox.active:
-                    print(f"Current working directory: {os.getcwd()}")
-                    print(f"Directory contents: {os.listdir(os.path.dirname(pdf_path))}")
-                self._show_error(error_msg)
-                
-        except Exception as e:
-            error_msg = f'Error previewing PDF: {str(e)}'
-            print(error_msg)
-            if self.debug_checkbox.active:
-                traceback.print_exc()
-            self._show_error(error_msg)
 
     def show_results(self, test_data: TestData):
         """Display test results in a popup"""
@@ -1159,7 +1104,7 @@ class MainWindow(BoxLayout):
                     raw_data = self._get_aiic_raw_data(test_obj)
                     if not raw_data:
                         continue
-                        
+                    
                     # Process frequency data
                     freq_data = self._process_aiic_frequencies(raw_data)
                     if not freq_data:
@@ -1241,12 +1186,48 @@ class MainWindow(BoxLayout):
                 else:
                     print(f"{test_type}: No calculated values")
             
-            # Show success message
+            # Show success message with button
+            content = BoxLayout(orientation='vertical', padding=10, spacing=10)
+            
+            # Add success message
+            content.add_widget(Label(
+                text='Calculated values stored successfully',
+                size_hint_y=None,
+                height=40
+            ))
+            
+            # Add button to return to main menu
+            return_btn = Button(
+                text='Return to Main Menu For Export',
+                size_hint_y=None,
+                height=40,
+                background_color=(0.2, 0.6, 0.8, 1),  # Blue background
+                color=(1, 1, 1, 1)  # White text
+            )
+            
+            def close_and_return(instance):
+                try:
+                    # First close the success popup
+                    success_popup.dismiss()
+                    
+                    # Find the plot selection popup and close it
+                    for child in self.children:
+                        if isinstance(child, Popup):
+                            child.dismiss()
+                            break
+                except Exception as e:
+                    print(f"Error closing windows: {str(e)}")
+                    # If there's an error, at least try to close the success popup
+                    success_popup.dismiss()
+            
+            return_btn.bind(on_press=close_and_return)
+            content.add_widget(return_btn)
+            
             success_popup = Popup(
                 title='Success',
-                content=Label(text='Calculated values stored successfully, press Escape three times to return to main menu'),
+                content=content,
                 size_hint=(None, None),
-                size=(300, 150)
+                size=(400, 150)
             )
             success_popup.open()
             

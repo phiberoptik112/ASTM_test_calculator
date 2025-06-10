@@ -1,4 +1,4 @@
-# STC Tester Reporter
+# ASTM Test Calculator
 
 ## How to get started
 
@@ -13,6 +13,8 @@ Run the GUI (to get file locations)
 
 
 ![](main_menu.png)
+
+![](overall_program_flow.png)
 
 This is in 'Minimum Lovable Prototype' Phase of development, so please be gentle!
 
@@ -30,9 +32,9 @@ Use the 'Generate Reports' Button to generate the CSV reports from the stored da
 
 Use the 'Raw Loaded Data Plot' Button to return to the available loaded tests to select and store more data from the testplan.
 
-/Exampledata contains the properly stored Rawdata as well as the Testplanv2 formatted document, please review these and maintain the directory format to ensure no errors result.
+/Exampledata contains the properly stored Rawdata as well as the Example_testplan.csv formatted document, please review these and maintain the directory format to ensure no errors result.
 
 The TestPlan format is critical to properly propigating the test information into the calculations and report generation. 
-Errors and unexpected behaviors will result if the Testplanv2 format is not followed.
+Errors and unexpected behaviors will result if the Testplan format is not followed.
 
 The 'Test Input Populate' button will utilize the /Exampledata folder's data for a test report output. 
