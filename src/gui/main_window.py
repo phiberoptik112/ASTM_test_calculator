@@ -130,7 +130,7 @@ class MainWindow(BoxLayout):
             text='...',
             size_hint_x=0.15
         )
-        file_picker_btn.bind(on_press=lambda x: self.show_file_picker(self.slm_data_1_path, [('All Files', '*.*')]))
+        file_picker_btn.bind(on_press=lambda x: self.show_file_picker(self.slm_data_1_path, [('All Files', '*.*')], dirselect=True))
         slm1_layout.add_widget(file_picker_btn)
         input_grid.add_widget(slm1_layout)
         
@@ -149,7 +149,7 @@ class MainWindow(BoxLayout):
             text='...',
             size_hint_x=0.15
         )
-        file_picker_btn.bind(on_press=lambda x: self.show_file_picker(self.slm_data_2_path, [('All Files', '*.*')]))
+        file_picker_btn.bind(on_press=lambda x: self.show_file_picker(self.slm_data_2_path, [('All Files', '*.*')], dirselect=True))
         slm2_layout.add_widget(file_picker_btn)
         input_grid.add_widget(slm2_layout)
         
@@ -169,7 +169,7 @@ class MainWindow(BoxLayout):
             text='...',
             size_hint_x=0.15
         )
-        file_picker_btn.bind(on_press=lambda x: self.show_file_picker(self.output_path, [('All Files', '*.*')]))
+        file_picker_btn.bind(on_press=lambda x: self.show_file_picker(self.output_path, [('All Files', '*.*')], dirselect=True))
         output_layout.add_widget(file_picker_btn)
         input_grid.add_widget(output_layout)
         
@@ -2636,7 +2636,7 @@ class MainWindow(BoxLayout):
             # Try loading the data again
             self.load_data(None)
 
-    def show_file_picker(self, target_input, filters):
+    def show_file_picker(self, target_input, filters, dirselect=False):
         """Show a file picker dialog and update the target input with selected path
         
         Args:
@@ -2658,7 +2658,8 @@ class MainWindow(BoxLayout):
         file_chooser = FileChooserListView(
             path=workspace_dir,  # Start in workspace directory
             filters=[custom_filter],
-            size_hint=(1, 0.9)
+            size_hint=(1, 0.9),
+            dirselect=dirselect
         )
         
         # Create buttons
