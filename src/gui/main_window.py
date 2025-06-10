@@ -1010,14 +1010,13 @@ class MainWindow(BoxLayout):
             with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
                 plt.savefig(temp_file.name, dpi=300, bbox_inches='tight')
                 
-                # Create scrollable image view
-                scroll = ScrollView(size_hint=(1, 0.9))  # Reduced height to make room for button
+                # Create image view that fills available space
                 image = KivyImage(
                     source=temp_file.name,
-                    size_hint=(1, None)
+                    allow_stretch=True,
+                    keep_ratio=True,
+                    size_hint=(1, 1)
                 )
-                image.height = image.texture_size[1]
-                scroll.add_widget(image)
                 
                 # Create button layout at bottom
                 button_layout = BoxLayout(
@@ -1027,19 +1026,17 @@ class MainWindow(BoxLayout):
                     padding='10dp'
                 )
                 
-                # Add store values button
                 store_button = Button(
                     text='Store Calculated Values',
                     size_hint_x=None,
                     width='200dp'
                 )
                 store_button.bind(on_press=lambda x: self._store_calculated_values(test_label))
-                
                 button_layout.add_widget(store_button)
                 
-                # Add both to main layout
+                # Main layout
                 layout = BoxLayout(orientation='vertical')
-                layout.add_widget(scroll)
+                layout.add_widget(image)
                 layout.add_widget(button_layout)
                 
                 # Show in popup
