@@ -122,8 +122,7 @@ class TestType(Enum):
     DTC = "DTC"
 
 ######### SLM import - hardcoded - gives me the willies, but it works for now.##########
-### maybe change to something thats a better troubleshooting effort later ###
-##  ask GPT later about how best to do this, maybe a config file or something? 
+
 def format_SLMdata(srs_data):
     ## verify that srs_data iloc[7] is correct- will have a label as 1/3 octave
     srs_thirdoct = srs_data.iloc[7] # hardcoded to SLM export data format

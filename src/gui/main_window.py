@@ -115,12 +115,12 @@ class MainWindow(BoxLayout):
         input_grid.add_widget(test_plan_layout)
         
         # SLM Data Inputs
-        input_grid.add_widget(Label(text='SLM Data Meter 1:'))
+        input_grid.add_widget(Label(text='SLM Raw Data Folder 1:'))
         slm1_layout = BoxLayout(orientation='horizontal', spacing=5)
         
         self.slm_data_1_path = TextInput(
             multiline=False,
-            hint_text='Path to first SLM data file',
+            hint_text='Path to first SLM data folder',
             size_hint_x=0.85
         )
         slm1_layout.add_widget(self.slm_data_1_path)
@@ -130,16 +130,16 @@ class MainWindow(BoxLayout):
             text='...',
             size_hint_x=0.15
         )
-        file_picker_btn.bind(on_press=lambda x: self.show_file_picker(self.slm_data_1_path, [('All Files', '*.*')]))
+        file_picker_btn.bind(on_press=lambda x: self.show_file_picker(self.slm_data_1_path, [('All Files', '*.*')], dirselect=True))
         slm1_layout.add_widget(file_picker_btn)
         input_grid.add_widget(slm1_layout)
         
-        input_grid.add_widget(Label(text='SLM Data Meter 2:'))
+        input_grid.add_widget(Label(text='SLM Raw Data Folder 2:'))
         slm2_layout = BoxLayout(orientation='horizontal', spacing=5)
         
         self.slm_data_2_path = TextInput(
             multiline=False,
-            hint_text='Path to second SLM data file',
+            hint_text='Path to second SLM data folder',
             size_hint_x=0.85
         )
         slm2_layout.add_widget(self.slm_data_2_path)
@@ -149,7 +149,7 @@ class MainWindow(BoxLayout):
             text='...',
             size_hint_x=0.15
         )
-        file_picker_btn.bind(on_press=lambda x: self.show_file_picker(self.slm_data_2_path, [('All Files', '*.*')]))
+        file_picker_btn.bind(on_press=lambda x: self.show_file_picker(self.slm_data_2_path, [('All Files', '*.*')], dirselect=True))
         slm2_layout.add_widget(file_picker_btn)
         input_grid.add_widget(slm2_layout)
         
@@ -169,7 +169,7 @@ class MainWindow(BoxLayout):
             text='...',
             size_hint_x=0.15
         )
-        file_picker_btn.bind(on_press=lambda x: self.show_file_picker(self.output_path, [('All Files', '*.*')]))
+        file_picker_btn.bind(on_press=lambda x: self.show_file_picker(self.output_path, [('All Files', '*.*')], dirselect=True))
         output_layout.add_widget(file_picker_btn)
         input_grid.add_widget(output_layout)
         
@@ -192,7 +192,7 @@ class MainWindow(BoxLayout):
         
         # Populate Test Inputs Button
         self.populate_button = Button(
-            text='Load Example Data',
+            text='Populate Test Inputs',
             size_hint_x=0.5
         )
         self.populate_button.bind(on_press=self.populate_test_inputs)
@@ -226,7 +226,7 @@ class MainWindow(BoxLayout):
 
     def _create_analysis_section(self):
         """Create analysis dashboard section with integrated update methods"""
-        self.analysis_tabs = TabbedPanel(size_hint_y=0.5)
+        self.analysis_tabs = TabbedPanel(size_hint_y=0.5, do_default_tab=False)
         
         # Test Plan Tab with integrated update functionality
         self.test_plan_tab = TabbedPanelItem(text='Test Plan')
@@ -540,61 +540,6 @@ class MainWindow(BoxLayout):
         except Exception as e:
             self._show_error(f"Error saving test plan: {str(e)}")
 
-    def preview_pdf(self, pdf_path):
-        """Preview generated PDF report"""
-        try:
-            print(f"\nAttempting to preview PDF at: {pdf_path}")
-            if not pdf_path:
-                raise ValueError("PDF path is empty or None")
-                
-            if os.path.exists(pdf_path):
-                print(f"PDF file found at: {pdf_path}")
-                try:
-                    # Create temporary image of first page
-                    doc = fitz.open(pdf_path)
-                    page = doc[0]
-                    pix = page.get_pixmap()
-                    img_path = tempfile.mktemp(suffix='.png')
-                    pix.save(img_path)
-                    print(f"Created preview image at: {img_path}")
-                    
-                    # Create scrollable image preview
-                    scroll = ScrollView(size_hint=(1, 1))
-                    image = KivyImage(source=img_path, size_hint_y=None)
-                    image.height = image.texture_size[1]
-                    scroll.add_widget(image)
-                    
-                    # Create popup with preview
-                    content = BoxLayout(orientation='vertical')
-                    content.add_widget(scroll)
-                    
-                    preview_popup = Popup(
-                        title='PDF Preview',
-                        content=content,
-                        size_hint=(0.9, 0.9)
-                    )
-                    preview_popup.open()
-                    
-                except Exception as e:
-                    error_msg = f"Error creating PDF preview: {str(e)}"
-                    print(error_msg)
-                    if self.debug_checkbox.active:
-                        traceback.print_exc()
-                    self._show_error(error_msg)
-            else:
-                error_msg = f'PDF file not found at path: {pdf_path}'
-                print(error_msg)
-                if self.debug_checkbox.active:
-                    print(f"Current working directory: {os.getcwd()}")
-                    print(f"Directory contents: {os.listdir(os.path.dirname(pdf_path))}")
-                self._show_error(error_msg)
-                
-        except Exception as e:
-            error_msg = f'Error previewing PDF: {str(e)}'
-            print(error_msg)
-            if self.debug_checkbox.active:
-                traceback.print_exc()
-            self._show_error(error_msg)
 
     def show_results(self, test_data: TestData):
         """Display test results in a popup"""
@@ -665,14 +610,25 @@ class MainWindow(BoxLayout):
                     print(f"  Room properties: {test_data['room_properties']}")
                     print(f"  Test data type: {type(test_data['test_data'])}")
 
-        # Create content layout
+        # Create content layout with a light background
         content = BoxLayout(orientation='vertical', spacing=10, padding=10)
+        with content.canvas.before:
+            Color(0.95, 0.95, 0.95, 1)  # Light gray background
+            self.rect = Rectangle(pos=content.pos, size=content.size)
+        
+        def update_rect(instance, value):
+            self.rect.pos = instance.pos
+            self.rect.size = instance.size
+        
+        content.bind(pos=update_rect, size=update_rect)
         
         # Add title label
         content.add_widget(Label(
             text='Select tests and types to plot:',
             size_hint_y=None,
-            height=40
+            height=40,
+            bold=True,
+            color=(0.2, 0.2, 0.2, 1)  # Dark gray text
         ))
         
         # Create scrollable list
@@ -694,20 +650,30 @@ class MainWindow(BoxLayout):
             test_data = self.test_data_manager.test_data_collection[test_label]
             print(f"Test data keys: {test_data.keys()}")
             
-            # Create container for this test
+            # Create container for this test with a white background
             test_container = BoxLayout(
                 orientation='vertical',
                 size_hint_y=None,
                 height=120,
                 padding=[10, 5]
             )
+            with test_container.canvas.before:
+                Color(1, 1, 1, 1)  # White background
+                self.test_rect = Rectangle(pos=test_container.pos, size=test_container.size)
+            
+            def update_test_rect(instance, value):
+                instance.canvas.before.children[-1].pos = instance.pos
+                instance.canvas.before.children[-1].size = instance.size
+            
+            test_container.bind(pos=update_test_rect, size=update_test_rect)
             
             # Add test label
             test_container.add_widget(Label(
                 text=f'Test {test_label}',
                 size_hint_y=None,
                 height=30,
-                bold=True
+                bold=True,
+                color=(0.2, 0.2, 0.2, 1)  # Dark gray text
             ))
             
             # Create horizontal layout for checkboxes
@@ -737,19 +703,30 @@ class MainWindow(BoxLayout):
             print(f"Available test types for {test_label}: {[t[0] for t in available_types]}")
             
             for type_name, test_type in available_types:
-                # Create checkbox container
+                # Create checkbox container with light blue background
                 type_container = BoxLayout(
                     orientation='horizontal',
                     size_hint_y=None,
                     height=30,
-                    spacing=5
+                    spacing=5,
+                    padding=[5, 2]
                 )
+                with type_container.canvas.before:
+                    Color(0.9, 0.95, 1, 1)  # Light blue background
+                    self.type_rect = Rectangle(pos=type_container.pos, size=type_container.size)
                 
-                # Create checkbox
+                def update_type_rect(instance, value):
+                    instance.canvas.before.children[-1].pos = instance.pos
+                    instance.canvas.before.children[-1].size = instance.size
+                
+                type_container.bind(pos=update_type_rect, size=update_type_rect)
+                
+                # Create checkbox with custom colors
                 checkbox = CheckBox(
                     size_hint_x=None,
                     width=30,
-                    active=False
+                    active=False,
+                    color=(0.2, 0.6, 0.8, 1)  # Blue color for checkbox
                 )
                 self.test_type_checkboxes[test_label][test_type] = checkbox
                 
@@ -758,7 +735,8 @@ class MainWindow(BoxLayout):
                     text=type_name,
                     size_hint_x=None,
                     width=70,
-                    halign='left'
+                    halign='left',
+                    color=(0.2, 0.2, 0.2, 1)  # Dark gray text
                 )
                 
                 # Add widgets to container
@@ -770,11 +748,13 @@ class MainWindow(BoxLayout):
             
             test_container.add_widget(checkbox_layout)
             
-            # Add plot button
+            # Add plot button with custom styling
             plot_btn = Button(
                 text='Plot Selected',
                 size_hint_y=None,
-                height=30
+                height=30,
+                background_color=(0.2, 0.6, 0.8, 1),  # Blue background
+                color=(1, 1, 1, 1)  # White text
             )
             plot_btn.bind(
                 on_press=lambda x, label=test_label: self.plot_selected_test_data(label)
@@ -787,7 +767,7 @@ class MainWindow(BoxLayout):
                 height=2
             )
             with separator.canvas:
-                Color(0.5, 0.5, 0.5, 1)
+                Color(0.7, 0.7, 0.7, 1)  # Lighter gray for separator
                 Rectangle(pos=separator.pos, size=separator.size)
             
             def update_rect(instance, value):
@@ -802,18 +782,21 @@ class MainWindow(BoxLayout):
         scroll.add_widget(main_layout)
         content.add_widget(scroll)
         
-        # Create close button
+        # Create close button with custom styling
         close_btn = Button(
             text='Close',
             size_hint_y=None,
-            height=40
+            height=40,
+            background_color=(0.8, 0.2, 0.2, 1),  # Red background
+            color=(1, 1, 1, 1)  # White text
         )
         
         # Create popup
         plot_popup = Popup(
             title='Plot Test Data',
             content=content,
-            size_hint=(0.8, 0.8)
+            size_hint=(0.8, 0.8),
+            background='white'  # White background for popup
         )
         
         # Bind close button
@@ -1027,14 +1010,13 @@ class MainWindow(BoxLayout):
             with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
                 plt.savefig(temp_file.name, dpi=300, bbox_inches='tight')
                 
-                # Create scrollable image view
-                scroll = ScrollView(size_hint=(1, 0.9))  # Reduced height to make room for button
+                # Create image view that fills available space
                 image = KivyImage(
                     source=temp_file.name,
-                    size_hint=(1, None)
+                    allow_stretch=True,
+                    keep_ratio=True,
+                    size_hint=(1, 1)
                 )
-                image.height = image.texture_size[1]
-                scroll.add_widget(image)
                 
                 # Create button layout at bottom
                 button_layout = BoxLayout(
@@ -1044,19 +1026,17 @@ class MainWindow(BoxLayout):
                     padding='10dp'
                 )
                 
-                # Add store values button
                 store_button = Button(
                     text='Store Calculated Values',
                     size_hint_x=None,
                     width='200dp'
                 )
                 store_button.bind(on_press=lambda x: self._store_calculated_values(test_label))
-                
                 button_layout.add_widget(store_button)
                 
-                # Add both to main layout
+                # Main layout
                 layout = BoxLayout(orientation='vertical')
-                layout.add_widget(scroll)
+                layout.add_widget(image)
                 layout.add_widget(button_layout)
                 
                 # Show in popup
@@ -1121,7 +1101,7 @@ class MainWindow(BoxLayout):
                     raw_data = self._get_aiic_raw_data(test_obj)
                     if not raw_data:
                         continue
-                        
+                    
                     # Process frequency data
                     freq_data = self._process_aiic_frequencies(raw_data)
                     if not freq_data:
@@ -1203,12 +1183,48 @@ class MainWindow(BoxLayout):
                 else:
                     print(f"{test_type}: No calculated values")
             
-            # Show success message
+            # Show success message with button
+            content = BoxLayout(orientation='vertical', padding=10, spacing=10)
+            
+            # Add success message
+            content.add_widget(Label(
+                text='Calculated values stored successfully',
+                size_hint_y=None,
+                height=40
+            ))
+            
+            # Add button to return to main menu
+            return_btn = Button(
+                text='Return to Main Menu For Export',
+                size_hint_y=None,
+                height=40,
+                background_color=(0.2, 0.6, 0.8, 1),  # Blue background
+                color=(1, 1, 1, 1)  # White text
+            )
+            
+            def close_and_return(instance):
+                try:
+                    # First close the success popup
+                    success_popup.dismiss()
+                    
+                    # Find the plot selection popup and close it
+                    for child in self.children:
+                        if isinstance(child, Popup):
+                            child.dismiss()
+                            break
+                except Exception as e:
+                    print(f"Error closing windows: {str(e)}")
+                    # If there's an error, at least try to close the success popup
+                    success_popup.dismiss()
+            
+            return_btn.bind(on_press=close_and_return)
+            content.add_widget(return_btn)
+            
             success_popup = Popup(
                 title='Success',
-                content=Label(text='Calculated values stored successfully, press Escape twice to return to main menu'),
+                content=content,
                 size_hint=(None, None),
-                size=(300, 150)
+                size=(400, 150)
             )
             success_popup.open()
             
@@ -2620,7 +2636,7 @@ class MainWindow(BoxLayout):
             # Try loading the data again
             self.load_data(None)
 
-    def show_file_picker(self, target_input, filters):
+    def show_file_picker(self, target_input, filters, dirselect=False):
         """Show a file picker dialog and update the target input with selected path
         
         Args:
@@ -2642,7 +2658,8 @@ class MainWindow(BoxLayout):
         file_chooser = FileChooserListView(
             path=workspace_dir,  # Start in workspace directory
             filters=[custom_filter],
-            size_hint=(1, 0.9)
+            size_hint=(1, 0.9),
+            dirselect=dirselect
         )
         
         # Create buttons
