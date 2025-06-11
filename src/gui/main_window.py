@@ -192,7 +192,7 @@ class MainWindow(BoxLayout):
         
         # Populate Test Inputs Button
         self.populate_button = Button(
-            text='Load Example Data',
+            text='Populate Test Inputs',
             size_hint_x=0.5
         )
         self.populate_button.bind(on_press=self.populate_test_inputs)
@@ -226,7 +226,7 @@ class MainWindow(BoxLayout):
 
     def _create_analysis_section(self):
         """Create analysis dashboard section with integrated update methods"""
-        self.analysis_tabs = TabbedPanel(size_hint_y=0.5)
+        self.analysis_tabs = TabbedPanel(size_hint_y=0.5, do_default_tab=False)
         
         # Test Plan Tab with integrated update functionality
         self.test_plan_tab = TabbedPanelItem(text='Test Plan')
