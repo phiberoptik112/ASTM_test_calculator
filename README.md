@@ -21,7 +21,7 @@ This is in 'Minimum Lovable Prototype' Phase of development, so please be gentle
 Input the appropriate file and folder paths or use the ... button to search your install folder for the correct paths, then press 'Load data'. This will copy the raw excel data into the appropriate dataframes for each test listed in the Testplan. 
 
 Once the data is loaded, a 'Plot Test Data' menu will show the tests available to plot: 
-![](plot_test_data.png)
+![](plot_test_datav2.png)
 
 Checking the box by the appropriate test number and type and pressing 'Plot selected' will open the plot of the raw data and the test result calculations:
 ![](test_data_plot.png)

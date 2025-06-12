@@ -10,3 +10,4 @@
 ./example_data_kaanapali/
 ./example_data_kaanapali/**/*
 .DS_Store
+/Example_Data/.DS_Store
