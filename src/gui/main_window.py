@@ -20,6 +20,7 @@ from kivy.uix.image import Image as KivyImage
 from kivy.core.window import Window
 from typing import Dict, Optional, Any
 import os
+from kivy.graphics import Color, Rectangle
 
 # Import services
 from src.core.test_data_manager import TestDataManager
@@ -277,48 +278,118 @@ class MainWindow(BoxLayout):
             self.status_panel.set_status("Report generation failed", "error")
     
     def show_plot_selection(self, instance):
-        """Show plot selection dialog"""
+        """Show plot selection dialog with enhanced UI/UX from original code"""
         try:
             test_collection = self.test_data_manager.get_test_collection()
-            
             if not test_collection:
                 self.status_panel.show_warning("No test data loaded. Please load data first.")
                 return
-            
-            # Create plot selection popup
-            content = BoxLayout(orientation='vertical', padding=10, spacing=10)
-            
-            # Title
-            content.add_widget(Label(
-                text='Select tests to plot:',
+
+            # Main vertical layout for popup
+            content = BoxLayout(orientation='vertical', padding=20, spacing=16)
+            with content.canvas.before:
+                Color(1, 1, 1, 1)  # Solid white background
+                rect = Rectangle(pos=content.pos, size=content.size)
+            def update_rect(instance, value):
+                rect.pos = instance.pos
+                rect.size = instance.size
+            content.bind(pos=update_rect, size=update_rect)
+
+            # Title label
+            title_label = Label(
+                text='[b]Select tests and types to plot:[/b]',
                 size_hint_y=None,
-                height=30
-            ))
-            
-            # Create scrollable list of tests
-            scroll = ScrollView()
-            test_grid = GridLayout(cols=1, spacing=5, size_hint_y=None)
-            test_grid.bind(minimum_height=test_grid.setter('height'))
-            
+                height=36,
+                halign='center',
+                valign='middle',
+                color=(0.1, 0.1, 0.1, 1),
+                markup=True
+            )
+            title_label.bind(size=title_label.setter('text_size'))
+            content.add_widget(title_label)
+
+            # Scrollable area for test groups
+            scroll = ScrollView(size_hint=(1, 1))
+            test_groups_grid = GridLayout(cols=1, spacing=18, size_hint_y=None, padding=(0, 8))
+            test_groups_grid.bind(minimum_height=test_groups_grid.setter('height'))
+
             checkboxes = {}
             for test_label, test_data in test_collection.items():
+                # Test group container with white background and padding
+                group_container = BoxLayout(orientation='vertical', size_hint_y=None, padding=[8, 8, 8, 8])
+                group_container.height = 80 + 40  # 80 for row, 40 for label
+                with group_container.canvas.before:
+                    Color(1, 1, 1, 1)
+                    group_rect = Rectangle(pos=group_container.pos, size=group_container.size)
+                def update_group_rect(instance, value, rect=group_rect):
+                    rect.pos = instance.pos
+                    rect.size = instance.size
+                group_container.bind(pos=update_group_rect, size=update_group_rect)
+
+                # Test group label
+                group_label = Label(
+                    text=f'[b]Test {test_label}[/b]',
+                    size_hint_y=None,
+                    height=28,
+                    halign='center',
+                    valign='middle',
+                    color=(0.1, 0.1, 0.1, 1),
+                    markup=True
+                )
+                group_label.bind(size=group_label.setter('text_size'))
+                group_container.add_widget(group_label)
+
+                # Horizontal row of checkboxes for this test, with light blue background
+                row = BoxLayout(orientation='horizontal', spacing=18, size_hint_y=None, height=32, padding=(8, 0))
+                with row.canvas.before:
+                    Color(0.9, 0.95, 1, 1)  # Light blue
+                    row_rect = Rectangle(pos=row.pos, size=row.size)
+                def update_row_rect(instance, value, rect=row_rect):
+                    rect.pos = instance.pos
+                    rect.size = instance.size
+                row.bind(pos=update_row_rect, size=update_row_rect)
+
                 for test_type in test_data.keys():
-                    test_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=30)
-                    
-                    checkbox = CheckBox(size_hint_x=None, width=30)
-                    test_layout.add_widget(checkbox)
-                    test_layout.add_widget(Label(text=f"{test_label} - {test_type.name}"))
-                    
-                    test_grid.add_widget(test_layout)
-                    checkboxes[(test_label, test_type)] = checkbox
-            
-            scroll.add_widget(test_grid)
+                    cb = CheckBox(size_hint=(None, None), size=(24, 24))
+                    label = Label(
+                        text=f'[b]{test_type.name}[/b]',
+                        size_hint_x=None,
+                        width=60,
+                        halign='left',
+                        valign='middle',
+                        color=(0.1, 0.1, 0.1, 1),
+                        markup=True
+                    )
+                    label.bind(size=label.setter('text_size'))
+                    row.add_widget(cb)
+                    row.add_widget(label)
+                    checkboxes[(test_label, test_type)] = cb
+                group_container.add_widget(row)
+
+                # Colored separator line below each group
+                divider = BoxLayout(size_hint_y=None, height=2)
+                with divider.canvas:
+                    Color(0.2, 0.4, 0.5, 1)
+                    divider_rect = Rectangle(pos=divider.pos, size=(10000, 2))
+                def update_divider_rect(instance, value, rect=divider_rect):
+                    rect.pos = divider.pos
+                    rect.size = (divider.width, 2)
+                divider.bind(pos=update_divider_rect, size=update_divider_rect)
+                group_container.add_widget(divider)
+
+                test_groups_grid.add_widget(group_container)
+
+            scroll.add_widget(test_groups_grid)
             content.add_widget(scroll)
-            
-            # Buttons
-            button_layout = BoxLayout(size_hint_y=None, height=50, spacing=10)
-            
-            plot_button = Button(text='Plot Selected')
+
+            # Action buttons at the bottom
+            button_layout = BoxLayout(size_hint_y=None, height=48, spacing=16, padding=(0, 8))
+            plot_button = Button(
+                text='Plot Selected',
+                background_color=(0.1, 0.2, 0.25, 1),
+                color=(1, 1, 1, 1),
+                bold=True
+            )
             def plot_selected(instance):
                 selected_tests = [(label, test_type) for (label, test_type), cb in checkboxes.items() if cb.active]
                 popup.dismiss()
@@ -326,23 +397,27 @@ class MainWindow(BoxLayout):
                     self._plot_selected_tests(selected_tests)
                 else:
                     self.status_panel.show_warning("No tests selected for plotting")
-            
             plot_button.bind(on_press=plot_selected)
             button_layout.add_widget(plot_button)
-            
-            cancel_button = Button(text='Cancel')
-            cancel_button.bind(on_press=lambda x: popup.dismiss())
-            button_layout.add_widget(cancel_button)
-            
+
+            close_button = Button(
+                text='Close',
+                background_color=(0.4, 0.1, 0.1, 1),
+                color=(1, 1, 1, 1),
+                bold=True
+            )
+            close_button.bind(on_press=lambda x: popup.dismiss())
+            button_layout.add_widget(close_button)
+
             content.add_widget(button_layout)
-            
+
             popup = Popup(
-                title='Select Tests to Plot',
+                title='',
                 content=content,
-                size_hint=(0.8, 0.8)
+                size_hint=(0.8, 0.8),
+                background='white'
             )
             popup.open()
-            
         except Exception as e:
             error_message = f"Error showing plot selection: {str(e)}"
             if self._get_debug_mode():
@@ -406,18 +481,56 @@ class MainWindow(BoxLayout):
             return False
     
     def _get_frequency_data(self, test_obj, test_type: TestType) -> Optional[Dict[str, Any]]:
-        """Get frequency data for the test (simplified version)"""
-        # This is a simplified version - the full implementation would need to extract
-        # the frequency processing logic from the original main_window.py
+        """Get frequency data for the test, filtered to standard 17 1/3-octave bands (100-4000 Hz)"""
         try:
-            # For now, return a basic structure
-            # In full implementation, this would process the SLM data
-            return {
-                'source': [],
-                'background': [],
-                'rt': [],
-                'room_props': test_obj.room_properties
-            }
+            # Standard 1/3-octave bands for ASTM
+            freq_bands = [100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000]
+
+            def filter_to_bands(levels, bands, target_bands):
+                band_map = {int(round(float(b))): i for i, b in enumerate(bands)}
+                idxs = [band_map.get(b) for b in target_bands if band_map.get(b) is not None]
+                if hasattr(levels, '__getitem__'):
+                    return levels[idxs]
+                else:
+                    return [levels[i] for i in idxs]
+
+            # Extract frequency bands from SLMData
+            srs_bands = test_obj.srs_data.frequency_bands
+            rec_bands = test_obj.recive_data.frequency_bands
+            bkg_bands = test_obj.bkgrnd_data.frequency_bands
+            rt_bands = test_obj.rt.frequency_bands if hasattr(test_obj.rt, 'frequency_bands') else None
+
+            # Filter all arrays to the standard bands
+            source = filter_to_bands(test_obj.srs_data.overall_levels, srs_bands, freq_bands)
+            receive = filter_to_bands(test_obj.recive_data.overall_levels, rec_bands, freq_bands)
+            background = filter_to_bands(test_obj.bkgrnd_data.overall_levels, bkg_bands, freq_bands)
+            rt = filter_to_bands(test_obj.rt.rt_thirty, rt_bands, freq_bands) if rt_bands is not None else [0]*len(freq_bands)
+
+            if test_type in [TestType.ASTC, TestType.NIC]:
+                return {
+                    'source': source,
+                    'receive': receive,
+                    'background': background,
+                    'rt': rt,
+                    'room_props': test_obj.room_properties
+                }
+            elif test_type == TestType.AIIC:
+                return {
+                    'source': source,
+                    'background': background,
+                    'rt': rt,
+                    'room_props': test_obj.room_properties
+                }
+            elif test_type == TestType.DTC:
+                return {
+                    'source': source,
+                    'receive': receive,
+                    'background': background,
+                    'rt': rt,
+                    'room_props': test_obj.room_properties
+                }
+            else:
+                return None
         except Exception as e:
             if self._get_debug_mode():
                 print(f"Error getting frequency data: {str(e)}")
@@ -459,7 +572,8 @@ class MainWindow(BoxLayout):
             plot_popup = Popup(
                 title=f'Test Data Plot - {title}',
                 content=layout,
-                size_hint=(0.9, 0.9)
+                size_hint=(0.9, 0.9),
+                background='white'
             )
             plot_popup.open()
             
