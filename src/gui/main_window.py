@@ -220,7 +220,10 @@ class MainWindow(BoxLayout):
             # Process test data
             self.status_panel.set_status("Processing test data...", "info")
             self.test_data_manager.process_test_data()
-            
+
+            # Ensure test processor has the test data collection
+            self.test_data_manager.test_processor.set_test_collection(self.test_data_manager.test_data_collection)
+
             # Update displays
             self.update_displays()
             
